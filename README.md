@@ -346,6 +346,13 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 2.0 – Animieren, eigene Spielfigur, Figuren-Export**
+
+- Neuer Reiter **Animieren**: die Figur aus „Charakter bauen“ / „Objekt bauen“ bekommt Animationen – Charakter: *Atmen, Laufen, Rennen, Springen, Rutschen, Angriff, Treffer, Umfallen*; Objekt: *Schweben, Wackeln, Pulsieren, Flackern, Öffnen*. Die Bewegung entsteht aus den Körperzonen (Kopf, Oberkörper, Arme mit Waffe/Schild, Beine), funktioniert also auch mit selbst gezeichneten Ebenen und mit jeder Teile-Kombination. Vorschau mit Abspielen/Pause, Einzelbild-Leiste, Zwiebelschicht, Geschwindigkeit (fps) pro Animation, Hintergrund; Frames haben Rand (32-px-Figur → 48-px-Frames), damit Sprünge und Schläge nicht abgeschnitten werden.
+- **Als Spielfigur verwenden**: die eigene Figur läuft im Test (▶) über die Karte – mit Atmen im Stand und Laufanimation, nach links gespiegelt. Bleibt im Browser gespeichert, „Standard“ stellt die alte Figur wieder her.
+- **Export für Figuren**: *Godot-Paket (ZIP)* – Ordner ins Godot-Projekt ziehen, `.tscn` in die Szene ziehen, fertig: Spritesheet, `SpriteFrames` (.tres) mit allen Animationen, Szene (`CharacterBody2D` bzw. `StaticBody2D` + `AnimatedSprite2D` mit Nearest-Filter, Füße am Ursprung für Y-Sort, Kollisionsbox an den Füßen), Bewegungs-Skript mit Pfeiltasten (walk/idle, Spiegeln), README. Außerdem Spritesheet PNG (1× / 4×), Einzelbilder als ZIP und JSON (Zeilen, Frames, fps) für Unity, GDevelop, Phaser.
+- Neu: `sprites/animation.ts`, `sprites/AnimStudio.tsx`, `sprites/exportSprite.ts`, `playtest/playerSprite.ts`.
+
 **Version 1.9 – mehr Teile, Paletten, Profi-Werkzeuge**
 
 - Charakter-Baukasten deutlich erweitert: neue Gruppe **Rücken** (Umhang, Engels-/Fledermausflügel, Rucksack, Köcher, Schwanz), Körper *Rundlich* und *Groß*, Frisuren (Seitenscheitel, Pony, Afro, Zwei Zöpfe, Undercut, Lange Wellen), Gesichter (Wütend, Überrascht, Zwinkern, Katzenaugen), Kopf-Extras – jetzt kombinierbar – (Katzenohren, Brille, Schnurrbart, Sommersprossen, Narbe, Tuchmaske, Kriegsbemalung), Oberteile (Lederrüstung, Kettenhemd, Mantel, Kleid, Kapuzenpulli, Kampfanzug), Beinschienen, Leggings, Hüte (Barett, Federhut, Kopftuch, Heiligenschein, Hörnerhelm, Hexenhut), Waffen (Dolch, Streitkolben, Katana, Dreizack, Sense, Sternstab) und zweite Hand (zweites Schwert, Zauberkugel, Blume, Schlüssel).

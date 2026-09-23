@@ -4,7 +4,8 @@ import { Icon } from './icons';
 import { SaveState } from './SaveState';
 import { GenerateButtons } from './GeneratorPanel';
 import { UndoRedo } from '../editor/Toolbar';
-import { PAGES, useApp, type Page } from '../store/appStore';
+import { PAGES, isPlaceholder, useApp, type Page } from '../store/appStore';
+import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { startPlaytest, stopPlaytest } from '../playtest/controller';
 import { getRenderer } from '../editor/rendererRef';
@@ -14,6 +15,7 @@ const PAGE_ICON: Record<Page, (p: { size?: number }) => React.ReactElement> = {
   map: Icon.Map,
   character: Icon.Person,
   object: Icon.Box,
+  animate: Icon.Film,
   settings: Icon.Gear,
 };
 
@@ -60,7 +62,9 @@ export function PlayButton() {
       useApp.getState().goTo('map');
       // wait until the map canvas (renderer) is mounted
       const t0 = performance.now();
-      const wait = () => (getRenderer() || performance.now() - t0 > 2000 ? startPlaytest() : requestAnimationFrame(wait));
+      // wait until the map canvas is mounted and a first map exists (placeholder → generated)
+      const ready = () => !!getRenderer() && !useProject.getState().generating && !isPlaceholder();
+      const wait = () => (ready() || performance.now() - t0 > 6000 ? startPlaytest() : requestAnimationFrame(wait));
       requestAnimationFrame(wait);
       return;
     }

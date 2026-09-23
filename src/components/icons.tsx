@@ -363,6 +363,12 @@ export const Icon = {
       <path d="M19 14.5A7.5 7.5 0 1 1 9.5 5a6 6 0 0 0 9.5 9.5z" />
     </Svg>
   ),
+  Film: (p: P) => (
+    <Svg {...p}>
+      <rect x="4" y="5" width="16" height="14" rx="2" />
+      <path d="M8 5v14M16 5v14M4 9h4M4 15h4M16 9h4M16 15h4" />
+    </Svg>
+  ),
   Home: (p: P) => (
     <Svg {...p}>
       <path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" />

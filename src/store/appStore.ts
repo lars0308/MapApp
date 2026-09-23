@@ -5,13 +5,14 @@ import { useEditor } from './editorStore';
 // Top level pages (tabs in the header). The app always opens on "Projekt":
 // new project / open a file / continue a recent one.
 
-export type Page = 'project' | 'map' | 'character' | 'object' | 'settings';
+export type Page = 'project' | 'map' | 'character' | 'object' | 'animate' | 'settings';
 
 export const PAGES: { id: Page; label: string; short: string }[] = [
   { id: 'project', label: 'Projekt', short: 'Projekt' },
   { id: 'map', label: 'Karte bauen', short: 'Karte' },
   { id: 'character', label: 'Charakter bauen', short: 'Charakter' },
   { id: 'object', label: 'Objekt bauen', short: 'Objekt' },
+  { id: 'animate', label: 'Animieren', short: 'Animieren' },
   { id: 'settings', label: 'Einstellungen', short: 'Einstell.' },
 ];
 

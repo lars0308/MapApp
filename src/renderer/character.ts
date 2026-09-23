@@ -1,4 +1,6 @@
-// Neutral pixel test character (editor-only, never exported).
+import { getPlayerSprite } from '../playtest/playerSprite';
+
+// Pixel test character (editor-only, never exported) – or the own figure from "Charakter bauen".
 
 export interface CharacterState {
   /** centre x in tiles */
@@ -19,6 +21,27 @@ export function drawCharacter(
   sy: (y: number) => number,
   zoom: number,
 ) {
+  const own = getPlayerSprite();
+  if (own) {
+    // own character: ~1.6 tiles tall for a 32 px sprite, feet on the ground point
+    const spx = zoom / 20; // 32 px figure ≈ 1.6 tiles
+    const walking = c.moving;
+    const row = walking ? 1 : 0;
+    const count = walking ? own.walk : own.idle;
+    const frame = walking ? Math.floor(c.step * 4) % count : Math.floor(performance.now() / 250) % count;
+    const w = own.size * spx;
+    const x = sx(c.x) - w / 2;
+    const y = sy(c.y) - (own.feet + 1) * spx;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    if (c.dir === 'left') {
+      ctx.translate(sx(c.x) * 2, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(own.img, frame * own.size, row * own.size, own.size, own.size, Math.round(x), Math.round(y), Math.round(w), Math.round(w));
+    ctx.restore();
+    return;
+  }
   const px = zoom / 16; // one sprite pixel
   const baseX = sx(c.x) - 6 * px;
   const baseY = sy(c.y) - 20 * px;
