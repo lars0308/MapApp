@@ -346,6 +346,16 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 2.1 – Ansichten, Bild für Bild, Kreaturen, Import/Export**
+
+- **Ansichten vorne / Seite / hinten**: im Baukasten umschaltbar. Seite und Rücken werden aus den Teilen erzeugt (Profil mit Nase und einem Auge, schmaler Körper; von hinten Haare statt Gesicht, Umhang/Flügel liegen oben). Was man in Seite/Hinten malt, gilt nur für diese Ansicht („Ansicht zurücksetzen“). Animationen gibt es in allen drei Richtungen – von der Seite schwingen die Beine vor und zurück.
+- **Kreatur bauen** (neuer Reiter): 12 Körper (Schleim, Fledermaus, Spinne, Geist, Schwebendes Auge, Pilz, Käfer, Wolf, Golem, Drachenbaby, Kobold, Skelett) + Augen, Maul, Hörner & Ohren, Flügel & Schwanz, Arme & Klauen (auch Keule, Schwert, Stab), Muster, Aura – alles passt sich dem Körper an. Kreatur-Animationen: Wabern, Hüpfen, Krabbeln, Fliegen, Angriff, Treffer, Zerfallen (mit Stauchen/Strecken).
+- **Standards** zum Anklicken im Reiter Animieren: Top-Down-Held, Platformer-Held, Kämpfer, Magier, NPC, Alles; Gegner am Boden, Fliegender Gegner, Krabbler, Boss; Sammelobjekt, Truhe/Tür, Feuer/Magie, Falle. Neue Animationen: Zaubern, Blocken, Ducken, Winken, Klettern, Fallen.
+- **Bild für Bild**: jedes Bild einer Animation lässt sich bearbeiten (Stift, Radierer, Füllen, Pipette, Verschieben, Zwiebelschicht, Undo) – bearbeitete Bilder sind markiert und zurücksetzbar. **Eigene Animationen**: Kopie einer Animation oder leer beginnen, Bilder duplizieren/einfügen/verschieben/löschen, Name, fps, Richtung, Schleife.
+- **Import**: eigenes Bild als Ebene oder als neue Figur / neues Objekt (Ränder werden abgeschnitten, bis 64 px), **Spritesheet** als eigene Animationen (Frame-Größe einstellbar, jede Zeile eine Animation, leere Zellen übersprungen). **Figur-Datei** (`.mapforge-sprite.json`) speichern und öffnen – mit Ebenen, Ansichten, bearbeiteten Bildern und eigenen Animationen.
+- **Export** mit Richtungen (`walk_down`, `walk_side`, `walk_up` …) und eigenen Animationen; das Godot-Skript der Spielfigur wählt die Richtung selbst, Kreaturen bekommen ein **Gegner-Skript** (wartet, verfolgt die Spielfigur, spielt fly/hop/crawl). Die Spielfigur im Test läuft in allen vier Richtungen.
+- Neu: `sprites/parts/creature.ts`, `sprites/FrameEditor.tsx`, `sprites/animPresets.ts`, `sprites/frame.ts`.
+
 **Version 2.0 – Animieren, eigene Spielfigur, Figuren-Export**
 
 - Neuer Reiter **Animieren**: die Figur aus „Charakter bauen“ / „Objekt bauen“ bekommt Animationen – Charakter: *Atmen, Laufen, Rennen, Springen, Rutschen, Angriff, Treffer, Umfallen*; Objekt: *Schweben, Wackeln, Pulsieren, Flackern, Öffnen*. Die Bewegung entsteht aus den Körperzonen (Kopf, Oberkörper, Arme mit Waffe/Schild, Beine), funktioniert also auch mit selbst gezeichneten Ebenen und mit jeder Teile-Kombination. Vorschau mit Abspielen/Pause, Einzelbild-Leiste, Zwiebelschicht, Geschwindigkeit (fps) pro Animation, Hintergrund; Frames haben Rand (32-px-Figur → 48-px-Frames), damit Sprünge und Schläge nicht abgeschnitten werden.

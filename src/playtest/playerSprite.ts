@@ -1,6 +1,6 @@
 import type { SpriteDoc } from '../sprites/types';
-import { ANIMATIONS, buildSheet, framePad, frameSize } from '../sprites/animation';
-import { feetRow } from '../sprites/exportSprite';
+import { ANIMATIONS, buildSheet, feetInFrame, frameSize, type AnimDef } from '../sprites/animation';
+import type { View } from '../sprites/types';
 
 // Own character from "Charakter bauen" as the playtest figure (idle + walk rows).
 // Kept in browser storage so it survives reloads; editor-only, never part of the map.
@@ -11,9 +11,12 @@ export interface Stored {
   name: string;
   size: number;
   png: string;
+  /** frames of row 0 (idle) / row 1 (walk), front view – older entries */
   idle: number;
   walk: number;
   feet: number;
+  /** "idle_down", "walk_side" … → row + frames */
+  rows?: Record<string, { row: number; frames: number }>;
 }
 
 let stored: Stored | null = null;
@@ -39,9 +42,14 @@ function load() {
 load();
 
 export function setPlayerSprite(doc: SpriteDoc): boolean {
-  const anims = ['idle', 'walk'].map((id) => ANIMATIONS.find((a) => a.id === id)!);
-  const { canvas } = buildSheet(doc, anims);
-  const s: Stored = { name: doc.name, size: frameSize(doc.size), png: canvas.toDataURL('image/png'), idle: anims[0].poses.length, walk: anims[1].poses.length, feet: feetRow(doc) + framePad(doc.size) };
+  const pick = (ids: string[]) => ids.map((id) => ANIMATIONS.find((a) => a.id === id)).find(Boolean) as AnimDef;
+  const idle = doc.kind === 'creature' ? pick(['k_idle']) : pick(['idle']);
+  const walk = doc.kind === 'creature' ? pick(['k_fly', 'k_hop']) : pick(['walk']);
+  const views: View[] = ['front', 'side', 'back'];
+  const { canvas, rows } = buildSheet(doc, [idle, walk], views);
+  const map: Stored['rows'] = {};
+  for (const r of rows) map[`${r.animId === idle.id ? 'idle' : 'walk'}_${r.view}`] = { row: r.row, frames: r.frames };
+  const s: Stored = { name: doc.name, size: frameSize(doc.size), png: canvas.toDataURL('image/png'), idle: idle.poses.length, walk: walk.poses.length, feet: feetInFrame(doc), rows: map };
   try {
     localStorage.setItem(KEY, JSON.stringify(s));
   } catch {

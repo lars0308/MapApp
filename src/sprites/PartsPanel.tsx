@@ -82,7 +82,7 @@ function useDragToCanvas(kind: SpriteKind) {
 
 export function PartsPanel({ kind }: { kind: SpriteKind }) {
   const slots = SLOTS[kind];
-  const [slot, setSlot] = useState(slots.find((s) => s.id === (kind === 'character' ? 'hair' : 'base'))!.id);
+  const [slot, setSlot] = useState(slots.find((s) => s.id === (kind === 'character' ? 'hair' : kind === 'creature' ? 'body' : 'base'))!.id);
   const doc = useSprites((s) => s[kind].doc);
   const locks = useSprites((s) => s[kind].locks);
   const userParts = useSprites((s) => s.userParts);
@@ -94,7 +94,7 @@ export function PartsPanel({ kind }: { kind: SpriteKind }) {
 
   const demo = DEMO_PARTS[kind].filter((p) => p.slot === slot);
   const own = userParts.filter((p) => p.kind === kind && p.slot === slot);
-  const slotDef = slots.find((s) => s.id === slot)!;
+  const slotDef = slots.find((s) => s.id === slot) ?? slots[0];
   const layersOfSlot = doc.layers.filter((l) => l.slot === slot);
   const usedIds = new Set(doc.layers.map((l) => l.partId));
 

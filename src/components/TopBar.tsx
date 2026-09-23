@@ -14,6 +14,7 @@ const PAGE_ICON: Record<Page, (p: { size?: number }) => React.ReactElement> = {
   project: Icon.Folder,
   map: Icon.Map,
   character: Icon.Person,
+  creature: Icon.Ghost,
   object: Icon.Box,
   animate: Icon.Film,
   settings: Icon.Gear,

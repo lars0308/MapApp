@@ -26,8 +26,11 @@ export function drawCharacter(
     // own character: ~1.6 tiles tall for a 32 px sprite, feet on the ground point
     const spx = zoom / 20; // 32 px figure ≈ 1.6 tiles
     const walking = c.moving;
-    const row = walking ? 1 : 0;
-    const count = walking ? own.walk : own.idle;
+    // direction rows (front / side / back), older player figures only have the front rows
+    const view = c.dir === 'up' ? 'back' : c.dir === 'down' ? 'front' : 'side';
+    const r = own.rows?.[`${walking ? 'walk' : 'idle'}_${view}`] ?? own.rows?.[`${walking ? 'walk' : 'idle'}_front`];
+    const row = r ? r.row : walking ? 1 : 0;
+    const count = r ? r.frames : walking ? own.walk : own.idle;
     const frame = walking ? Math.floor(c.step * 4) % count : Math.floor(performance.now() / 250) % count;
     const w = own.size * spx;
     const x = sx(c.x) - w / 2;

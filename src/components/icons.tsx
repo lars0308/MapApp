@@ -369,6 +369,13 @@ export const Icon = {
       <path d="M8 5v14M16 5v14M4 9h4M4 15h4M16 9h4M16 15h4" />
     </Svg>
   ),
+  Ghost: (p: P) => (
+    <Svg {...p}>
+      <path d="M6 20V11a6 6 0 0 1 12 0v9l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5z" />
+      <circle cx="10" cy="11" r="1" fill="currentColor" stroke="none" />
+      <circle cx="14" cy="11" r="1" fill="currentColor" stroke="none" />
+    </Svg>
+  ),
   Home: (p: P) => (
     <Svg {...p}>
       <path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" />

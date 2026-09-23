@@ -4879,3 +4879,146 @@ body.is-resizing-y * {
     padding: 0 2px;
   }
 }
+
+/* views, frame editor, own animations */
+.view-hint {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 20px);
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--accent-line);
+  background: rgba(19, 19, 24, 0.92);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.studio-bar .segmented {
+  width: auto;
+}
+.studio-bar .segmented button {
+  height: 32px;
+  padding: 0 10px;
+}
+.anim-presets .chips {
+  gap: 5px;
+}
+.anim-list .subhead {
+  margin: 10px 4px 4px;
+}
+.anim-new {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px;
+}
+.anim-new .btn {
+  flex: 1 1 auto;
+  height: 34px;
+  font-size: 12.5px;
+}
+.anim-view-row {
+  display: flex;
+  justify-content: center;
+}
+.anim-view-row .segmented {
+  width: 280px;
+}
+.anim-custom-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.anim-custom-tools .input {
+  width: 180px;
+  height: 36px;
+}
+.anim-custom-tools .toggle {
+  width: auto;
+}
+.anim-dirs {
+  display: flex;
+  gap: 14px;
+}
+.anim-frame.is-edited {
+  position: relative;
+}
+.anim-frame.is-edited::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.frame-editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.frame-editor-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.frame-editor-tools {
+  display: flex;
+  gap: 2px;
+}
+.frame-editor-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.frame-editor-swatches .swatch {
+  width: 24px;
+  height: 24px;
+}
+.frame-editor-swatches .swatch-current {
+  width: 40px;
+  height: 24px;
+  grid-column: auto;
+}
+.frame-editor-stage {
+  flex: 1;
+  min-height: 240px;
+  position: relative;
+}
+.frame-editor-stage canvas {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  cursor: crosshair;
+}
+.frame-editor-foot {
+  justify-content: flex-end;
+}
+.frame-editor-foot .btn {
+  flex: 0 0 auto;
+}
+.anim-studio.is-mobile .frame-editor-stage {
+  height: min(calc(100vw - 24px), 50vh);
+  flex: none;
+}
+.anim-studio.is-mobile .anim-list {
+  flex-wrap: nowrap;
+}
+.anim-studio.is-mobile .anim-presets,
+.anim-studio.is-mobile .anim-list .subhead,
+.anim-studio.is-mobile .anim-new {
+  flex: none;
+  width: 220px;
+}

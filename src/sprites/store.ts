@@ -1,13 +1,15 @@
 import { create } from 'zustand';
-import type { Body, Bounds, DemoPart, FitContext, SlotDef, SpriteDoc, SpriteKind, SpriteLayer, UserPart } from './types';
-import { BODIES, CHARACTER_PARTS, CHARACTER_SLOTS } from './parts/character';
+import type { Body, Bounds, Creature, CustomAnim, DemoPart, FitContext, SlotDef, SpriteDoc, SpriteKind, SpriteLayer, UserPart, View } from './types';
+import { BODIES, CHARACTER_PARTS, CHARACTER_SLOTS, viewBody } from './parts/character';
+import { CREATURE_PARTS, CREATURE_SLOTS, DEFAULT_CREATURE, viewCreature } from './parts/creature';
+import { frameSize } from './frame';
 import { OBJECT_PARTS, OBJECT_SLOTS } from './parts/object';
 import { render, S } from './painter';
 import { CHANNELS, PALETTE_PRESETS, RAMP_PRESETS, defaultRamps, hexToRgb, type Channel, type DrawPalette, type Ramp, type Ramps } from './palette';
 import { uid } from '../utils/id';
 
-export const SLOTS: Record<SpriteKind, SlotDef[]> = { character: CHARACTER_SLOTS, object: OBJECT_SLOTS };
-export const DEMO_PARTS: Record<SpriteKind, DemoPart[]> = { character: CHARACTER_PARTS, object: OBJECT_PARTS };
+export const SLOTS: Record<SpriteKind, SlotDef[]> = { character: CHARACTER_SLOTS, object: OBJECT_SLOTS, creature: CREATURE_SLOTS };
+export const DEMO_PARTS: Record<SpriteKind, DemoPart[]> = { character: CHARACTER_PARTS, object: OBJECT_PARTS, creature: CREATURE_PARTS };
 export const SIZES = [16, 32, 48, 64];
 
 export type SpriteTool = 'pen' | 'eraser' | 'fill' | 'pipette' | 'line' | 'rect' | 'move' | 'dither' | 'replace' | 'lighten' | 'darken' | 'hand';
@@ -104,21 +106,57 @@ export function paintPart(part: DemoPart, ctx: FitContext, ramps: Ramps, size: n
 
 export function partById(id: string | null): DemoPart | undefined {
   if (!id) return undefined;
-  return (id.startsWith('c.') ? CHARACTER_PARTS : OBJECT_PARTS).find((p) => p.id === id);
+  return (id.startsWith('c.') ? CHARACTER_PARTS : id.startsWith('k.') ? CREATURE_PARTS : OBJECT_PARTS).find((p) => p.id === id);
 }
 
-export function fitContext(doc: Pick<SpriteDoc, 'layers'>): FitContext {
+export function fitContext(doc: Pick<SpriteDoc, 'layers'>, view: View = 'front'): FitContext {
   let body: Body = BODIES.normal;
   let bounds: Bounds = DEFAULT_BOUNDS;
+  let creature: Creature = DEFAULT_CREATURE;
   for (const l of doc.layers) {
     const p = partById(l.partId);
     if (p?.body) body = p.body;
     if (p?.bounds) bounds = p.bounds;
+    if (p?.creature) creature = p.creature;
   }
-  return { body, bounds };
+  return { body: viewBody(body, view), bounds, creature: viewCreature(creature, view) };
 }
 
-const cloneLayers = (layers: SpriteLayer[]) => layers.map((l) => ({ ...l, data: new Uint8ClampedArray(l.data) }));
+// ---------------------------------------------------------------- views (front / side / back)
+
+const viewCache = new WeakMap<SpriteLayer, Map<string, Uint8ClampedArray>>();
+
+/** pixels of a layer in a view: own side/back pixels, else re-painted from the part, else the front */
+export function layerPixels(doc: SpriteDoc, layer: SpriteLayer, view: View): Uint8ClampedArray {
+  if (view === 'front') return layer.data;
+  const own = layer.views?.[view];
+  if (own) return own;
+  const p = partById(layer.partId);
+  if (!p || layer.edited) return layer.data;
+  const key = `${view}|${doc.size}|${JSON.stringify(doc.ramps)}|${JSON.stringify(fitContext(doc, view))}`;
+  let m = viewCache.get(layer);
+  if (!m) viewCache.set(layer, (m = new Map()));
+  let d = m.get(key);
+  if (!d) {
+    d = paintPart(p, fitContext(doc, view), doc.ramps, doc.size);
+    m.set(key, d);
+  }
+  return d;
+}
+
+/** layers as seen from a view (from behind, wings / capes are drawn over the body) */
+export function viewLayers(doc: SpriteDoc, view: View): SpriteLayer[] {
+  const layers = doc.layers.map((l) => ({ ...l, data: layerPixels(doc, l, view) }));
+  if (view !== 'back') return layers;
+  return [...layers.filter((l) => l.slot !== 'back'), ...layers.filter((l) => l.slot === 'back')];
+}
+
+export function composeView(doc: SpriteDoc, view: View): Uint8ClampedArray {
+  return view === 'front' ? compose(doc) : compose({ ...doc, layers: viewLayers(doc, view) });
+}
+
+const cloneViews = (v: SpriteLayer['views']) => (v ? Object.fromEntries(Object.entries(v).map(([k, d]) => [k, new Uint8ClampedArray(d!)])) : undefined);
+const cloneLayers = (layers: SpriteLayer[]) => layers.map((l) => ({ ...l, data: new Uint8ClampedArray(l.data), views: cloneViews(l.views) }));
 
 function slotIndex(kind: SpriteKind, slot: string | null) {
   const i = SLOTS[kind].findIndex((s) => s.id === slot);
@@ -166,31 +204,60 @@ function withPart(doc: SpriteDoc, part: DemoPart): { layers: SpriteLayer[]; id: 
 const DEFAULT_SET: Record<SpriteKind, string[]> = {
   character: ['c.shadow.soft', 'c.body.normal', 'c.legs.pants', 'c.feet.boots', 'c.top.tunic', 'c.face.normal', 'c.hair.short', 'c.weapon.sword'],
   object: ['o.shadow.soft', 'o.base.chest', 'o.detail.bands', 'o.detail.lock'],
+  creature: ['k.shadow.soft', 'k.body.slime', 'k.eyes.two', 'k.mouth.smile'],
 };
 
+export const KIND_NAME: Record<SpriteKind, string> = { character: 'Neuer Charakter', object: 'Neues Objekt', creature: 'Neue Kreatur' };
+
 export function newDoc(kind: SpriteKind, size = 32, empty = false): SpriteDoc {
-  let doc: SpriteDoc = { id: uid(), kind, name: kind === 'character' ? 'Neuer Charakter' : 'Neues Objekt', size, layers: [], ramps: defaultRamps(), updatedAt: Date.now() };
+  let doc: SpriteDoc = { id: uid(), kind, name: KIND_NAME[kind], size, layers: [], ramps: defaultRamps(), updatedAt: Date.now() };
   if (!empty) for (const id of DEFAULT_SET[kind]) doc = { ...doc, layers: withPart(doc, partById(id)!).layers };
   return doc;
 }
 
 // ---------------------------------------------------------------- persistence (browser storage)
 
-interface StoredDoc extends Omit<SpriteDoc, 'layers'> {
-  layers: (Omit<SpriteLayer, 'data'> & { png: string })[];
+interface StoredDoc extends Omit<SpriteDoc, 'layers' | 'frames' | 'customAnims'> {
+  layers: (Omit<SpriteLayer, 'data' | 'views'> & { png: string; views?: Record<string, string> })[];
+  frames?: Record<string, string>;
+  customAnims?: (Omit<CustomAnim, 'frames'> & { frames: string[] })[];
 }
 export interface GalleryEntry {
   doc: StoredDoc;
   thumb: string;
 }
 
-function serialize(doc: SpriteDoc): StoredDoc {
-  return { ...doc, layers: doc.layers.map(({ data, ...l }) => ({ ...l, png: toPng(data, doc.size) })) };
+export function serialize(doc: SpriteDoc): StoredDoc {
+  const F = frameSize(doc.size);
+  return {
+    ...doc,
+    layers: doc.layers.map(({ data, views, ...l }) => ({
+      ...l,
+      png: toPng(data, doc.size),
+      views: views ? Object.fromEntries(Object.entries(views).map(([k, d]) => [k, toPng(d!, doc.size)])) : undefined,
+    })),
+    frames: doc.frames ? Object.fromEntries(Object.entries(doc.frames).map(([k, d]) => [k, toPng(d, F)])) : undefined,
+    customAnims: doc.customAnims?.map((a) => ({ ...a, frames: a.frames.map((f) => toPng(f, F)) })),
+  };
 }
-async function deserialize(s: StoredDoc): Promise<SpriteDoc> {
-  const layers = await Promise.all(s.layers.map(async ({ png, ...l }) => ({ ...l, data: await fromPng(png, s.size) })));
-  return { ...s, ramps: { ...defaultRamps(), ...s.ramps }, layers };
+export async function deserialize(s: StoredDoc): Promise<SpriteDoc> {
+  const F = frameSize(s.size);
+  const layers = await Promise.all(
+    s.layers.map(async ({ png, views, ...l }) => {
+      const out: SpriteLayer = { ...l, data: await fromPng(png, s.size) };
+      if (views) {
+        out.views = {};
+        for (const [k, v] of Object.entries(views)) out.views[k as 'side' | 'back'] = await fromPng(v, s.size);
+      }
+      return out;
+    }),
+  );
+  const frames: Record<string, Uint8ClampedArray> = {};
+  for (const [k, v] of Object.entries(s.frames ?? {})) frames[k] = await fromPng(v, F);
+  const customAnims = await Promise.all((s.customAnims ?? []).map(async (a) => ({ ...a, frames: await Promise.all(a.frames.map((f) => fromPng(f, F))) })));
+  return { ...s, ramps: { ...defaultRamps(), ...s.ramps }, layers, frames, customAnims };
 }
+export type { StoredDoc };
 
 const read = <T,>(key: string, fallback: T): T => {
   try {
@@ -223,6 +290,12 @@ interface KindState {
 interface SpriteState {
   character: KindState;
   object: KindState;
+  creature: KindState;
+  /** view shown / edited in the builder */
+  view: View;
+  setViewDir: (v: View) => void;
+  /** pixels to paint on for a layer in the current view (own side/back copy is created on demand) */
+  editPixels: (kind: SpriteKind, layerId: string) => Uint8ClampedArray | null;
   loaded: Record<SpriteKind, boolean>;
   tool: SpriteTool;
   color: string;
@@ -246,6 +319,17 @@ interface SpriteState {
   duplicateLayer: (kind: SpriteKind, id: string) => void;
   mergeDown: (kind: SpriteKind, id: string) => void;
   outlineLayer: (kind: SpriteKind, id: string, color: string) => void;
+  /** hand-edited frame of a built-in animation (null = back to the generated one) */
+  setFrame: (kind: SpriteKind, key: string, data: Uint8ClampedArray | null) => void;
+  addCustomAnim: (kind: SpriteKind, anim: CustomAnim) => void;
+  updateCustomAnim: (kind: SpriteKind, id: string, patch: Partial<CustomAnim>) => void;
+  deleteCustomAnim: (kind: SpriteKind, id: string) => void;
+  /** own image as a new layer (centred) */
+  importImageLayer: (kind: SpriteKind, img: ImageData, name: string) => void;
+  /** own image as a new figure / object (size fitted: 16, 32, 48 or 64) */
+  newFromImage: (kind: SpriteKind, img: ImageData, name: string) => void;
+  /** replace the current figure (sprite file import / gallery) */
+  setDocument: (kind: SpriteKind, doc: SpriteDoc) => void;
   /** snap every pixel of every layer to the nearest palette colour */
   applyPalette: (kind: SpriteKind, colors: string[]) => void;
   userParts: UserPart[];
@@ -307,7 +391,22 @@ export const useSprites = create<SpriteState>((set, get) => {
   return {
     character: kindState('character'),
     object: kindState('object'),
-    loaded: { character: false, object: false },
+    creature: kindState('creature'),
+    loaded: { character: false, object: false, creature: false },
+    view: 'front',
+    setViewDir: (view) => set({ view, rev: get().rev + 1 }),
+    editPixels: (kind, layerId) => {
+      const k = get()[kind];
+      const layer = k.doc.layers.find((l) => l.id === layerId);
+      if (!layer) return null;
+      const view = get().view;
+      if (view === 'front') return layer.data;
+      if (layer.views?.[view]) return layer.views[view]!;
+      const copy = new Uint8ClampedArray(layerPixels(k.doc, layer, view));
+      const layers = k.doc.layers.map((l) => (l.id === layerId ? { ...l, views: { ...l.views, [view]: copy } } : l));
+      set({ [kind]: { ...k, doc: { ...k.doc, layers } } } as Partial<SpriteState>);
+      return copy;
+    },
     tool: 'pen',
     color: '#e86f6f',
     mirror: false,
@@ -370,6 +469,55 @@ export const useSprites = create<SpriteState>((set, get) => {
       const layers = k.doc.layers.filter((l) => l.id !== id).map((l) => (l.id === below.id ? { ...l, data: merged, edited: true } : l));
       setDoc(kind, { layers }, { ...snapshot(kind), active: below.id });
     },
+    setFrame: (kind, key, data) => {
+      const frames = { ...(get()[kind].doc.frames ?? {}) };
+      if (data) frames[key] = data;
+      else delete frames[key];
+      setDoc(kind, { frames });
+    },
+    addCustomAnim: (kind, anim) => setDoc(kind, { customAnims: [...(get()[kind].doc.customAnims ?? []), anim] }),
+    updateCustomAnim: (kind, id, p) => setDoc(kind, { customAnims: (get()[kind].doc.customAnims ?? []).map((a) => (a.id === id ? { ...a, ...p } : a)) }),
+    deleteCustomAnim: (kind, id) => setDoc(kind, { customAnims: (get()[kind].doc.customAnims ?? []).filter((a) => a.id !== id) }),
+    importImageLayer: (kind, img, name) => {
+      const k = get()[kind];
+      const n = k.doc.size;
+      const data = blank(n);
+      const ox = Math.floor((n - img.width) / 2);
+      const oy = Math.max(Math.floor((n - img.height) / 2), n - img.height - Math.round(n * 0.06));
+      for (let y = 0; y < img.height; y++)
+        for (let x = 0; x < img.width; x++) {
+          const tx = x + ox;
+          const ty = y + oy;
+          if (tx < 0 || ty < 0 || tx >= n || ty >= n) continue;
+          const s = (y * img.width + x) * 4;
+          if (img.data[s + 3]) data.set(img.data.subarray(s, s + 4), (ty * n + tx) * 4);
+        }
+      const layer: SpriteLayer = { id: uid(), name, slot: 'extra', partId: null, edited: true, visible: true, data };
+      setDoc(kind, { layers: [...k.doc.layers, layer] }, { ...snapshot(kind), active: layer.id });
+    },
+    newFromImage: (kind, img, name) => {
+      const need = Math.max(img.width, img.height);
+      const size = SIZES.find((s) => s >= need) ?? 64;
+      let src = img;
+      if (need > 64) {
+        // larger images are scaled down (nearest neighbour) to 64 px
+        const f = 64 / need;
+        const w = Math.max(1, Math.round(img.width * f));
+        const h = Math.max(1, Math.round(img.height * f));
+        const d = new Uint8ClampedArray(w * h * 4);
+        for (let y = 0; y < h; y++)
+          for (let x = 0; x < w; x++) {
+            const s = (Math.floor(y / f) * img.width + Math.floor(x / f)) * 4;
+            d.set(img.data.subarray(s, s + 4), (y * w + x) * 4);
+          }
+        src = new ImageData(d, w, h);
+      }
+      const doc = newDoc(kind, size, true);
+      doc.name = name;
+      patch(kind, { ...snapshot(kind), doc, active: null });
+      get().importImageLayer(kind, src, name);
+    },
+    setDocument: (kind, doc) => patch(kind, { ...snapshot(kind), doc: { ...doc, kind }, active: doc.layers[doc.layers.length - 1]?.id ?? null }),
     applyPalette: (kind, colors) => {
       if (!colors.length) return;
       const k = get()[kind];
@@ -452,7 +600,8 @@ export const useSprites = create<SpriteState>((set, get) => {
     checkpoint: (kind) => patch(kind, snapshot(kind)),
     touch: (kind, layerId) => {
       const k = get()[kind];
-      setDoc(kind, { layers: layerId ? k.doc.layers.map((l) => (l.id === layerId ? { ...l, edited: true } : l)) : k.doc.layers });
+      const front = get().view === 'front';
+      setDoc(kind, { layers: layerId && front ? k.doc.layers.map((l) => (l.id === layerId ? { ...l, edited: true } : l)) : k.doc.layers });
     },
     undo: (kind) => {
       const k = get()[kind];
@@ -524,7 +673,13 @@ export const useSprites = create<SpriteState>((set, get) => {
                 d[t + 2] = l.data[s + 2];
                 d[t + 3] = l.data[s + 3];
               }
-            return { ...l, data: d, edited: true };
+            const flipOne = (src: Uint8ClampedArray) => {
+              const o = blank(n);
+              for (let y = 0; y < n; y++)
+                for (let x = 0; x < n; x++) o.set(src.subarray((y * n + x) * 4, (y * n + x) * 4 + 4), (y * n + (n - 1 - x)) * 4);
+              return o;
+            };
+            return { ...l, data: d, edited: true, views: l.views ? Object.fromEntries(Object.entries(l.views).map(([v, dd]) => [v, flipOne(dd!)])) : undefined };
           }),
         },
         hist,
@@ -537,8 +692,8 @@ export const useSprites = create<SpriteState>((set, get) => {
       const old = k.doc.ramps[ch].map(hexToRgb);
       const neu = ramp.map(hexToRgb);
       const hist = snapshot(kind);
-      const layers = k.doc.layers.map((l) => {
-        const d = new Uint8ClampedArray(l.data);
+      const recolor = (src: Uint8ClampedArray) => {
+        const d = new Uint8ClampedArray(src);
         let changed = false;
         for (let i = 0; i < d.length; i += 4) {
           if (!d[i + 3]) continue;
@@ -551,9 +706,17 @@ export const useSprites = create<SpriteState>((set, get) => {
               break;
             }
         }
-        return changed ? { ...l, data: d } : l;
+        return changed ? d : src;
+      };
+      const layers = k.doc.layers.map((l) => {
+        const data = recolor(l.data);
+        const views = l.views ? Object.fromEntries(Object.entries(l.views).map(([v, d]) => [v, recolor(d!)])) : undefined;
+        return data !== l.data || views ? { ...l, data, views } : l;
       });
-      setDoc(kind, { layers, ramps: { ...k.doc.ramps, [ch]: ramp } }, hist);
+      // hand-edited frames and own animations follow the colour change too
+      const frames = k.doc.frames ? Object.fromEntries(Object.entries(k.doc.frames).map(([key, d]) => [key, recolor(d)])) : undefined;
+      const customAnims = k.doc.customAnims?.map((a) => ({ ...a, frames: a.frames.map(recolor) }));
+      setDoc(kind, { layers, ramps: { ...k.doc.ramps, [ch]: ramp }, frames, customAnims }, hist);
     },
     toggleLock: (kind, slot) => patch(kind, { locks: { ...get()[kind].locks, [slot]: !get()[kind].locks[slot] } }),
 
@@ -571,13 +734,15 @@ export const useSprites = create<SpriteState>((set, get) => {
       const chance: Record<string, number> =
         kind === 'character'
           ? { shadow: 1, back: 0.3, body: 1, legs: 0.9, feet: 0.85, top: 0.95, hands: 0.4, face: 1, hair: 0.85, hat: 0.4, weapon: 0.75, offhand: 0.4 }
-          : { shadow: 1, base: 1 };
+          : kind === 'creature'
+            ? { shadow: 1, body: 1, eyes: 1, mouth: 0.9, horns: 0.45, limbs: 0.35 }
+            : { shadow: 1, base: 1 };
       // body / base first (others fit to it)
       const order = [...SLOTS[kind]].sort((a, b) => Number(b.id === 'body' || b.id === 'base') - Number(a.id === 'body' || a.id === 'base'));
       for (const slot of order) {
         if (k.locks[slot.id] || slot.id === 'extra') continue;
         if (slot.multi) {
-          const n = slot.id === 'detail' ? Math.floor(Math.random() * 3) : slot.id === 'headx' ? (Math.random() < 0.45 ? 1 : 0) + (Math.random() < 0.15 ? 1 : 0) : Math.random() < 0.35 ? 1 : 0;
+          const n = slot.id === 'detail' ? Math.floor(Math.random() * 3) : slot.id === 'pattern' ? (Math.random() < 0.5 ? 1 : 0) : slot.id === 'headx' ? (Math.random() < 0.45 ? 1 : 0) + (Math.random() < 0.15 ? 1 : 0) : Math.random() < 0.35 ? 1 : 0;
           const pool = parts.filter((p) => p.slot === slot.id);
           const chosen = new Set<string>();
           for (let i = 0; i < n; i++) chosen.add(pick(pool).id);
@@ -633,6 +798,10 @@ export const useSprites = create<SpriteState>((set, get) => {
         },
         { undo: [], redo: [] },
       );
+      // own side / back pixels and hand-edited frames belong to the old size
+      const d2 = get()[kind].doc;
+      if (d2.layers.some((l) => l.views) || d2.frames || d2.customAnims?.length)
+        setDoc(kind, { layers: d2.layers.map((l) => ({ ...l, views: undefined })), frames: undefined, customAnims: [] });
     },
 
     saveAsPart: (kind, slot, label, layerId) => {

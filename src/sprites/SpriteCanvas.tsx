@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { compose, useSprites } from './store';
+import { compose, composeView, useSprites, viewLayers } from './store';
 import { hexToRgb, shiftColor } from './palette';
 import type { SpriteKind } from './types';
 import { useEditor } from '../store/editorStore';
@@ -10,7 +10,7 @@ type Pt = { x: number; y: number };
 type RGBA = [number, number, number, number];
 
 /** cells of a line (Bresenham) */
-function lineCells(a: Pt, b: Pt): Pt[] {
+export function lineCells(a: Pt, b: Pt): Pt[] {
   const out: Pt[] = [];
   let { x, y } = a;
   const dx = Math.abs(b.x - x);
@@ -34,7 +34,7 @@ function lineCells(a: Pt, b: Pt): Pt[] {
   return out;
 }
 
-function rectCells(a: Pt, b: Pt): Pt[] {
+export function rectCells(a: Pt, b: Pt): Pt[] {
   const out: Pt[] = [];
   const x0 = Math.min(a.x, b.x);
   const x1 = Math.max(a.x, b.x);
@@ -67,6 +67,7 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
   useSprites((s) => s.pan);
   useSprites((s) => s.brush);
   useSprites((s) => s.mirror);
+  useSprites((s) => s.view);
 
   const draw = () => {
     const c = canvasRef.current;
@@ -102,7 +103,7 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     // composite (active layer shifted while moving)
     const mv = preview.current?.move;
     const act = st[kind].active;
-    const img = mv && act ? compose({ ...d, layers: d.layers.map((l) => (l.id === act ? { ...l, data: shifted(l.data, n, mv.x, mv.y) } : l)) }) : compose(d);
+    const img = mv && act ? compose({ ...d, layers: viewLayers(d, st.view).map((l) => (l.id === act ? { ...l, data: shifted(l.data, n, mv.x, mv.y) } : l)) }) : composeView(d, st.view);
     const off = document.createElement('canvas');
     off.width = off.height = n;
     off.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(img), n, n), 0, 0);
@@ -203,7 +204,9 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
       useEditor.getState().toast('Aktive Ebene ist ausgeblendet');
       return null;
     }
-    return useSprites.getState()[kind].doc.layers.find((x) => x.id === id) ?? null;
+    const layer = useSprites.getState()[kind].doc.layers.find((x) => x.id === id);
+    const data = layer ? useSprites.getState().editPixels(kind, layer.id) : null;
+    return layer && data ? { layer, data } : null;
   };
 
   /** paint one brush dab (size, mirror, dither, lighten / darken) */
@@ -260,32 +263,33 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     }
     if (tool === 'pipette') {
       if (p.x < 0 || p.y < 0 || p.x >= n || p.y >= n) return;
-      const img = compose(st[kind].doc);
+      const img = composeView(st[kind].doc, st.view);
       const i = (p.y * n + p.x) * 4;
       if (img[i + 3]) st.setColor('#' + [img[i], img[i + 1], img[i + 2]].map((v) => v.toString(16).padStart(2, '0')).join(''));
       return;
     }
-    const layer = target();
-    if (!layer) return;
+    const tgt = target();
+    if (!tgt) return;
+    const { layer, data } = tgt;
     st.checkpoint(kind);
     const inside = p.x >= 0 && p.y >= 0 && p.x < n && p.y < n;
     if (tool === 'fill') {
       if (inside) {
         const rgba: RGBA = [...hexToRgb(st.color), 255];
-        flood(layer.data, n, p, rgba);
-        if (st.mirror) flood(layer.data, n, { x: n - 1 - p.x, y: p.y }, rgba);
+        flood(data, n, p, rgba);
+        if (st.mirror) flood(data, n, { x: n - 1 - p.x, y: p.y }, rgba);
         st.touch(kind, layer.id);
       }
       return;
     }
     if (tool === 'replace') {
-      if (inside && replaceColor(layer.data, (p.y * n + p.x) * 4, [...hexToRgb(st.color), 255])) st.touch(kind, layer.id);
+      if (inside && replaceColor(data, (p.y * n + p.x) * 4, [...hexToRgb(st.color), 255])) st.touch(kind, layer.id);
       return;
     }
     touched.current = new Set();
     drag.current = { start: p, last: p, layer: layer.id, tool, screen: { x: e.clientX, y: e.clientY }, pan: st.pan };
     if (BRUSH_TOOLS.includes(tool)) {
-      dab(layer.data, n, p, tool);
+      dab(data, n, p, tool);
       st.touch(kind, layer.id);
     }
   };
@@ -316,9 +320,10 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     if (dr.last.x === p.x && dr.last.y === p.y) return;
     const n = st[kind].doc.size;
     const layer = st[kind].doc.layers.find((l) => l.id === dr.layer);
-    if (!layer) return;
+    const data = layer && st.editPixels(kind, layer.id);
+    if (!layer || !data) return;
     if (BRUSH_TOOLS.includes(dr.tool)) {
-      for (const q of lineCells(dr.last, p)) dab(layer.data, n, q, dr.tool);
+      for (const q of lineCells(dr.last, p)) dab(data, n, q, dr.tool);
       st.touch(kind, layer.id);
     } else if (dr.tool === 'line' || dr.tool === 'rect') {
       const cells = dr.tool === 'line' ? lineCells(dr.start, p) : rectCells(dr.start, p);
@@ -343,13 +348,14 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     const st = useSprites.getState();
     const n = st[kind].doc.size;
     const layer = st[kind].doc.layers.find((l) => l.id === dr.layer);
-    if (layer && (dr.tool === 'line' || dr.tool === 'rect')) {
-      for (const q of dr.tool === 'line' ? lineCells(dr.start, dr.last) : rectCells(dr.start, dr.last)) dab(layer.data, n, q, 'pen-1');
+    const data = layer && st.editPixels(kind, layer.id);
+    if (layer && data && (dr.tool === 'line' || dr.tool === 'rect')) {
+      for (const q of dr.tool === 'line' ? lineCells(dr.start, dr.last) : rectCells(dr.start, dr.last)) dab(data, n, q, 'pen-1');
       st.touch(kind, layer.id);
-    } else if (layer && dr.tool === 'move') {
+    } else if (layer && data && dr.tool === 'move') {
       const m = preview.current?.move;
       if (m && (m.x || m.y)) {
-        layer.data.set(shifted(layer.data, n, m.x, m.y));
+        data.set(shifted(data, n, m.x, m.y));
         st.touch(kind, layer.id);
       }
     }
@@ -394,7 +400,7 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
   );
 }
 
-function shifted(data: Uint8ClampedArray, n: number, dx: number, dy: number): Uint8ClampedArray {
+export function shifted(data: Uint8ClampedArray, n: number, dx: number, dy: number): Uint8ClampedArray {
   const out = new Uint8ClampedArray(data.length);
   for (let y = 0; y < n; y++)
     for (let x = 0; x < n; x++) {
@@ -408,7 +414,7 @@ function shifted(data: Uint8ClampedArray, n: number, dx: number, dy: number): Ui
 }
 
 /** every pixel of the clicked colour on this layer gets the new colour */
-function replaceColor(data: Uint8ClampedArray, at: number, rgba: RGBA): boolean {
+export function replaceColor(data: Uint8ClampedArray, at: number, rgba: RGBA): boolean {
   if (!data[at + 3]) return false;
   const ref = [data[at], data[at + 1], data[at + 2], data[at + 3]];
   let changed = false;
@@ -420,7 +426,7 @@ function replaceColor(data: Uint8ClampedArray, at: number, rgba: RGBA): boolean 
   return changed;
 }
 
-function flood(data: Uint8ClampedArray, n: number, p: Pt, rgba: RGBA) {
+export function flood(data: Uint8ClampedArray, n: number, p: Pt, rgba: RGBA) {
   const i0 = (p.y * n + p.x) * 4;
   const ref = [data[i0], data[i0 + 1], data[i0 + 2], data[i0 + 3]];
   if (ref.every((v, k) => v === rgba[k])) return;

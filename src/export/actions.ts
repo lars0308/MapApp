@@ -56,10 +56,15 @@ export async function exportGodotPackage(p: Project, includeShadows = true) {
           frameWidth: player.size,
           frameHeight: player.size,
           columns: Math.max(player.idle, player.walk),
-          animations: [
-            { name: 'idle', row: 0, frames: player.idle, fps: 4, loop: true },
-            { name: 'walk', row: 1, frames: player.walk, fps: walkFps, loop: true },
-          ],
+          animations: player.rows
+            ? Object.entries(player.rows).map(([k, r]) => {
+                const [base, view] = k.split('_');
+                return { name: `${base}_${view === 'front' ? 'down' : view === 'back' ? 'up' : 'side'}`, row: r.row, frames: r.frames, fps: base === 'walk' ? walkFps : 4, loop: true };
+              })
+            : [
+                { name: 'idle', row: 0, frames: player.idle, fps: 4, loop: true },
+                { name: 'walk', row: 1, frames: player.walk, fps: walkFps, loop: true },
+              ],
         },
       }),
     );

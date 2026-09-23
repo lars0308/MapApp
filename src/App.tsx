@@ -75,10 +75,10 @@ export function App() {
         <ErrorBoundary area="Editor">{desktop ? <DesktopLayout /> : <MobileLayout />}</ErrorBoundary>
       ) : (
         <PageShell desktop={desktop}>
-          <ErrorBoundary area={page === 'project' ? 'Projekt' : page === 'settings' ? 'Einstellungen' : page === 'character' ? 'Charakter bauen' : page === 'animate' ? 'Animieren' : 'Objekt bauen'} key={page}>
+          <ErrorBoundary area={page === 'project' ? 'Projekt' : page === 'settings' ? 'Einstellungen' : page === 'character' ? 'Charakter bauen' : page === 'creature' ? 'Kreatur bauen' : page === 'animate' ? 'Animieren' : 'Objekt bauen'} key={page}>
             {page === 'project' && <StartPage />}
             {page === 'settings' && <SettingsPage desktop={desktop} />}
-            {(page === 'character' || page === 'object') && <SpriteStudio kind={page} desktop={desktop} />}
+            {(page === 'character' || page === 'object' || page === 'creature') && <SpriteStudio kind={page} desktop={desktop} />}
             {page === 'animate' && <AnimStudio desktop={desktop} />}
           </ErrorBoundary>
         </PageShell>

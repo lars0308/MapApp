@@ -1,5 +1,5 @@
 import { C, FIX, Painter } from '../painter';
-import type { Body, DemoPart, FitContext, SlotDef } from '../types';
+import type { Body, DemoPart, FitContext, SlotDef, View } from '../types';
 
 // Chibi characters, front view, 32 × 32. Every part is painted from the body measurements,
 // so clothes, hair and weapons fit all body types (plug and play).
@@ -40,6 +40,25 @@ const WOOD = C('wood');
 const head = (b: Body) => ({ xl: Math.floor(b.hx - b.hrx), xr: Math.ceil(b.hx + b.hrx) - 1, top: Math.floor(b.hy - b.hry), ey: Math.round(b.hy) });
 
 type Paint = (b: Body, p: Painter) => void;
+/** Body for another view: side = narrow torso, one arm, legs side by side, facing right. */
+export function viewBody(b: Body, view: View): Body {
+  if (view !== 'side') return { ...b, view };
+  const hx = b.hx;
+  const tw = Math.max(5, Math.round((b.t[2] - b.t[0] + 1) * 0.6));
+  const t0 = Math.round(hx - tw / 2);
+  const armW = b.aR[1] - b.aR[0] + 1;
+  const lw = b.lR[1] - b.lR[0] + 1;
+  const arm: [number, number] = [hx - 1, hx - 2 + armW];
+  return { ...b, view, hrx: b.hrx - 0.5, t: [t0, b.t[1], t0 + tw - 1, b.t[3]], aL: arm, aR: arm, lL: [hx - lw, hx - 1], lR: [hx, hx + lw - 1] };
+}
+
+/** which parts exist in which view (face from behind, shield behind the body from the side …) */
+function visibleIn(slot: string, id: string, view: View | undefined): boolean {
+  if (view === 'back') return slot !== 'face' && (slot !== 'headx' || ['elf', 'horns', 'catears'].includes(id));
+  if (view === 'side') return slot !== 'offhand' && !(slot === 'headx' && id === 'patch');
+  return true;
+}
+
 const part = (slot: string, id: string, label: string, paint: Paint, opts: { outline?: boolean; shade?: boolean } = {}): DemoPart => ({
   id: `c.${slot}.${id}`,
   kind: 'character',
@@ -47,14 +66,99 @@ const part = (slot: string, id: string, label: string, paint: Paint, opts: { out
   label,
   paint: (ctx: FitContext) => {
     const p = new Painter();
-    paint(ctx.body, p);
+    const b = ctx.body;
+    if (!visibleIn(slot, id, b.view)) return p;
+    const side = b.view === 'side';
+    if (side && slot === 'face') sideFace(id, b, p);
+    else if (side && slot === 'headx' && SIDE_HEADX[id]) SIDE_HEADX[id](b, p);
+    else paint(b, p);
+    if (side) {
+      // face side (right) stays free of hair below the hairline
+      if (slot === 'hair') p.clearWhere((x, y) => x >= b.hx && y >= b.hy - 2 && y <= b.hy + 4 && x <= b.hx + b.hrx + 1);
+      // things on the back peek out behind the body; a tail points backwards
+      if (slot === 'back') {
+        if (id === 'tail') p.mirrorX(b.hx);
+        else p.shiftX(-3);
+      }
+    }
     return p.finish(opts);
   },
 });
 
-const bodyPart = (id: string, label: string, b: Body): DemoPart => ({
-  ...part('body', id, label, (_, p) => {
+/** side view faces (looking right): one eye, mouth at the front */
+function sideFace(id: string, b: Body, p: Painter) {
+  const { ey } = head(b);
+  const ex = b.hx + 2;
+  const mouth = () => p.px(b.hx + 4, ey + 3, C('skin', 2), true);
+  switch (id) {
+    case 'happy':
+      p.px(ex - 1, ey + 1, FIX.EYE, true).px(ex, ey, FIX.EYE, true).px(ex + 1, ey + 1, FIX.EYE, true);
+      p.px(b.hx + 4, ey + 3, FIX.EYE, true).px(b.hx + 1, ey + 2, FIX.RED, true);
+      break;
+    case 'grim':
+    case 'angry':
+      p.rect(ex, ey + 1, ex + 1, ey + 1, FIX.EYE, true).line(ex - 1, ey - 1, ex + 1, ey, FIX.EYE, true);
+      p.rect(b.hx + 3, ey + 3, b.hx + 4, ey + 3, FIX.EYE, true);
+      break;
+    case 'sleepy':
+      p.rect(ex, ey + 1, ex + 1, ey + 1, FIX.EYE, true);
+      mouth();
+      break;
+    case 'cat':
+      p.rect(ex, ey, ex + 1, ey + 1, FIX.GOLD, true).px(ex + 1, ey, FIX.EYE, true).px(ex + 1, ey + 1, FIX.EYE, true);
+      mouth();
+      break;
+    case 'surprised':
+      p.rect(ex, ey, ex, ey + 1, FIX.EYE, true).px(ex + 1, ey, FIX.WHITE, true);
+      p.rect(b.hx + 4, ey + 3, b.hx + 4, ey + 4, FIX.EYE, true);
+      break;
+    case 'wink':
+      p.rect(ex, ey + 1, ex + 1, ey + 1, FIX.EYE, true);
+      p.px(b.hx + 4, ey + 3, FIX.EYE, true);
+      break;
+    default:
+      p.rect(ex, ey, ex, ey + (id === 'big' ? 2 : 1), FIX.EYE, true).px(ex + 1, ey, FIX.WHITE, true);
+      mouth();
+  }
+}
+
+/** side view variants of head extras that are not symmetric */
+const SIDE_HEADX: Record<string, Paint> = {
+  elf: (b, p) => p.tri(b.hx - 1, b.hy - 1, b.hx - 1, b.hy + 2, b.hx - 5, b.hy - 4, SKIN),
+  glasses: (b, p) => {
+    const { ey } = head(b);
+    const ex = b.hx + 2;
+    p.line(ex - 1, ey - 1, ex + 2, ey - 1, FIX.EYE, true).line(ex - 1, ey + 2, ex + 2, ey + 2, FIX.EYE, true).line(ex - 1, ey, ex - 1, ey + 1, FIX.EYE, true);
+    p.line(b.hx - 2, ey, ex - 2, ey, FIX.EYE, true);
+  },
+  mustache: (b, p) => {
+    const { ey } = head(b);
+    p.rect(b.hx + 2, ey + 2, b.hx + 4, ey + 2, C('hair', 1), true).px(b.hx + 2, ey + 3, C('hair', 1), true);
+  },
+  freckles: (b, p) => {
+    const { ey } = head(b);
+    p.px(b.hx + 1, ey + 2, C('skin', 2), true).px(b.hx + 2, ey + 3, C('skin', 2), true).px(b.hx + 3, ey + 2, C('skin', 2), true);
+  },
+  scar: (b, p) => {
+    const { ey } = head(b);
+    p.line(b.hx + 1, ey - 2, b.hx + 3, ey + 2, FIX.RED, true);
+  },
+  paint: (b, p) => {
+    const { ey } = head(b);
+    p.line(b.hx + 1, ey + 2, b.hx + 2, ey + 3, FIX.RED, true).line(b.hx + 2, ey + 2, b.hx + 3, ey + 3, FIX.RED, true);
+  },
+  tusks: (b, p) => {
+    const { ey } = head(b);
+    p.rect(b.hx + 3, ey + 2, b.hx + 3, ey + 3, FIX.WHITE, true);
+  },
+  beard: (b, p) => p.ell(b.hx + 1.5, b.hy + 3.5, b.hrx - 1.5, 4, HAIR, (_, y) => y >= Math.round(b.hy) + 2),
+};
+
+const bodyPart = (id: string, label: string, body: Body): DemoPart => ({
+  ...part('body', id, label, (b, p) => {
     p.ell(b.hx, b.hy, b.hrx, b.hry, SKIN);
+    // nose in profile
+    if (b.view === 'side') p.px(Math.round(b.hx + b.hrx), Math.round(b.hy) + 1, SKIN);
     const [x0, y0, x1, y1] = b.t;
     p.rect(x0, y0, x1, y1, SKIN);
     p.rect(b.aL[0], b.ay[0], b.aL[1], b.ay[1], SKIN);
@@ -62,7 +166,7 @@ const bodyPart = (id: string, label: string, b: Body): DemoPart => ({
     p.rect(b.lL[0], b.ly[0], b.lL[1], b.ly[1], SKIN);
     p.rect(b.lR[0], b.ly[0], b.lR[1], b.ly[1], SKIN);
   }),
-  body: b,
+  body,
 });
 
 // ---------------------------------------------------------------- face (no outline)
@@ -125,6 +229,15 @@ const FACES: DemoPart[] = [
 // ---------------------------------------------------------------- hair
 
 const cap = (b: Body, p: Painter) => {
+  // from behind the hair covers the whole head; from the side the back half
+  if (b.view === 'back') {
+    p.ell(b.hx, b.hy - 0.6, b.hrx + 0.7, b.hry + 0.4, HAIR, (_, y) => y <= b.hy + 2);
+    return;
+  }
+  if (b.view === 'side') {
+    p.ell(b.hx, b.hy - 0.6, b.hrx + 0.7, b.hry + 0.4, HAIR, (x, y) => y <= b.hy - 3 || (x <= b.hx - 1 && y <= b.hy + 2));
+    return;
+  }
   // hairline stays above the eyes (its outline must not cover them)
   p.ell(b.hx, b.hy - 0.6, b.hrx + 0.7, b.hry + 0.4, HAIR, (_, y) => y <= b.hy - 3);
   const { xl, xr } = head(b);
@@ -316,7 +429,9 @@ const HATS: DemoPart[] = [
   part('hat', 'hood', 'Kapuze', (b, p) => {
     const rx = b.hrx - 1.4;
     const ry = b.hry - 1.3;
-    p.ell(b.hx, b.hy, b.hrx + 1.6, b.hry + 1.5, P2, (x, y) => ((x + 0.5 - b.hx) / rx) ** 2 + ((y + 0.5 - (b.hy + 1)) / ry) ** 2 > 1);
+    // face opening: centre from the front, shifted forward from the side, none from behind
+    const fx = b.view === 'side' ? b.hx + 2.5 : b.hx;
+    p.ell(b.hx, b.hy, b.hrx + 1.6, b.hry + 1.5, P2, (x, y) => b.view === 'back' || ((x + 0.5 - fx) / (b.view === 'side' ? rx * 0.7 : rx)) ** 2 + ((y + 0.5 - (b.hy + 1)) / ry) ** 2 > 1);
   }),
   part(
     'hat',
@@ -340,7 +455,8 @@ const HATS: DemoPart[] = [
 
 // ---------------------------------------------------------------- held items
 
-const hand = (b: Body) => ({ gx: b.aR[1] + 1, hy: b.ay[1], ox: b.aL[0] - 1 });
+/** weapon hand / other hand – swapped when seen from behind */
+const hand = (b: Body) => (b.view === 'back' ? { gx: b.aL[0] - 2, hy: b.ay[1], ox: b.aR[1] + 2 } : { gx: b.aR[1] + 1, hy: b.ay[1], ox: b.aL[0] - 1 });
 
 const WEAPONS: DemoPart[] = [
   part('weapon', 'sword', 'Schwert', (b, p) => {

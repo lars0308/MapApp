@@ -1,14 +1,45 @@
-import { useEffect, useMemo, useState } from 'react';
-import { SIZES, SLOTS, compose, toPng, useSprites, type SpriteTool } from './store';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { SIZES, SLOTS, compose, composeView, deserialize, serialize, toPng, useSprites, type SpriteTool } from './store';
 import { SpriteCanvas } from './SpriteCanvas';
 import { PartsPanel } from './PartsPanel';
 import { ColorsPanel, GalleryPanel, LayersList, PalettePanel } from './SidePanels';
 import { PALETTE_PRESETS } from './palette';
-import type { SpriteKind } from './types';
+import { VIEWS, type SpriteKind } from './types';
 import { Icon } from '../components/icons';
-import { Button, IconButton } from '../components/ui';
+import { Button, IconButton, Segmented } from '../components/ui';
 import { useEditor } from '../store/editorStore';
-import { dataUrlToBytes, downloadBlob, safeFileName } from '../utils/download';
+import { dataUrlToBytes, downloadBlob, downloadText, readFileAsDataUrl, readFileAsText, safeFileName } from '../utils/download';
+
+async function imageDataFromFile(file: File): Promise<ImageData> {
+  const url = await readFileAsDataUrl(file);
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = () => rej(new Error('Bild konnte nicht gelesen werden'));
+    i.src = url;
+  });
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth;
+  c.height = img.naturalHeight;
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  g.drawImage(img, 0, 0);
+  // crop transparent margins so the own sprite sits right
+  const d = g.getImageData(0, 0, c.width, c.height);
+  let x0 = c.width,
+    y0 = c.height,
+    x1 = -1,
+    y1 = -1;
+  for (let y = 0; y < c.height; y++)
+    for (let x = 0; x < c.width; x++)
+      if (d.data[(y * c.width + x) * 4 + 3] > 0) {
+        x0 = Math.min(x0, x);
+        y0 = Math.min(y0, y);
+        x1 = Math.max(x1, x);
+        y1 = Math.max(y1, y);
+      }
+  if (x1 < 0) throw new Error('Das Bild ist leer (nur transparent)');
+  return g.getImageData(x0, y0, x1 - x0 + 1, y1 - y0 + 1);
+}
 
 const TOOLS: { id: SpriteTool; label: string; key: string; icon: (p: { size?: number }) => React.ReactElement }[] = [
   { id: 'pen', label: 'Stift', key: 'B', icon: Icon.Pencil },
@@ -98,6 +129,7 @@ export function SpriteStudio({ kind, desktop }: { kind: SpriteKind; desktop: boo
         <div className="sprite-main">
           <ToolRail />
           <div className="sprite-stage">
+            <ViewHint kind={kind} />
             {loaded ? <SpriteCanvas kind={kind} /> : <div className="sprite-canvas" />}
             <Preview kind={kind} />
           </div>
@@ -114,8 +146,44 @@ function StudioBar({ kind, onSavePart }: { kind: SpriteKind; onSavePart: () => v
   const canUndo = useSprites((s) => s[kind].undo.length > 0);
   const canRedo = useSprites((s) => s[kind].redo.length > 0);
   const { undo, redo, randomize, renameDoc, setSize, reset } = useSprites.getState();
+  const view = useSprites((s) => s.view);
   const [newOpen, setNewOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [ioOpen, setIoOpen] = useState(false);
+  const [fileMode, setFileMode] = useState<'layer' | 'new' | 'file'>('layer');
+  const fileRef = useRef<HTMLInputElement>(null);
+  const pick = (m: 'layer' | 'new' | 'file') => {
+    setFileMode(m);
+    setTimeout(() => fileRef.current?.click(), 0);
+  };
+  const exportFile = () => {
+    downloadText(JSON.stringify({ format: 'mapforge-sprite', version: 1, doc: serialize(doc) }), `${safeFileName(doc.name)}.mapforge-sprite.json`);
+    toast('Figur-Datei gespeichert – enthält Ebenen, Ansichten, bearbeitete Bilder und eigene Animationen', 'success');
+  };
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const st = useSprites.getState();
+      if (fileMode === 'file') {
+        const json = JSON.parse(await readFileAsText(file));
+        if (json?.format !== 'mapforge-sprite' || !json.doc?.layers) throw new Error('Keine MapForge-Figur-Datei');
+        const loaded = await deserialize(json.doc);
+        if (loaded.kind !== kind) toast(`Datei ist ein${loaded.kind === 'object' ? ' Objekt' : loaded.kind === 'creature' ?'e Kreatur' : ' Charakter'} – hier als ${kind === 'object' ? 'Objekt' : kind === 'creature' ? 'Kreatur' : 'Charakter'} geöffnet`);
+        st.setDocument(kind, loaded);
+        toast(`„${loaded.name}“ geöffnet`, 'success');
+      } else {
+        const img = await imageDataFromFile(file);
+        const name = file.name.replace(/\.[^.]+$/, '');
+        if (fileMode === 'layer') st.importImageLayer(kind, img, name);
+        else st.newFromImage(kind, img, name);
+        toast(fileMode === 'layer' ? `„${name}“ als Ebene eingefügt – mit „Ebene verschieben“ platzieren` : `„${name}“ als neue ${kind === 'object' ? 'Objekt' : 'Figur'} geöffnet (${img.width} × ${img.height} px)`, 'success');
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Datei konnte nicht geöffnet werden', 'error');
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
   const toast = useEditor((s) => s.toast);
 
   const exportPng = (scale: number) => {
@@ -128,6 +196,12 @@ function StudioBar({ kind, onSavePart }: { kind: SpriteKind; onSavePart: () => v
   return (
     <div className="studio-bar">
       <input className="input studio-name" value={doc.name} aria-label="Name" onChange={(e) => renameDoc(kind, e.target.value.slice(0, 40))} />
+      <Segmented
+        label="Ansicht"
+        value={view}
+        onChange={(v) => useSprites.getState().setViewDir(v)}
+        options={VIEWS.map((v) => ({ value: v.id, label: v.label }))}
+      />
       <select className="input studio-size" value={doc.size} aria-label="Größe in Pixeln" onChange={(e) => setSize(kind, Number(e.target.value))} title="Größe in Pixeln (Baukasten-Teile sind für 32 px gezeichnet)">
         {SIZES.map((s) => (
           <option key={s} value={s}>
@@ -147,7 +221,7 @@ function StudioBar({ kind, onSavePart }: { kind: SpriteKind; onSavePart: () => v
           <span>Zufall</span>
         </button>
         <div className="studio-menu-wrap">
-          <button type="button" className="btn btn-ghost" aria-expanded={newOpen} onClick={() => (setNewOpen(!newOpen), setExportOpen(false))}>
+          <button type="button" className="btn btn-ghost" aria-expanded={newOpen} onClick={() => (setNewOpen(!newOpen), setExportOpen(false), setIoOpen(false))}>
             <Icon.Plus size={16} />
             <span>Neu</span>
           </button>
@@ -161,6 +235,29 @@ function StudioBar({ kind, onSavePart }: { kind: SpriteKind; onSavePart: () => v
               </button>
             </div>
           )}
+        </div>
+        <div className="studio-menu-wrap">
+          <button type="button" className="btn btn-ghost" aria-expanded={ioOpen} onClick={() => (setIoOpen(!ioOpen), setNewOpen(false), setExportOpen(false))} title="Eigene Bilder und Figur-Dateien">
+            <Icon.Upload size={16} />
+            <span>Import</span>
+          </button>
+          {ioOpen && (
+            <div className="studio-menu" role="menu">
+              <button type="button" role="menuitem" onClick={() => (setIoOpen(false), pick('layer'))}>
+                Bild als neue Ebene …
+              </button>
+              <button type="button" role="menuitem" onClick={() => (setIoOpen(false), pick('new'))}>
+                Bild als neue {kind === 'object' ? 'Objekt' : 'Figur'} …
+              </button>
+              <button type="button" role="menuitem" onClick={() => (setIoOpen(false), pick('file'))}>
+                Figur-Datei öffnen (.mapforge-sprite.json) …
+              </button>
+              <button type="button" role="menuitem" onClick={() => (setIoOpen(false), exportFile())}>
+                Figur-Datei speichern
+              </button>
+            </div>
+          )}
+          <input ref={fileRef} type="file" hidden accept={fileMode === 'file' ? '.json,application/json' : 'image/png,image/gif,image/webp,image/jpeg'} onChange={(e) => void onFile(e.target.files?.[0])} />
         </div>
         <button type="button" className="btn btn-ghost" onClick={onSavePart} title="Ganze Figur als Teil speichern – taucht rechts in der Auswahl auf">
           <Icon.Save size={16} />
@@ -244,7 +341,8 @@ function ToolRail() {
 function Preview({ kind }: { kind: SpriteKind }) {
   const doc = useSprites((s) => s[kind].doc);
   const rev = useSprites((s) => s.rev);
-  const src = useMemo(() => toPng(compose(doc), doc.size), [doc, rev]);
+  const view = useSprites((s) => s.view);
+  const src = useMemo(() => toPng(composeView(doc, view), doc.size), [doc, rev, view]);
   return (
     <div className="sprite-preview" aria-label="Vorschau">
       <img src={src} alt="" style={{ width: doc.size, height: doc.size }} />
@@ -293,6 +391,34 @@ function SavePartDialog({ kind, layerId, onClose }: { kind: SpriteKind; layerId:
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** side / back view: explain where the pixels come from, reset own pixels */
+function ViewHint({ kind }: { kind: SpriteKind }) {
+  const view = useSprites((s) => s.view);
+  const doc = useSprites((s) => s[kind].doc);
+  if (view === 'front') return null;
+  const own = doc.layers.some((l) => l.views?.[view]);
+  return (
+    <div className="view-hint">
+      <span>
+        {view === 'side' ? 'Seitenansicht' : 'Rückansicht'}: automatisch aus den Teilen. Was du hier malst, gilt nur für diese Ansicht.
+      </span>
+      {own && (
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => {
+            const st = useSprites.getState();
+            st.checkpoint(kind);
+            st.setDocument(kind, { ...doc, layers: doc.layers.map((l) => ({ ...l, views: l.views ? { ...l.views, [view]: undefined } : undefined })) });
+          }}
+        >
+          Ansicht zurücksetzen
+        </button>
+      )}
     </div>
   );
 }

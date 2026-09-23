@@ -70,6 +70,42 @@ export class Painter {
     return this.rect(x0, y0, x1, y1, 0);
   }
 
+  /** move everything horizontally */
+  shiftX(dx: number) {
+    const g = new Uint8Array(S * S);
+    const fx = new Uint8Array(S * S);
+    for (let y = 0; y < S; y++)
+      for (let x = 0; x < S; x++) {
+        const tx = x + dx;
+        if (tx < 0 || tx >= S) continue;
+        g[y * S + tx] = this.g[y * S + x];
+        fx[y * S + tx] = this.fixed[y * S + x];
+      }
+    this.g = g;
+    this.fixed = fx;
+    return this;
+  }
+  /** mirror around the vertical line at cx (pixel-corner coordinates, 16 = centre) */
+  mirrorX(cx = S / 2) {
+    const g = new Uint8Array(S * S);
+    const fx = new Uint8Array(S * S);
+    for (let y = 0; y < S; y++)
+      for (let x = 0; x < S; x++) {
+        const tx = Math.round(2 * cx - 1 - x);
+        if (tx < 0 || tx >= S) continue;
+        g[y * S + tx] = this.g[y * S + x];
+        fx[y * S + tx] = this.fixed[y * S + x];
+      }
+    this.g = g;
+    this.fixed = fx;
+    return this;
+  }
+  /** remove pixels where the test is true */
+  clearWhere(test: (x: number, y: number) => boolean) {
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (test(x, y)) this.g[y * S + x] = 0;
+    return this;
+  }
+
   /** light top edge, dark bottom / right edge for all channel base pixels */
   shade() {
     const src = this.g.slice();

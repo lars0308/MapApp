@@ -159,6 +159,8 @@ export function ColorsPanel({ kind }: { kind: SpriteKind }) {
 
 // ---------------------------------------------------------------- gallery
 
+const PLURAL: Record<SpriteKind, string> = { character: 'Charaktere', creature: 'Kreaturen', object: 'Objekte' };
+
 export function GalleryPanel({ kind }: { kind: SpriteKind }) {
   const gallery = useSprites((s) => s.gallery).filter((g) => g.doc.kind === kind);
   const cur = useSprites((s) => s[kind].doc.id);
@@ -172,7 +174,7 @@ export function GalleryPanel({ kind }: { kind: SpriteKind }) {
         icon={<Icon.Save size={16} />}
         onClick={() => {
           const ok = saveToGallery(kind);
-          toast(ok ? `In „Meine ${kind === 'character' ? 'Charaktere' : 'Objekte'}“ gespeichert` : 'Speicher voll – ältere Einträge löschen', ok ? 'success' : 'error');
+          toast(ok ? `In „Meine ${PLURAL[kind]}“ gespeichert` : 'Speicher voll – ältere Einträge löschen', ok ? 'success' : 'error');
         }}
       >
         Aktuellen speichern
@@ -196,7 +198,7 @@ export function GalleryPanel({ kind }: { kind: SpriteKind }) {
           </li>
         ))}
       </ul>
-      {!gallery.length && <p className="muted small">Noch nichts gespeichert. Gespeicherte {kind === 'character' ? 'Charaktere' : 'Objekte'} bleiben in diesem Browser.</p>}
+      {!gallery.length && <p className="muted small">Noch nichts gespeichert. Gespeicherte {PLURAL[kind]} bleiben in diesem Browser.</p>}
     </div>
   );
 }
