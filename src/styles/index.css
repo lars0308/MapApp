@@ -2386,6 +2386,11 @@ input[type='range']:active::-webkit-slider-thumb {
   .wizard-backdrop {
     padding: 0;
     place-items: stretch;
+    /* full screen anyway: no blur over the (hidden) editor */
+    background: var(--bg-2);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    animation: none;
   }
   .wizard {
     width: 100%;
@@ -3154,4 +3159,11 @@ body.is-resizing-y * {
 }
 .buildkit-actions .btn {
   flex: 1 1 auto;
+}
+
+/* phones: the full-screen setup wizard covers the editor – hide it so nothing renders behind */
+@media (max-width: 720px), (max-height: 560px) {
+  .app.has-wizard .mobile {
+    visibility: hidden;
+  }
 }

@@ -102,7 +102,10 @@ function WizardDialog() {
   const setMap = (patch: Partial<MapSettings>) => setDraft((d) => ({ ...d, map: { ...d.map, ...patch } }));
   const setGen = (patch: Partial<GeneratorSettings>) => setDraft((d) => ({ ...d, gen: { ...d.gen, ...patch } }));
 
-  useEffect(() => bodyRef.current?.scrollTo({ top: 0 }), [step]);
+  // braces matter: newer Chrome returns a Promise from scrollTo(), React would call it as cleanup
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: 0 });
+  }, [step]);
 
   const cancel = async () => {
     closeWizard();

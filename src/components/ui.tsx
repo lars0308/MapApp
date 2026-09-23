@@ -63,7 +63,9 @@ export function Slider({
   const id = useId();
   const pct = ((value - min) / (max - min)) * 100;
   const [draft, setDraft] = useState(String(value));
-  useEffect(() => setDraft(String(value)), [value]);
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
   const commit = () => {
     const n = Number(draft.replace(',', '.'));
     const v = Number.isFinite(n) ? clamp(Math.round(n / step) * step, min, max) : value;
@@ -201,7 +203,9 @@ export function NumberField({
 }) {
   const id = useId();
   const [draft, setDraft] = useState(String(value));
-  useEffect(() => setDraft(String(value)), [value]);
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
   const commit = (v: number) => {
     const n = clamp(Number.isFinite(v) ? Math.round(v / step) * step : value, min, max);
     setDraft(String(n));

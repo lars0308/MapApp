@@ -46,7 +46,9 @@ export function BottomSheet({
   const [heights, setHeights] = useState(snapHeights);
   const drag = useRef<{ y: number; h: number; moved: boolean } | null>(null);
 
-  useEffect(() => setSnap('half'), [title]);
+  useEffect(() => {
+    setSnap('half');
+  }, [title]);
   useEffect(() => {
     const onResize = () => setHeights(snapHeights());
     window.addEventListener('resize', onResize);

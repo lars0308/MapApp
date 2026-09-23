@@ -34,6 +34,7 @@ async function boot() {
 export function App() {
   const desktop = useMediaQuery(DESKTOP_QUERY);
   const [ready, setReady] = useState(false);
+  const wizardOpen = useEditor((s) => s.wizardOpen);
   useShortcuts();
 
   useEffect(() => {
@@ -63,7 +64,7 @@ export function App() {
   }, []);
 
   return (
-    <div className={`app${ready ? ' is-ready' : ''}`}>
+    <div className={`app${ready ? ' is-ready' : ''}${wizardOpen ? ' has-wizard' : ''}`}>
       <ErrorBoundary area="Editor">{desktop ? <DesktopLayout /> : <MobileLayout />}</ErrorBoundary>
       <ErrorBoundary area="Setup-Assistent" onClose={() => useEditor.getState().closeWizard()} closeLabel="Assistent schließen">
         <SetupWizard />

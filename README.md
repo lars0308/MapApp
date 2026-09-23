@@ -346,6 +346,8 @@ Wichtige Entscheidungen:
 
 **Version 1.4.1 – Stabilität**
 
+- **Fehler behoben: schwarzer Bildschirm nach „Weiter“ im Setup** (u. a. Chrome 153 auf Android, Fehler „l is not a function“). Ursache: `useEffect(() => bodyRef.current?.scrollTo(...))` gab den Rückgabewert von `scrollTo()` zurück; neue Chrome-Versionen liefern dort ein Promise, das React beim Schrittwechsel als Aufräumfunktion aufrief. Alle Effekte geben jetzt nichts mehr zurück. Das war auch die Ursache des früher gemeldeten „schwarzen Bildschirms nach Low Top-Down“.
+
 - Fehleranzeige statt schwarzem Bildschirm: Abstürze in Editor oder Assistent zeigen die Fehlermeldung mit „Fehler kopieren“, „Erneut versuchen“, „Assistent schließen“, „Neu laden“. Der letzte Fehler bleibt gespeichert und erscheint nach dem Neuladen als Hinweis.
 - Datenbank: Ist eine ältere MapForge-Version noch in einem anderen Tab / als App geöffnet, hängt die App nicht mehr (Timeout, Hinweis), „Map erstellen“ / „Baukasten öffnen“ laufen trotzdem durch; alte Verbindungen geben die Datenbank für neuere Versionen frei.
 - Manueller Modus: leere Map zeigt eine Startkarte (Startraum anlegen · Raum aufziehen · Automatisch generieren) statt einer dunklen, leeren Fläche.
