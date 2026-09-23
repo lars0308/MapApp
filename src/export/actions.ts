@@ -1,6 +1,7 @@
 import type { Project } from '../types';
 import { dataUrlToBytes, downloadBlob, downloadText, safeFileName } from '../utils/download';
-import { playerSpriteData } from '../playtest/playerSprite';
+import { playerSheet, playerSpriteData } from '../playtest/playerSprite';
+import { useSprites } from '../sprites/store';
 import { spriteGodotEntries } from '../sprites/exportSprite';
 import { serializeProject, PROJECT_EXTENSION } from '../persistence/projectFile';
 import { OBJECTS_IMAGE, buildGodotData, scaledObjectsPng, scaledTilesetPng, tilesetImageName } from './godotJson';
@@ -38,16 +39,25 @@ export async function exportGodotPackage(p: Project, includeShadows = true) {
     const png = await scaledTilesetPng(ts, p.map.tileSize);
     entries.push({ path: `${folder}/tilesets/${tilesetImageName(ts)}`, data: new Uint8Array(await png.arrayBuffer()) });
   }
-  // ready scene + own player figure (if one is set in "Animieren")
-  const player = playerSpriteData();
+  // ready scene + player figure: the own one from "Animieren", else the figure from the builder
+  const side = p.map.perspective === 'side_view';
+  let player = playerSpriteData();
+  if (!player) {
+    try {
+      player = playerSheet(useSprites.getState().character.doc);
+    } catch {
+      player = null;
+    }
+  }
   if (player) {
-    const walkFps = 8;
+    const dir = (view: string) => (view === 'front' ? 'down' : view === 'back' ? 'up' : 'side');
     entries.push(
       ...spriteGodotEntries({
         folder: `${folder}/player`,
         base: 'player',
         name: player.name,
         character: true,
+        platformer: side,
         png: dataUrlToBytes(player.png),
         feetInFrame: player.feet,
         spriteSize: Math.round(player.size / 1.5),
@@ -55,15 +65,16 @@ export async function exportGodotPackage(p: Project, includeShadows = true) {
           name: player.name,
           frameWidth: player.size,
           frameHeight: player.size,
-          columns: Math.max(player.idle, player.walk),
+          columns: Math.max(player.idle, player.walk, ...Object.values(player.rows ?? {}).map((r) => r.frames)),
           animations: player.rows
             ? Object.entries(player.rows).map(([k, r]) => {
-                const [base, view] = k.split('_');
-                return { name: `${base}_${view === 'front' ? 'down' : view === 'back' ? 'up' : 'side'}`, row: r.row, frames: r.frames, fps: base === 'walk' ? walkFps : 4, loop: true };
+                const cut = k.lastIndexOf('_');
+                const base = k.slice(0, cut);
+                return { name: `${base}_${dir(k.slice(cut + 1))}`, row: r.row, frames: r.frames, fps: r.fps ?? (base === 'walk' ? 8 : 4), loop: r.loop ?? true };
               })
             : [
                 { name: 'idle', row: 0, frames: player.idle, fps: 4, loop: true },
-                { name: 'walk', row: 1, frames: player.walk, fps: walkFps, loop: true },
+                { name: 'walk', row: 1, frames: player.walk, fps: 8, loop: true },
               ],
         },
       }),

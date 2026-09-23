@@ -37,6 +37,13 @@ const NON_BLOCKING_ROLES = new Set<TileRole>([
   'bridge_end',
   'bridge_left',
   'bridge_right',
+  // side view: handled by the side-scroller physics (one-way, climbable, hazard, background)
+  'platform',
+  'platform_left',
+  'platform_right',
+  'ladder',
+  'spikes',
+  'back_wall',
 ]);
 
 /** Does this tile block movement? Explicit `collision` wins, otherwise role / category decide. */

@@ -3,6 +3,7 @@ import type { GeneratorSettings, Layer, Project } from '../types';
 import { DEFAULT_MAP, defaultGenerator, defaultTerrain, defaultTerrainSets } from '../generator/presets';
 import { DEFAULT_LAYERS, layerFromDef } from '../layers/defaults';
 import { DEMO_AUTOTILE_IDS, createDemoAutotileSets } from '../tilesets/demoAutotiles';
+import { DEMO_SIDE_ID, createDemoSideTileset } from '../tilesets/demoSide';
 
 type LegacyGenerator = GeneratorSettings & { hazards?: number; lava?: boolean; water?: boolean; abyss?: boolean };
 
@@ -38,6 +39,12 @@ export function migrateProject(p: Project): Project {
     tilesets = [...tilesets, ...sets];
     const last = sets[sets.length - 1];
     nextGid = last.firstGid + last.columns * last.rows;
+  }
+  // side-scroller demo tiles (v2.5)
+  if (!tilesets.some((t) => t.id === DEMO_SIDE_ID)) {
+    const side = createDemoSideTileset(nextGid);
+    tilesets = [...tilesets, side];
+    nextGid = side.firstGid + side.columns * side.rows;
   }
 
   // layers: y-sort flag + missing default roles at their default position

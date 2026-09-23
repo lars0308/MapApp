@@ -13,6 +13,14 @@ export function TerrainPanel() {
   const update = useProject((s) => s.updateGenerator);
   const setTerrains = useProject((s) => s.setTerrains);
   const change = (id: string, patch: Partial<TerrainSet>) => setTerrains(sets.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  const side = useProject((s) => s.project.map.perspective === 'side_view');
+
+  if (side)
+    return (
+      <div className="panel-scroll">
+        <p className="hint side-intro">In der Seitenansicht stellst du Gruben, Wasser, Lava, Stacheln, Plattformen und Leitern direkt im Panel „Generator“ ein.</p>
+      </div>
+    );
 
   return (
     <div className="panel-scroll">

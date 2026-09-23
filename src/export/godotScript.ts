@@ -48,6 +48,9 @@ var player: Node2D
 var _sources: Dictionary = {}
 var _objects_texture: Texture2D
 
+## side-scroller: emitted when a body of group "player" reaches the goal
+signal goal_reached(body: Node)
+
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # crisp pixel art
@@ -78,8 +81,12 @@ func build_now() -> void:
 		build_collision_rects(map_data)
 	build_spawn_markers(map_data)
 	astar = build_astar(map_data)
+	if perspective == "side_view":
+		build_side(map_data)
 	if player_scene:
 		_spawn_player()
+		if perspective == "side_view":
+			_setup_side_player()
 	print("MapForge: %d layers, %d objects, %d rooms" % [layer_nodes.size(), map_data.get("objects", []).size(), get_rooms().size()])
 
 
@@ -326,6 +333,88 @@ func _spawn_player() -> void:
 	player.add_child(cam)
 
 
+# ------------------------------------------------------------------ side-scroller
+
+## One-way platforms, ladders (group "ladder"), hazards (group "hazard") and the goal.
+func build_side(data: Dictionary) -> void:
+	var side: Dictionary = data.get("side", {})
+	var root := Node2D.new()
+	root.name = "SideScroller"
+	add_child(root)
+	for pl in side.get("platforms", []):
+		var body := StaticBody2D.new()
+		body.name = "Platform"
+		var shape := CollisionShape2D.new()
+		var rect := RectangleShape2D.new()
+		rect.size = Vector2(float(pl["w"]) * tile_size, 4.0)
+		shape.shape = rect
+		shape.one_way_collision = true
+		shape.position = Vector2((float(pl["x"]) + float(pl["w"]) / 2.0) * tile_size, float(pl["y"]) * tile_size + 2.0)
+		body.add_child(shape)
+		root.add_child(body)
+	for ld in side.get("ladders", []):
+		var area := _area(root, "Ladder", float(ld["x"]) + 0.2, float(ld["y"]), 0.6, float(ld["h"]))
+		area.add_to_group("ladder")
+	for hz in side.get("hazards", []):
+		var area := _area(root, "Hazard", float(hz["x"]) + 0.1, float(hz["y"]) + 0.3, float(hz["w"]) - 0.2, float(hz["h"]) - 0.3)
+		area.add_to_group("hazard")
+		area.body_entered.connect(_on_hazard)
+	var goal = side.get("goal", null)
+	if goal != null:
+		var area := _area(root, "Goal", float(goal[0]) - 0.5, float(goal[1]) - 1.0, 2.0, 2.0)
+		area.add_to_group("goal")
+		area.body_entered.connect(_on_goal)
+
+
+func _area(parent: Node, area_name: String, x: float, y: float, w: float, h: float) -> Area2D:
+	var area := Area2D.new()
+	area.name = area_name
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(w * tile_size, h * tile_size)
+	shape.shape = rect
+	shape.position = Vector2((x + w / 2.0) * tile_size, (y + h / 2.0) * tile_size)
+	area.add_child(shape)
+	parent.add_child(area)
+	return area
+
+
+func _on_hazard(body: Node) -> void:
+	if body.has_method("hazard_hit"):
+		body.call("hazard_hit")
+	elif body.has_method("hurt"):
+		body.call("hurt", 1)
+
+
+func _on_goal(body: Node) -> void:
+	if body.is_in_group("player"):
+		print("MapForge: goal reached")
+		goal_reached.emit(body)
+
+
+## same jump / speed as the MapForge playtest, camera kept inside the level
+func _setup_side_player() -> void:
+	var side: Dictionary = map_data.get("side", {})
+	var phys: Dictionary = side.get("physics", {})
+	for key in ["gravity", "jump_velocity", "run_speed", "speed", "fall_limit"]:
+		var value = null
+		match key:
+			"gravity": value = phys.get("gravity", null)
+			"jump_velocity": value = phys.get("jumpVelocity", null)
+			"run_speed": value = phys.get("runSpeed", null)
+			"speed": value = phys.get("walkSpeed", null)
+			"fall_limit": value = side.get("fallLimit", null)
+		if value != null and key in player:
+			player.set(key, float(value))
+	var info: Dictionary = map_data.get("map", {})
+	for c in player.get_children():
+		if c is Camera2D:
+			c.limit_left = 0
+			c.limit_top = 0
+			c.limit_right = int(info.get("width", 0)) * tile_size
+			c.limit_bottom = int(info.get("height", 0)) * tile_size
+
+
 static func rle_decode(rle: Array, size: int) -> PackedByteArray:
 	var out := PackedByteArray()
 	out.resize(size)
@@ -397,6 +486,14 @@ Y-sort
   pillars, wall fronts and cliffs when it stands above their base line and in
   front of them when it stands below.
 - Tall tiles carry TileData.y_sort_origin, objects are positioned at their base line.
+
+Side-Scroller (Seitenansicht)
+- Plattformen sind Einweg-Plattformen (von unten durchspringen), Leitern sind Area2D in der
+  Gruppe "ladder", Stacheln/Wasser/Lava sind Area2D "hazard" (ruft hazard_hit() / hurt() auf).
+- Die Spielfigur bekommt die Platformer-Steuerung mit denselben Sprungwerten wie in MapForge:
+  ← → laufen, Shift rennt, ↑/Leertaste springt (lang drücken = höher), ↑/↓ an Leitern klettern,
+  ↓ + Springen fällt durch Plattformen, J/X greift an.
+- Signal goal_reached(body) am Loader, wenn die Figur das Ziel erreicht.
 
 Collision & navigation
 - The Collision layer gets full-tile collision polygons (hidden by default).

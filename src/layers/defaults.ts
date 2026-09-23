@@ -63,6 +63,27 @@ export const ROLE_LABEL: Record<LayerRole, string> = {
   custom: 'Eigener Layer',
 };
 
+/** layer names in side-scroller projects (same roles, clearer names) */
+export const SIDE_LAYER_NAME: Partial<Record<LayerRole, string>> = {
+  floor: 'Hintergrund',
+  walls: 'Boden (fest)',
+  objects: 'Plattformen & Leitern',
+  overhead: 'Wasser & Lava',
+  deco: 'Deko',
+};
+
+/** rename default-named layers for a perspective (own names stay) */
+export function namesFor(layers: Layer[], side: boolean): Layer[] {
+  return layers.map((l) => {
+    const sideName = SIDE_LAYER_NAME[l.role];
+    if (!sideName) return l;
+    const def = DEFAULT_LAYERS.find((d) => d.role === l.role)?.name;
+    if (side && l.name === def) return { ...l, name: sideName };
+    if (!side && l.name === sideName && def) return { ...l, name: def };
+    return l;
+  });
+}
+
 export function createLayer(name: string, role: LayerRole, color: string, size: number, visible = true, ySort = false): Layer {
   return { id: uid('layer'), name, role, color, visible, locked: false, ySort, data: new Uint32Array(size) };
 }

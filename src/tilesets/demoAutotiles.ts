@@ -12,7 +12,7 @@ const COLS = 8;
 
 type Ctx = CanvasRenderingContext2D;
 
-interface Def {
+export interface Def {
   role?: TileRole;
   category?: TileCategory;
   tags?: string[];
@@ -22,20 +22,21 @@ interface Def {
   draw: (d: D) => void;
 }
 
-class D {
+export class D {
   constructor(
     public ctx: Ctx,
     public ox: number,
     public oy: number,
     public rng: Rng,
   ) {}
-  rect(x: number, y: number, w: number, h: number, c: string) {
-    if (w <= 0 || h <= 0) return;
+  rect(x: number, y: number, w: number, h: number, c: string): this {
+    if (w <= 0 || h <= 0) return this;
     this.ctx.fillStyle = c;
     this.ctx.fillRect(this.ox + x, this.oy + y, w, h);
+    return this;
   }
-  px(x: number, y: number, c: string) {
-    this.rect(x, y, 1, 1, c);
+  px(x: number, y: number, c: string): this {
+    return this.rect(x, y, 1, 1, c);
   }
   speckle(colors: string[], p: number, x0 = 0, y0 = 0, w = T, h = T) {
     for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (this.rng.chance(p)) this.px(x, y, this.rng.pick(colors));
@@ -445,7 +446,7 @@ function terrainDefs(): Def[] {
   return defs;
 }
 
-function build(id: string, name: string, defs: Def[], perspectives: Perspective[], firstGid: number, seed: number): Tileset {
+export function build(id: string, name: string, defs: Def[], perspectives: Perspective[], firstGid: number, seed: number): Tileset {
   const rows = Math.ceil(defs.length / COLS);
   const canvas = document.createElement('canvas');
   canvas.width = COLS * T;

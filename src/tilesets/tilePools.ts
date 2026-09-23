@@ -70,6 +70,21 @@ export const ROLE_FALLBACK: Partial<Record<TileRole, RoleFallback>> = {
   lava: { cats: ['lava'] },
   abyss: { cats: ['abyss'] },
   shadow: { cats: ['shadow'] },
+  ground_top: { roles: ['ground_fill'], cats: ['wallTop'] },
+  ground_top_left: { roles: ['ground_top'], cats: ['wallTop'] },
+  ground_top_right: { roles: ['ground_top_left', 'ground_top'], cats: ['wallTop'] },
+  ground_left: { roles: ['ground_fill'], cats: ['wallTop'] },
+  ground_right: { roles: ['ground_left', 'ground_fill'], cats: ['wallTop'] },
+  ground_bottom: { roles: ['ground_fill'], cats: ['wallTop'] },
+  ground_inner_left: { roles: ['ground_fill'], cats: ['wallTop'] },
+  ground_inner_right: { roles: ['ground_inner_left', 'ground_fill'], cats: ['wallTop'] },
+  ground_fill: { roles: ['wall_top'], cats: ['wallTop'] },
+  platform: { roles: ['bridge_middle'], cats: ['bridge', 'path'] },
+  platform_left: { roles: ['platform'], cats: ['bridge', 'path'] },
+  platform_right: { roles: ['platform_left', 'platform'], cats: ['bridge', 'path'] },
+  ladder: { cats: ['stairs'] },
+  spikes: { cats: ['obstacle'] },
+  back_wall: { cats: [] },
 };
 
 function pickFrom(rng: Rng, list: PoolTile[], prefer?: string[], avoid?: string[]): number {

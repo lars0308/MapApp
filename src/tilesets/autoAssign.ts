@@ -336,6 +336,21 @@ const ROLE_SHORT: Partial<Record<TileRole, string>> = {
   raised_floor: 'Erhöht',
   transition: 'Übergang',
   shadow: 'Schatten',
+  ground_top: 'Gras ↑',
+  ground_top_left: 'Gras ┌',
+  ground_top_right: 'Gras ┐',
+  ground_left: 'Erde ←',
+  ground_right: 'Erde →',
+  ground_bottom: 'Erde ↓',
+  ground_inner_left: 'Erde ┘',
+  ground_inner_right: 'Erde └',
+  ground_fill: 'Erde',
+  platform: 'Plattform',
+  platform_left: 'Plattf. ←',
+  platform_right: 'Plattf. →',
+  ladder: 'Leiter',
+  spikes: 'Stacheln',
+  back_wall: 'Hintergrund',
 };
 
 const CATEGORY_SHORT: Record<TileCategory, string> = {

@@ -8,7 +8,7 @@ import { setRenderer } from './rendererRef';
 import { computeBlocked } from './collision';
 import { applyAutoWalls } from './autoWalls';
 import { OBJECT_DEFS } from '../objects/defs';
-import type { MapObject } from '../types';
+import type { MapObject, Project } from '../types';
 
 /** Top-most object whose sprite covers the cell. */
 export function objectAt(objects: MapObject[], x: number, y: number): MapObject | null {
@@ -75,6 +75,7 @@ export function MapCanvas() {
     const p = useProject.getState().project;
     r.setDocument(p.map.width, p.map.height, p.layers, p.tilesets);
     r.objects = p.objects;
+    r.backdrop = backdropOf(p);
 
     let fitted = false;
     const ro = new ResizeObserver(() => {
@@ -99,6 +100,10 @@ export function MapCanvas() {
       }
       if (p.objects !== prev.objects) {
         r.objects = p.objects;
+        r.requestRender();
+      }
+      if (backdropOf(p) !== r.backdrop) {
+        r.backdrop = backdropOf(p);
         r.requestRender();
       }
       if (sizeChanged || projectSwitched) r.fit();
@@ -533,3 +538,8 @@ export function MapCanvas() {
   );
 }
 
+/** side-scroller maps get a sky (outside) or a dark cave behind the tiles */
+function backdropOf(p: Project): 'plain' | 'sky' | 'cave' {
+  if (p.map.perspective !== 'side_view') return 'plain';
+  return p.generator.side?.style === 'cave' ? 'cave' : 'sky';
+}

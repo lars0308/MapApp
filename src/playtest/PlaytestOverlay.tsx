@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useEditor } from '../store/editorStore';
+import { useProject } from '../store/projectStore';
 import { joystick, stopPlaytest } from './controller';
 import { Icon } from '../components/icons';
 
@@ -48,21 +49,52 @@ function Joystick() {
   );
 }
 
+/** big jump button for side-scroller maps (bottom right) */
+function JumpButton() {
+  const set = (v: boolean) => (joystick.jump = v);
+  return (
+    <button
+      type="button"
+      className="jump-btn"
+      aria-label="Springen"
+      onPointerDown={(e) => {
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        set(true);
+      }}
+      onPointerUp={() => set(false)}
+      onPointerCancel={() => set(false)}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      Springen
+    </button>
+  );
+}
+
 export function PlaytestOverlay({ touch }: { touch: boolean }) {
   const on = useEditor((s) => s.playtest);
+  const side = useProject((s) => s.project.map.perspective === 'side_view');
   if (!on) return null;
   return (
     <>
       <div className="playtest-bar">
         <span className="playtest-dot" />
         <strong>Playtest</strong>
-        <span className="muted playtest-hint">{touch ? 'Joystick links unten' : 'WASD / Pfeiltasten · Esc beendet'}</span>
+        <span className="muted playtest-hint">
+          {side
+            ? touch
+              ? 'Joystick: laufen, hoch = Leiter · Knopf rechts: springen'
+              : 'A/D laufen · W/Leertaste springen (lang = höher) · ↓ durch Plattformen · Esc'
+            : touch
+              ? 'Joystick links unten'
+              : 'WASD / Pfeiltasten · Esc beendet'}
+        </span>
         <button type="button" className="btn btn-primary playtest-stop" onClick={stopPlaytest}>
           <Icon.Close size={16} />
           <span>Playtest beenden</span>
         </button>
       </div>
       {touch && <Joystick />}
+      {touch && side && <JumpButton />}
     </>
   );
 }

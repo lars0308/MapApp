@@ -1,8 +1,8 @@
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { PRESETS } from '../generator/presets';
-import type { Perspective, RoomShape } from '../types';
-import { PERSPECTIVES } from '../types';
+import { deriveConfig } from '../profiles';
+import type { Perspective, RoomShape, SideSettings } from '../types';
 import { CORRIDOR_OPTS, DISTRIBUTIONS, SHAPES, SPECIALS } from './generatorOptions';
 import { PERSPECTIVE_INFO } from '../generator/perspective';
 import { RoomCountGuard } from './RoomCountGuard';
@@ -12,6 +12,7 @@ import { copyText } from '../utils/clipboard';
 import { randomSeed } from '../generator/rng';
 import { COMMON_TILE_SIZES } from '../tilesets/slicing';
 import { Stats } from './Stats';
+import { SideFields, resolveSide } from './SideFields';
 
 export function SeedField() {
   const seed = useProject((s) => s.project.generator.seed);
@@ -48,19 +49,26 @@ export function MapSettingsFields() {
   const setMapSize = useProject((s) => s.setMapSize);
   const setTileSize = useProject((s) => s.setTileSize);
   const setMapOptions = useProject((s) => s.setMapOptions);
+  const profile = useProject((s) => s.project.profile);
   const custom = !COMMON_TILE_SIZES.includes(map.tileSize);
+  // only the perspectives of the chosen game type (top-down family, side view …)
+  const offered = deriveConfig(profile).perspectives;
+  const perspectives: Perspective[] = offered.includes(map.perspective) ? offered : [map.perspective, ...offered];
+  const side = map.perspective === 'side_view';
   return (
     <>
-      <div className="field">
-        <label>Perspektive</label>
-        <Segmented
-          label="Perspektive"
-          value={map.perspective}
-          options={PERSPECTIVES.map((p: Perspective) => ({ value: p, label: PERSPECTIVE_INFO[p].label.replace(' / Isometric-like', '') }))}
-          onChange={(perspective) => setMapOptions({ perspective })}
-        />
-      </div>
-      <Toggle label="Schatten" description="Wandschatten in den Layer „Schatten“ generieren" checked={map.shadows} onChange={(shadows) => setMapOptions({ shadows })} />
+      {perspectives.length > 1 && (
+        <div className="field">
+          <label>Perspektive</label>
+          <Segmented
+            label="Perspektive"
+            value={map.perspective}
+            options={perspectives.map((p: Perspective) => ({ value: p, label: PERSPECTIVE_INFO[p].label.replace(' / Isometric-like', '') }))}
+            onChange={(perspective) => setMapOptions({ perspective })}
+          />
+        </div>
+      )}
+      {!side && <Toggle label="Schatten" description="Wandschatten in den Layer „Schatten“ generieren" checked={map.shadows} onChange={(shadows) => setMapOptions({ shadows })} />}
       <div className="grid-2">
         <NumberField label="Breite" value={map.width} min={16} max={256} step={1} suffix="Tiles" onChange={(w) => setMapSize(w, map.height)} />
         <NumberField label="Höhe" value={map.height} min={16} max={256} step={1} suffix="Tiles" onChange={(h) => setMapSize(map.width, h)} />
@@ -92,11 +100,15 @@ export function GeneratorPanel() {
   const update = useProject((s) => s.updateGenerator);
   const applyPreset = useProject((s) => s.applyPreset);
 
+  const side = useProject((s) => s.project.map.perspective === 'side_view');
+
   const setShape = (id: RoomShape) => {
     const next = { ...g.shapes, [id]: !g.shapes[id] };
     if (!Object.values(next).some(Boolean)) return; // at least one shape
     update({ shapes: next });
   };
+
+  if (side) return <SidePanel />;
 
   return (
     <div className="panel-scroll">
@@ -194,6 +206,52 @@ export function GeneratorPanel() {
         <Toggle label="Säulen in großen Hallen" checked={g.objects.pillars} onChange={(pillars) => update({ objects: { ...g.objects, pillars } })} />
         <p className="hint">Wasser, Lava, Abgründe, Klippen und Brücken: Panel „Terrain“.</p>
       </Section>
+    </div>
+  );
+}
+
+const SIDE_PRESETS: { id: string; label: string; text: string; side: Partial<SideSettings>; boss?: boolean }[] = [
+  { id: 'easy', label: 'Leicht', text: 'Wenige Gruben, kaum Gegner', side: { hills: 30, gaps: 20, platforms: 30, enemies: 15, hazards: { abyss: true, water: true, lava: false, spikes: false } } },
+  { id: 'normal', label: 'Normal', text: 'Ausgewogen', side: { hills: 50, gaps: 40, platforms: 50, enemies: 40, hazards: { abyss: true, water: true, lava: false, spikes: true } } },
+  { id: 'hard', label: 'Schwer', text: 'Viele Sprünge, Lava und Stacheln', side: { hills: 70, gaps: 75, platforms: 75, enemies: 70, hazards: { abyss: true, water: false, lava: true, spikes: true } }, boss: true },
+  { id: 'cave', label: 'Höhle', text: 'Decke, Kristalle, Leitern', side: { style: 'cave', hills: 60, gaps: 45, platforms: 60, ladders: true, enemies: 45, hazards: { abyss: true, water: true, lava: true, spikes: true } } },
+];
+
+/** Settings of the side-scroller generator (perspective side_view). */
+function SidePanel() {
+  const g = useProject((s) => s.project.generator);
+  const update = useProject((s) => s.updateGenerator);
+  const run = useProject((s) => s.runGenerate);
+  const side = resolveSide(g.side);
+  const set = (patch: Partial<SideSettings>) => update({ side: { ...side, ...patch } });
+  return (
+    <div className="panel-scroll">
+      <BuildModeCard />
+      <Stats />
+      <p className="hint side-intro">Das Level läuft von links (Start) nach rechts (Ziel). Es wird nur so gebaut, dass alles mit der eingestellten Sprunghöhe und -weite schaffbar ist.</p>
+      <Section title="Schwierigkeit">
+        <div className="chips">
+          {SIDE_PRESETS.map((p) => (
+            <Chip
+              key={p.id}
+              active={false}
+              onClick={() => {
+                update({ side: { ...side, ...p.side, hazards: { ...side.hazards, ...p.side.hazards } }, specials: { ...g.specials, boss: !!p.boss } });
+                void run();
+              }}
+            >
+              {p.label}
+            </Chip>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Map">
+        <SeedField />
+        <MapSettingsFields />
+      </Section>
+
+      <SideFields side={side} onChange={set} boss={g.specials.boss} onBoss={(boss) => update({ specials: { ...g.specials, boss } })} deco={g.decoDensity} onDeco={(v) => update({ decoDensity: v })} />
     </div>
   );
 }

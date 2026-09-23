@@ -47,7 +47,13 @@ interface PaletteItem {
 }
 
 function Palette() {
-  const tilesets = useProject((s) => s.project.tilesets);
+  const allTilesets = useProject((s) => s.project.tilesets);
+  const perspective = useProject((s) => s.project.map.perspective);
+  // tiles drawn for this view first; demo tiles of other views (e.g. dungeon walls in a side-scroller) hidden
+  const tilesets = useMemo(() => {
+    const rank = (ts: Tileset) => (ts.perspectives?.includes(perspective) ? 0 : !ts.perspectives?.length ? 1 : 2);
+    return allTilesets.filter((ts) => !(ts.source === 'demo' && rank(ts) === 2)).sort((a, b) => rank(a) - rank(b));
+  }, [allTilesets, perspective]);
   const selectedGid = useEditor((s) => s.selectedGid);
   const marked = useEditor((s) => s.markedGids);
   const multi = useEditor((s) => s.multiSelect);

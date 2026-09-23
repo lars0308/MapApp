@@ -12,7 +12,19 @@ export function Stats() {
     );
   }
   const specials = result.rooms.filter((r) => r.type !== 'normal').length;
-  const items: [string, string | number][] = [
+  const count = (t: string) => result.spawnPoints.filter((sp) => sp.type === t).length;
+  const side = result.perspective === 'side_view';
+  const items: [string, string | number][] = side
+    ? [
+        ['Größe', `${map.width}×${map.height}`],
+        ['Gegner', count('enemy')],
+        ['Belohnungen', count('loot')],
+        ['Boss', result.rooms.some((r) => r.isBoss) ? 'ja' : 'nein'],
+        ['Ziel', result.rooms.some((r) => r.isEnd) ? 'rechts' : '–'],
+        ['Ansicht', PERSPECTIVE_INFO.side_view.label],
+        ['Seed', result.seed],
+      ]
+    : [
     ['Größe', `${map.width}×${map.height}`],
     ['Räume', result.rooms.length],
     ['Verbindungen', result.connections.length],

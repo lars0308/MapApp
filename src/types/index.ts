@@ -29,9 +29,12 @@ export type TileCategory =
   | 'special'
   | 'shadow';
 
-/** Camera perspective of the map. Controls which wall/tile roles the generator uses. */
-export type Perspective = 'top_down' | 'low_top_down' | 'isometric_45';
-export const PERSPECTIVES: Perspective[] = ['top_down', 'low_top_down', 'isometric_45'];
+/**
+ * Camera perspective of the map. Controls which wall/tile roles the generator uses.
+ * side_view = 2D side-scroller (gravity, ground, platforms) – its own generator.
+ */
+export type Perspective = 'top_down' | 'low_top_down' | 'isometric_45' | 'side_view';
+export const PERSPECTIVES: Perspective[] = ['top_down', 'low_top_down', 'isometric_45', 'side_view'];
 
 /**
  * Auto-tile roles. The generator asks for a role first and falls back to
@@ -93,6 +96,22 @@ export const TILE_ROLES = [
   'raised_floor',
   'transition',
   'shadow',
+  // side view (side-scroller): solid ground, one-way platforms, ladders, hazards, back wall
+  'ground_top',
+  'ground_top_left',
+  'ground_top_right',
+  'ground_left',
+  'ground_right',
+  'ground_bottom',
+  'ground_inner_left',
+  'ground_inner_right',
+  'ground_fill',
+  'platform',
+  'platform_left',
+  'platform_right',
+  'ladder',
+  'spikes',
+  'back_wall',
 ] as const;
 export type TileRole = (typeof TILE_ROLES)[number];
 
@@ -217,6 +236,30 @@ export interface GeneratorSettings {
   obstacleDensity: number;
   terrain: TerrainSettings;
   objects: { trees: number; rocks: number; arches: number; pillars: boolean };
+  /** side-scroller levels (perspective side_view) */
+  side?: SideSettings;
+}
+
+/** Settings of the side-scroller generator. Heights / widths are in tiles. */
+export interface SideSettings {
+  /** outdoor: sky above, cave: ceiling and back wall */
+  style: 'outdoor' | 'cave';
+  /** how far the player can jump (up / across) – the level never asks for more */
+  jumpHeight: number;
+  jumpWidth: number;
+  /** 0–100: how often the ground goes up and down */
+  hills: number;
+  /** 0–100: pits to jump over */
+  gaps: number;
+  /** 0–100: floating one-way platforms, upper routes with rewards */
+  platforms: number;
+  ladders: boolean;
+  /** what lies at the bottom of pits */
+  hazards: { water: boolean; lava: boolean; spikes: boolean; abyss: boolean };
+  /** 0–100: enemy spawn points on the ground */
+  enemies: number;
+  /** 0–100: loot on platforms and hidden spots */
+  loot: number;
 }
 
 export interface TerrainSettings {
@@ -329,7 +372,11 @@ export const T_CLIFF = 5;
 export const T_STAIRS = 6;
 export const T_BRIDGE = 7;
 export const T_TRANSITION = 8;
-export const TERRAIN_NAMES = ['ground', 'water', 'lava', 'abyss', 'plateau', 'cliff', 'stairs', 'bridge', 'transition'];
+/** side view: one-way platform, ladder, spikes */
+export const T_PLATFORM = 9;
+export const T_LADDER = 10;
+export const T_SPIKES = 11;
+export const TERRAIN_NAMES = ['ground', 'water', 'lava', 'abyss', 'plateau', 'cliff', 'stairs', 'bridge', 'transition', 'platform', 'ladder', 'spikes'];
 
 export interface GenerationResult {
   seed: string;

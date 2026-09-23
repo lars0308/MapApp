@@ -36,6 +36,14 @@ export const PERSPECTIVE_INFO: Record<Perspective, PerspectiveInfo> = {
     faceRows: 2,
     sideFaces: true,
   },
+  side_view: {
+    id: 'side_view',
+    label: 'Seitenansicht',
+    short: '2D Side-Scroller / Platformer',
+    points: ['Kamera von der Seite, Schwerkraft', 'Boden, Plattformen, Leitern, Abgründe', 'Level läuft von links nach rechts'],
+    faceRows: 0,
+    sideFaces: false,
+  },
 };
 
 /** Special rooms that each need a room of their own. */

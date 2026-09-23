@@ -1,7 +1,12 @@
-import type { GeneratorSettings, MapSettings, TerrainSet, TerrainSettings } from '../types';
+import type { GeneratorSettings, MapSettings, TerrainSet, TerrainSettings, SideSettings } from '../types';
 import { randomSeed } from './rng';
 
 export const DEFAULT_MAP: MapSettings = { width: 80, height: 80, tileSize: 32, perspective: 'top_down', shadows: true };
+
+/** side-scroller defaults: jump 3 up / 4 across fits the platformer figure script */
+export function defaultSide(): SideSettings {
+  return { style: 'outdoor', jumpHeight: 3, jumpWidth: 4, hills: 50, gaps: 40, platforms: 50, ladders: true, hazards: { water: true, lava: false, spikes: true, abyss: true }, enemies: 40, loot: 40 };
+}
 
 export function defaultGenerator(seed = randomSeed()): GeneratorSettings {
   return {

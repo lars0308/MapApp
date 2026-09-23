@@ -1,6 +1,7 @@
 import { useEditor } from '../store/editorStore';
 import { useProject } from '../store/projectStore';
-import { PERSPECTIVES, type Perspective } from '../types';
+import type { Perspective } from '../types';
+import { deriveConfig } from '../profiles';
 import { PERSPECTIVE_INFO } from '../generator/perspective';
 import { Button, Section, Segmented, Toggle } from './ui';
 import { Icon } from './icons';
@@ -14,6 +15,7 @@ export function SettingsPanel({ desktop = false }: { desktop?: boolean }) {
   const e = useEditor();
   const map = useProject((s) => s.project.map);
   const setMapOptions = useProject((s) => s.setMapOptions);
+  const profile = useProject((s) => s.project.profile);
   return (
     <div className="panel-scroll">
       <Section title="Ansicht">
@@ -31,16 +33,20 @@ export function SettingsPanel({ desktop = false }: { desktop?: boolean }) {
         />
       </Section>
       <ClearMap />
-      <Section title="Perspektive">
-        <Segmented
-          label="Perspektive"
-          value={map.perspective}
-          options={PERSPECTIVES.map((p: Perspective) => ({ value: p, label: PERSPECTIVE_INFO[p].label.replace(' / Isometric-like', '') }))}
-          onChange={(perspective) => setMapOptions({ perspective })}
-        />
-        <Toggle label="Schatten" checked={map.shadows} onChange={(shadows) => setMapOptions({ shadows })} />
-        <p className="hint">Wirkt beim nächsten Generieren.</p>
-      </Section>
+      {map.perspective !== 'side_view' && (
+        <Section title="Perspektive">
+          <Segmented
+            label="Perspektive"
+            value={map.perspective}
+            options={deriveConfig(profile)
+              .perspectives.filter((p) => p !== 'side_view')
+              .map((p: Perspective) => ({ value: p, label: PERSPECTIVE_INFO[p].label.replace(' / Isometric-like', '') }))}
+            onChange={(perspective) => setMapOptions({ perspective })}
+          />
+          <Toggle label="Schatten" checked={map.shadows} onChange={(shadows) => setMapOptions({ shadows })} />
+          <p className="hint">Wirkt beim nächsten Generieren.</p>
+        </Section>
+      )}
       {desktop && (
         <Section title="Arbeitsbereich">
           <p className="hint">

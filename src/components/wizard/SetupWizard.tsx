@@ -4,6 +4,7 @@ import { PERSPECTIVES } from '../../types';
 import { DEFAULT_MAP, defaultGenerator, defaultTerrainSets } from '../../generator/presets';
 import { TerrainFields } from '../TerrainFields';
 import { PERSPECTIVE_INFO, requiredRooms } from '../../generator/perspective';
+import { SideFields, resolveSide } from '../SideFields';
 import { randomSeed } from '../../generator/rng';
 import { COMMON_TILE_SIZES } from '../../tilesets/slicing';
 import { createProject, useProject } from '../../store/projectStore';
@@ -21,7 +22,7 @@ import { listLibraryTilesets, type LibraryTileset } from '../../persistence/db';
 import { TilePools } from '../../tilesets/tilePools';
 import { Rng } from '../../generator/rng';
 
-type StepId = 'game' | 'mode' | 'perspective' | 'tiles' | 'map' | 'rooms' | 'paths' | 'specials' | 'terrain' | 'equip' | 'summary';
+type StepId = 'game' | 'mode' | 'perspective' | 'tiles' | 'map' | 'level' | 'rooms' | 'paths' | 'specials' | 'terrain' | 'equip' | 'summary';
 
 const STEP_LABEL: Record<StepId, string> = {
   game: 'Spiel',
@@ -29,6 +30,7 @@ const STEP_LABEL: Record<StepId, string> = {
   perspective: 'Perspektive',
   tiles: 'Tiles',
   map: 'Map',
+  level: 'Level',
   rooms: 'Räume',
   paths: 'Wege',
   specials: 'Spezialräume',
@@ -41,6 +43,12 @@ const STEP_LABEL: Record<StepId, string> = {
 const FLOW: Record<ProjectMode, StepId[]> = {
   generate: ['game', 'mode', 'perspective', 'tiles', 'map', 'rooms', 'paths', 'specials', 'terrain', 'equip', 'summary'],
   manual: ['game', 'mode', 'perspective', 'tiles', 'map', 'summary'],
+};
+
+/** side-scroller: one perspective, the level settings replace rooms / paths / terrain */
+const SIDE_FLOW: Record<ProjectMode, StepId[]> = {
+  generate: ['game', 'mode', 'tiles', 'map', 'level', 'summary'],
+  manual: ['game', 'mode', 'tiles', 'map', 'summary'],
 };
 
 const SPECIAL_HINT: Record<SpecialRoomType, string> = {
@@ -92,7 +100,8 @@ function WizardDialog() {
   const [library, setLibrary] = useState<LibraryTileset[] | null>(null);
   const [upload, setUpload] = useState<Tileset | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const steps = FLOW[draft.mode];
+  const sideView = draft.map.perspective === 'side_view';
+  const steps = (sideView ? SIDE_FLOW : FLOW)[draft.mode];
   const id = steps[Math.min(step, steps.length - 1)];
 
   const reloadLibrary = async () => {
@@ -141,7 +150,7 @@ function WizardDialog() {
     setBusy(true);
     let gen = draft.gen;
     const need = requiredRooms(gen.specials);
-    if (gen.roomCount < need) {
+    if (!sideView && gen.roomCount < need) {
       gen = { ...gen, roomCount: need };
       toast(`Raumanzahl automatisch auf ${need} erhöht`);
     }
@@ -168,7 +177,16 @@ function WizardDialog() {
       closeWizard();
       setView('map');
       useApp.getState().goTo('map');
-      toast(draft.mode === 'generate' ? 'Map erstellt' : 'Baukasten geöffnet – Boden malen legt Räume und Wege an, Wände entstehen automatisch', 'success');
+      toast(
+        draft.mode === 'generate'
+          ? sideView
+            ? 'Level erstellt – mit ▶ gleich testen'
+            : 'Map erstellt'
+          : sideView
+            ? 'Baukasten geöffnet – festen Boden malen, Gras und Kanten entstehen automatisch'
+            : 'Baukasten geöffnet – Boden malen legt Räume und Wege an, Wände entstehen automatisch',
+        'success',
+      );
     } catch (e) {
       console.error(e);
       toast(`Projekt konnte nicht erstellt werden: ${e instanceof Error ? e.message : String(e)}`, 'error');
@@ -242,6 +260,20 @@ function WizardDialog() {
                   </button>
                 ))}
               </div>
+            </StepSection>
+          )}
+
+          {id === 'level' && (
+            <StepSection title="Wie soll dein Level aussehen?">
+              <p className="hint side-intro">Das Level läuft von links (Start) nach rechts (Ziel). Es wird nur so gebaut, dass alles mit der eingestellten Sprunghöhe und -weite schaffbar ist.</p>
+              <SideFields
+                side={resolveSide(gen.side)}
+                onChange={(patch) => setGen({ side: { ...resolveSide(gen.side), ...patch } })}
+                boss={gen.specials.boss}
+                onBoss={(boss) => setGen({ specials: { ...gen.specials, boss } })}
+                deco={gen.decoDensity}
+                onDeco={(v) => setGen({ decoDensity: v })}
+              />
             </StepSection>
           )}
 
@@ -554,7 +586,17 @@ function Summary({ draft, library, onName, onFixRooms }: { draft: Draft; library
     ['Ausstattung', `Deko ${gen.decoDensity} % · Bäume ${gen.objects.trees} % · Felsen ${gen.objects.rocks} %`],
     ['Seed', gen.seed],
   ];
-  const rows = draft.mode === 'generate' ? [...base, ...generatorRows] : base;
+  const sd = resolveSide(gen.side);
+  const sideRows: [string, string][] = [
+    ['Umgebung', sd.style === 'cave' ? 'Höhle' : 'Draußen'],
+    ['Sprung', `${sd.jumpHeight} hoch · ${sd.jumpWidth} weit`],
+    ['Gelände', `Hügel ${sd.hills} % · Gruben ${sd.gaps} % · Plattformen ${sd.platforms} %${sd.ladders ? ' · Leitern' : ''}`],
+    ['Gefahren', [sd.hazards.abyss && 'Abgrund', sd.hazards.water && 'Wasser', sd.hazards.lava && 'Lava', sd.hazards.spikes && 'Stacheln'].filter(Boolean).join(', ')],
+    ['Inhalt', `Gegner ${sd.enemies} % · Belohnungen ${sd.loot} %${gen.specials.boss ? ' · Boss-Arena' : ''}`],
+    ['Seed', gen.seed],
+  ];
+  const side = map.perspective === 'side_view';
+  const rows = draft.mode === 'generate' ? [...(side ? base.map(([k, v]) => [k, k === 'Perspektive' ? PERSPECTIVE_INFO[map.perspective].label : v] as [string, string]) : base), ...(side ? sideRows : generatorRows)] : base;
   return (
     <StepSection title="Zusammenfassung">
       <div className="field">
@@ -569,7 +611,7 @@ function Summary({ draft, library, onName, onFixRooms }: { draft: Draft; library
           </div>
         ))}
       </dl>
-      {draft.mode === 'generate' && <RoomCountGuard specials={gen.specials} roomCount={gen.roomCount} onFix={onFixRooms} />}
+      {draft.mode === 'generate' && !side && <RoomCountGuard specials={gen.specials} roomCount={gen.roomCount} onFix={onFixRooms} />}
     </StepSection>
   );
 }
@@ -577,9 +619,11 @@ function Summary({ draft, library, onName, onFixRooms }: { draft: Draft; library
 /** Manual mode: floor layer active, brush with a floor tile of the chosen tiles. */
 function prepareBuildKit() {
   const p = useProject.getState().project;
-  const floor = p.layers.find((l) => l.role === 'floor');
+  const side = p.map.perspective === 'side_view';
+  const floor = p.layers.find((l) => l.role === (side ? 'walls' : 'floor'));
   if (floor) useProject.getState().setActiveLayer(floor.id);
-  const gid = new TilePools(p.tilesets, p.map.perspective).pickPref(new Rng(1), ['floor']);
+  const pools = new TilePools(p.tilesets, p.map.perspective);
+  const gid = side ? pools.pickRole(new Rng(1), 'ground_top', ['side', 'grass']) : pools.pickPref(new Rng(1), ['floor']);
   const editor = useEditor.getState();
   if (gid) editor.selectTile(gid);
   editor.setTool('brush');

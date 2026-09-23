@@ -4,12 +4,13 @@ import { mapEvents } from '../store/events';
 import { getRenderer } from '../editor/rendererRef';
 import { computeBlocked } from '../editor/collision';
 import type { CharacterState } from '../renderer/character';
+import { buildSideMap, jumpSpeed, newBody, stepSide, type SideBody, type SideMap, type SideTuning } from './sidePhysics';
 
 // Editor-only playtest: a neutral character walks over the current map.
 // Nothing here is stored in the project or exported.
 
-/** analogue input from the touch joystick (-1..1) */
-export const joystick = { vx: 0, vy: 0 };
+/** analogue input from the touch joystick (-1..1) + jump button (side view) */
+export const joystick = { vx: 0, vy: 0, jump: false };
 
 const SPEED = 4.2; // tiles per second
 const HALF_W = 0.28; // feet box half width (tiles)
@@ -25,9 +26,13 @@ const keys = new Set<string>();
 let char: CharacterState | null = null;
 let unsubMap: (() => void) | null = null;
 let unsubProject: (() => void) | null = null;
+// side view (platformer): gravity, jumping, ladders
+let side: SideMap | null = null;
+let body: SideBody | null = null;
+let tune: SideTuning = { jumpV: 16, speed: 6.2 };
 
 export function playtestState() {
-  return { running, char: char ? { ...char } : null };
+  return { running, char: char ? { ...char } : null, side: !!side, body: body ? { ...body } : null };
 }
 
 function refreshBlocked() {
@@ -35,6 +40,26 @@ function refreshBlocked() {
   W = p.map.width;
   H = p.map.height;
   blocked = computeBlocked(p);
+  if (p.map.perspective === 'side_view') {
+    side = buildSideMap(p);
+    tune = jumpSpeed(p);
+  } else side = null;
+}
+
+/** side view: stand on the ground below the spawn (feet on top of the first solid cell) */
+function sideSpawn(): [number, number] | null {
+  if (!side) return null;
+  const p = useProject.getState().project;
+  const sp = p.result?.spawnPoints.find((s) => s.type === 'player');
+  const cands: [number, number][] = sp ? [[sp.x, sp.y]] : [];
+  for (let x = 1; x < W - 1; x++) cands.push([x, 0]);
+  for (const [cx, cy] of cands)
+    for (let y = Math.max(0, cy); y < H - 1; y++) {
+      const i = y * W + cx;
+      const below = (y + 1) * W + cx;
+      if (!side.solid[i] && !side.hazard[i] && (side.solid[below] || side.platform[below])) return [cx + 0.5, y + 1];
+    }
+  return null;
 }
 
 const free = (x: number, y: number) => {
@@ -77,10 +102,39 @@ function onKey(e: KeyboardEvent) {
     stopPlaytest();
     return;
   }
-  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) {
     e.preventDefault();
     if (e.type === 'keydown') keys.add(k);
     else keys.delete(k);
+  }
+}
+
+function sideTick(dt: number) {
+  if (!char || !side || !body) return;
+  let x = joystick.vx;
+  if (keys.has('a') || keys.has('arrowleft')) x -= 1;
+  if (keys.has('d') || keys.has('arrowright')) x += 1;
+  x = Math.max(-1, Math.min(1, Math.abs(x) < 0.2 ? 0 : x));
+  const up = keys.has('w') || keys.has('arrowup') || joystick.vy < -0.5;
+  const down = keys.has('s') || keys.has('arrowdown') || joystick.vy > 0.5;
+  const jump = keys.has(' ') || keys.has('w') || keys.has('arrowup') || joystick.jump;
+  // small steps so fast falls never skip a platform
+  let ev: string | null = null;
+  const steps = Math.ceil(dt / 0.008);
+  for (let k = 0; k < steps; k++) ev = stepSide(side, body, { x, up, down, jump }, dt / steps, tune) ?? ev;
+  if (ev === 'goal') useEditor.getState().toast('Ziel erreicht! 🎉', 'success');
+  char.x = body.x;
+  char.y = body.y;
+  char.moving = Math.abs(body.vx) > 0.5 || (body.climbing && Math.abs(body.vy) > 0.5);
+  if (body.climbing) char.dir = 'up';
+  else if (x < 0) char.dir = 'left';
+  else if (x > 0) char.dir = 'right';
+  else if (char.dir === 'up' || char.dir === 'down') char.dir = 'right';
+  if (char.moving) char.step += dt * (body.climbing ? 2.5 : 4);
+  const r = getRenderer();
+  if (r) {
+    r.character = body.hurt > 0 && Math.floor(body.hurt * 10) % 2 ? null : char;
+    r.follow(char.x, char.y - 2);
   }
 }
 
@@ -88,6 +142,11 @@ function tick(now: number) {
   if (!running || !char) return;
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  if (side) {
+    sideTick(dt);
+    raf = requestAnimationFrame(tick);
+    return;
+  }
   let vx = joystick.vx;
   let vy = joystick.vy;
   if (keys.has('a') || keys.has('arrowleft')) vx -= 1;
@@ -120,13 +179,14 @@ function tick(now: number) {
 export function startPlaytest(): boolean {
   if (running) return true;
   refreshBlocked();
-  const pos = spawnPosition();
+  const pos = side ? sideSpawn() : spawnPosition();
   const editor = useEditor.getState();
   if (!pos) {
     editor.toast('Keine begehbare Fläche gefunden', 'error');
     return false;
   }
-  char = { x: pos[0], y: pos[1], dir: 'down', step: 0, moving: false };
+  char = { x: pos[0], y: pos[1], dir: side ? 'right' : 'down', step: 0, moving: false };
+  body = side ? newBody(pos[0], pos[1]) : null;
   running = true;
   editor.setPlaytest(true);
   const r = getRenderer();
@@ -157,6 +217,8 @@ export function stopPlaytest() {
   keys.clear();
   joystick.vx = 0;
   joystick.vy = 0;
+  joystick.jump = false;
+  body = null;
   window.removeEventListener('keydown', onKey);
   window.removeEventListener('keyup', onKey);
   unsubMap?.();

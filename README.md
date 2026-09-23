@@ -346,6 +346,18 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 2.5 – Modus „2D Side-Scroller“**
+
+- Im Setup unter *Ansicht* jetzt verfügbar: **2D Side-Scroller** (Genre Platformer). Eigener Ablauf: Spiel → Modus → Tiles → Map → **Level** → Zusammenfassung.
+- **Level-Generator** (von links = Start nach rechts = Ziel), aus Abschnitten: Ebene, Stufen, Gruben (Abgrund, Wasser, Lava, Stacheln), lange Gruben mit schwebenden **Einweg-Plattformen**, Aufstiege mit Belohnung oben, hohe Stufen mit **Leiter**, optional **Boss-Arena** vor der **Zielfahne**. Umgebung *Draußen* (Gras, Himmel mit Hügeln) oder *Höhle* (Decke, Rückwand, Kristalle). Gegner stehen auf ebenen Strecken, Truhen auf Plattformen.
+- **Immer schaffbar:** Jeder Abschnitt wird nur innerhalb der eingestellten **Sprunghöhe/-weite** gebaut. Geprüft mit einer Suche über die echte Spielphysik (Start → Ziel) für viele Seeds und Einstellungen.
+- Regler im Panel *Generator*: Schwierigkeit (Leicht/Normal/Schwer/Höhle), Umgebung, Sprung, Hügel, Gruben, Plattformen, Leitern, Gefahren, Gegner, Belohnungen, Boss-Arena, Deko.
+- **Testspielen mit Schwerkraft**: A/D laufen, W/Leertaste springen (lang drücken = höher), kurze Gnadenzeit an Kanten, ↓ fällt durch Plattformen, Leitern hoch/runter, Gefahren und Abstürze setzen an die letzte sichere Stelle zurück, „Ziel erreicht!“. Am Handy Joystick + großer **Springen**-Knopf.
+- **Auto-Boden** beim Selbstbauen: festen Boden malen/löschen → Gras oben, Kanten, Unterseite, Innenecken und Kollision passen sich an. Layer heißen im Side-Scroller verständlich: *Hintergrund, Boden (fest), Plattformen & Leitern, Wasser & Lava*.
+- **Demo-Tiles Seitenansicht** (Gras- und Höhlenboden mit allen Kanten, Holzplattformen, Leiter, Stacheln, Wasser/Lava mit Oberfläche, Höhlenwand, Deko, Zielfahne, Truhe). Die Palette zeigt die passenden Tiles zuerst.
+- **Godot-Paket**: Der Loader baut Einweg-Plattformen (StaticBody2D, one_way_collision), Leitern (Area2D „ladder“), Gefahren (Area2D „hazard“ → hazard_hit()), Ziel (Signal goal_reached). Die Spielfigur bekommt automatisch die **Platformer-Steuerung** mit denselben Sprungwerten wie in MapForge, Kamera auf das Level begrenzt. Getestet in Godot 4.3 (headless): Figur steht, läuft, springt, landet, Gefahr → zurück zur sicheren Stelle.
+- Jedes Karten-Paket enthält jetzt eine Spielfigur: die eigene aus „Animieren“ oder sonst die aktuelle Figur aus dem Baukasten – mit idle, walk, run, jump, fall, attack, hurt, death, climb in allen Richtungen.
+
 **Version 2.4.1 – Waffe in der Hand, Angriff nach Norden, immer 4 Richtungen**
 
 - Waffen sitzen jetzt **in der Faust**: der Griff läuft durch die Hand, die Hand liegt darüber, die Klinge steht schräg nach außen (Schwert 30°, von der Seite 40° nach vorn; Stab/Speer steiler, Bogen senkrecht). Beim Laufen schwingt die Waffe mit, die Hand hält sie aber ruhig.

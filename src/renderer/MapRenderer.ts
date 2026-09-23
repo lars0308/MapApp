@@ -82,6 +82,8 @@ export class MapRenderer {
   };
   objects: MapObject[] = [];
   character: CharacterState | null = null;
+  /** background behind the tiles: plain, sky with hills (side view outside), dark cave */
+  backdrop: 'plain' | 'sky' | 'cave' = 'plain';
   onCameraChange?: (cam: Camera) => void;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -252,6 +254,47 @@ export class MapRenderer {
     return chunk.canvas;
   }
 
+  /** side view: sky gradient with two rows of soft hills (slower parallax), or a dark cave */
+  private drawBackdrop(x: number, y: number, w: number, h: number) {
+    const { ctx } = this;
+    if (this.backdrop === 'cave') {
+      const g = ctx.createLinearGradient(0, y, 0, y + h);
+      g.addColorStop(0, '#1b1924');
+      g.addColorStop(1, '#0f0e14');
+      ctx.fillStyle = g;
+      ctx.fillRect(x, y, w, h);
+      return;
+    }
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, '#5fb4ec');
+    g.addColorStop(0.7, '#b9e2f7');
+    g.addColorStop(1, '#dff3fb');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    const z = this.cam.zoom;
+    const hills = (color: string, level: number, amp: number, freq: number, parallax: number) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      const base = y + h * level;
+      const off = this.cam.x * z * parallax;
+      ctx.moveTo(x, y + h);
+      for (let px = 0; px <= w; px += 6) {
+        const t = (px + off) / (z * freq);
+        ctx.lineTo(x + px, base - amp * h * (0.5 + 0.35 * Math.sin(t) + 0.15 * Math.sin(t * 2.3 + 1)));
+      }
+      ctx.lineTo(x + w, y + h);
+      ctx.closePath();
+      ctx.fill();
+    };
+    hills('#a9d8c4', 0.62, 0.22, 9, 0.2);
+    hills('#8cc7a6', 0.72, 0.16, 5, 0.45);
+    ctx.restore();
+  }
+
   render() {
     if (this.table.refresh()) for (const c of this.chunks) c.dirty = true;
     const { ctx, cam } = this;
@@ -267,6 +310,7 @@ export class MapRenderer {
     // map background
     ctx.fillStyle = COLORS.mapBg;
     ctx.fillRect(sx(0), sy(0), sx(this.W) - sx(0), sy(this.H) - sy(0));
+    if (this.backdrop !== 'plain') this.drawBackdrop(sx(0), sy(0), sx(this.W) - sx(0), sy(this.H) - sy(0));
 
     const x0 = Math.max(0, Math.floor(cam.x));
     const y0 = Math.max(0, Math.floor(cam.y));

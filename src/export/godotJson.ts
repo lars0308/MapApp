@@ -4,6 +4,7 @@ import { rleEncode } from '../utils/rle';
 import { safeFileName } from '../utils/download';
 import { GODOT_LAYER_NAME } from '../layers/defaults';
 import { computeBlocked, metaTable, tileBlocks } from '../editor/collision';
+import { GRAVITY, buildSideMap, jumpSpeed } from '../playtest/sidePhysics';
 import { OBJECT_ATLAS_TILE, OBJECT_DEFS, objectAtlas } from '../objects/defs';
 
 // Map data for Godot 4 (TileMapLayer based, editable after import).
@@ -252,6 +253,7 @@ export async function buildGodotData(p: Project, opts: { embedImages: boolean; i
       cells: rleEncode(solidContent),
       rects: mergeRects(solidContent, W, H),
     },
+    ...(p.map.perspective === 'side_view' ? { side: sideData(p) } : {}),
     spawnPoints: r?.spawnPoints ?? [],
     spawnTypes: ['player', 'enemy', 'loot', 'npc', 'quest'],
     navigation: {
@@ -274,5 +276,51 @@ export async function buildGodotData(p: Project, opts: { embedImages: boolean; i
           floorMask: rleEncode(r.floorMask),
         }
       : null,
+  };
+}
+
+/**
+ * Side-scroller data for the loader: one-way platforms (row runs), ladders (column runs),
+ * hazard areas (spikes, water, lava), the goal and the jump physics in pixels –
+ * the same numbers as the editor playtest, so the level plays the same in Godot.
+ */
+function sideData(p: Project) {
+  const m = buildSideMap(p);
+  const { W, H } = m;
+  const ts = p.map.tileSize;
+  const platforms: { x: number; y: number; w: number }[] = [];
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (!m.platform[y * W + x]) continue;
+      let e = x;
+      while (e + 1 < W && m.platform[y * W + e + 1]) e++;
+      platforms.push({ x, y, w: e - x + 1 });
+      x = e;
+    }
+  const ladders: { x: number; y: number; h: number }[] = [];
+  for (let x = 0; x < W; x++)
+    for (let y = 0; y < H; y++) {
+      if (!m.ladder[y * W + x]) continue;
+      let e = y;
+      while (e + 1 < H && m.ladder[(e + 1) * W + x]) e++;
+      ladders.push({ x, y, h: e - y + 1 });
+      y = e;
+    }
+  const tune = jumpSpeed(p);
+  return {
+    note: 'Built by the loader: platforms = one-way StaticBody2D, ladders = Area2D group "ladder", hazards = Area2D group "hazard" (calls hazard_hit() / hurt() on the body), goal = Area2D, signal goal_reached.',
+    platforms,
+    ladders,
+    hazards: mergeRects(m.hazard, W, H),
+    goal: m.goal,
+    physics: {
+      gravity: Math.round(GRAVITY * ts),
+      jumpVelocity: Math.round(-tune.jumpV * ts),
+      runSpeed: Math.round(tune.speed * ts),
+      walkSpeed: Math.round(tune.speed * ts * 0.6),
+      jumpHeightTiles: p.generator.side?.jumpHeight ?? 3,
+      jumpWidthTiles: p.generator.side?.jumpWidth ?? 4,
+    },
+    fallLimit: (H + 2) * ts,
   };
 }

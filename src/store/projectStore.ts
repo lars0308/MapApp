@@ -7,11 +7,12 @@ import { randomSeed } from '../generator/rng';
 import { emptyResult, generate } from '../generator';
 import { createDemoTileset } from '../tilesets/demoTileset';
 import { createDemoAutotileSets } from '../tilesets/demoAutotiles';
+import { createDemoSideTileset } from '../tilesets/demoSide';
 import { applyTileMeta, findEmptyTiles } from '../tilesets/slicing';
 import { libraryToProjectTilesets, withTerrainsFor } from '../tilesets/library';
 import { learnFrom } from '../tilesets/learning';
 import type { LibraryTileset } from '../persistence/db';
-import { LAYER_COLORS, createDefaultLayers, createLayer, resizeData } from '../layers/defaults';
+import { LAYER_COLORS, createDefaultLayers, createLayer, namesFor, resizeData } from '../layers/defaults';
 import { uid } from '../utils/id';
 import { clamp } from '../utils/math';
 import { History, cloneLayers, type DocSnapshot, type HistoryEntry } from './history';
@@ -36,9 +37,12 @@ export function createProject(
   const demoActive = opts.demoActive ?? true;
   const demo = { ...createDemoTileset(1), active: demoActive };
   const auto = createDemoAutotileSets(1 + demo.columns * demo.rows).map((ts) => ({ ...ts, active: demoActive }));
+  const lastAuto = auto[auto.length - 1];
+  auto.push({ ...createDemoSideTileset(lastAuto.firstGid + lastAuto.columns * lastAuto.rows), active: demoActive });
   const last = auto[auto.length - 1];
   const own = libraryToProjectTilesets(opts.library ?? [], last.firstGid + last.columns * last.rows);
-  const layers = createDefaultLayers(map.width * map.height);
+  const side = map.perspective === 'side_view';
+  const layers = namesFor(createDefaultLayers(map.width * map.height), side);
   const now = Date.now();
   const mode = opts.mode ?? 'generate';
   const generator = opts.generator ? { ...opts.generator } : defaultGenerator();
@@ -55,7 +59,8 @@ export function createProject(
     tilesets: [demo, ...auto, ...own.tilesets],
     nextGid: own.nextGid,
     layers,
-    activeLayerId: layers[0].id,
+    // side view: start painting solid ground
+    activeLayerId: (side && layers.find((l) => l.role === 'walls')?.id) || layers[0].id,
     // manual mode starts with an empty structure grid so auto-walls work from the first stroke
     result: mode === 'manual' ? emptyResult(map.width, map.height, generator.seed, map.perspective) : null,
     terrains: withTerrainsFor(opts.terrains ?? defaultTerrainSets(), own.tilesets),
@@ -246,7 +251,9 @@ export const useProject = create<ProjectState>((set, get) => {
     },
     setMapOptions: (patch) => {
       const p = get().project;
-      touch({ ...p, map: { ...p.map, ...patch } });
+      const map = { ...p.map, ...patch };
+      const switched = (map.perspective === 'side_view') !== (p.map.perspective === 'side_view');
+      touch({ ...p, map, layers: switched ? namesFor(p.layers, map.perspective === 'side_view') : p.layers });
     },
     updateGenerator: (patch) => {
       const p = get().project;

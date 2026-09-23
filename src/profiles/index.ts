@@ -1,5 +1,5 @@
 import type { GeneratorSettings, MapSettings, Perspective } from '../types';
-import { PRESETS } from '../generator/presets';
+import { PRESETS, defaultSide } from '../generator/presets';
 
 // Game profile: the answers to "what kind of game is this?" from the setup wizard.
 // Only the answers are stored in the project (`project.profile`); everything the editor
@@ -36,7 +36,7 @@ export interface ViewInfo {
 export const VIEWS: ViewInfo[] = [
   { id: 'top_down', label: 'Top-Down', text: 'Von oben oder schräg von oben (3/4) – Zelda, Enter the Gungeon, Stardew Valley.', available: true, perspectives: ['top_down', 'low_top_down'] },
   { id: 'isometric', label: 'Isometrisch', text: 'Diagonale 45°-Ansicht mit hohen Wänden – Diablo, Hades.', available: true, perspectives: ['isometric_45'] },
-  { id: 'side_scroller', label: '2D Side-Scroller', text: 'Seitenansicht mit Schwerkraft, Plattformen, Schrägen – Celeste, Hollow Knight.', available: false, perspectives: [] },
+  { id: 'side_scroller', label: '2D Side-Scroller', text: 'Seitenansicht mit Schwerkraft, Plattformen, Leitern – Mario, Celeste, Hollow Knight.', available: true, perspectives: ['side_view'] },
   { id: 'hexagonal', label: 'Hexagonal', text: 'Sechseck-Raster für Strategie und Taktik – Civilization, Into the Breach (Hex).', available: false, perspectives: [] },
 ];
 
@@ -97,7 +97,7 @@ export const GENRES: GenreInfo[] = [
     map: preset('linear').map,
     apply: (g) => specials(preset('linear').apply(g), ['start', 'end', 'puzzle', 'secret']),
   },
-  { id: 'platformer', label: 'Platformer', text: 'Springen, Plattformen, Schrägen.', views: ['side_scroller'] },
+  { id: 'platformer', label: 'Platformer', text: 'Springen, Plattformen, Leitern, Gruben – Level von links nach rechts.', views: ['side_scroller'] },
   { id: 'other', label: 'Anderes', text: 'Keine Vorgaben – alle Einstellungen selbst wählen.', views: ['top_down', 'isometric', 'side_scroller', 'hexagonal'] },
 ];
 
@@ -110,6 +110,22 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, Math.
  * Genre first (room layout, special rooms), then the effort scales size and detail.
  */
 export function applyProfile(p: GameProfile, base: GeneratorSettings, map: Pick<MapSettings, 'width' | 'height'>): { gen: GeneratorSettings; map: Pick<MapSettings, 'width' | 'height'> } {
+  if (p.view === 'side_scroller') {
+    // a level runs left → right: wide and flat; effort = length and amount of content
+    const effort = p.effort ?? 'medium';
+    const side = defaultSide();
+    const big = effort === 'large';
+    const small = effort === 'small';
+    return {
+      gen: {
+        ...base,
+        side: { ...side, platforms: big ? 65 : small ? 35 : side.platforms, enemies: big ? 55 : small ? 25 : side.enemies },
+        specials: { ...base.specials, boss: big },
+        decoDensity: big ? 55 : small ? 20 : 40,
+      },
+      map: { width: big ? 220 : small ? 90 : 150, height: 32 },
+    };
+  }
   const g0 = genreInfo(p.genre);
   let gen = g0.apply ? g0.apply(base) : base;
   let size = { width: g0.map?.width ?? map.width, height: g0.map?.height ?? map.height };
@@ -158,7 +174,7 @@ export function profileLabel(p: GameProfile | undefined): string {
 
 /** Profile of a project saved before profiles existed. */
 export function profileFromPerspective(perspective: Perspective): GameProfile {
-  return { view: perspective === 'isometric_45' ? 'isometric' : 'top_down', genre: 'other', effort: 'medium' };
+  return { view: perspective === 'isometric_45' ? 'isometric' : perspective === 'side_view' ? 'side_scroller' : 'top_down', genre: 'other', effort: 'medium' };
 }
 
 /** Everything the app derives from a profile. */

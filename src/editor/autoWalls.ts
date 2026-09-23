@@ -3,6 +3,7 @@ import { useProject } from '../store/projectStore';
 import { TilePools } from '../tilesets/tilePools';
 import { frontTilePrefs, resolveWalls, roleAt } from '../generator/autotile';
 import { Rng, hashSeed } from '../generator/rng';
+import { groundRole } from '../generator/side';
 import { metaTable } from './collision';
 
 // Keeps walls consistent while editing by hand ("Auto-Wände"):
@@ -16,6 +17,10 @@ import { metaTable } from './collision';
 export function applyAutoWalls(changed: number[], paintedLayerId: string) {
   const store = useProject.getState();
   const p = store.project;
+  if (p.map.perspective === 'side_view') {
+    applyAutoGround(changed, paintedLayerId);
+    return;
+  }
   const r = p.result;
   if (!r || !changed.length || r.width !== p.map.width || r.height !== p.map.height) return;
   const W = p.map.width;
@@ -136,4 +141,66 @@ export function applyAutoWalls(changed: number[], paintedLayerId: string) {
   } else if (wallL) store.strokeSetLayer(wallL.id, wallCells, wallGids.map((g, k) => g || frontGids[k]));
   if (colL && collisionGid) store.strokeSetLayer(colL.id, wallCells, colGids);
   if (shadowL) store.strokeSetLayer(shadowL.id, shadowCells, shadowGids);
+}
+
+const GROUND_ROLES = new Set<TileRole>(['ground_top', 'ground_top_left', 'ground_top_right', 'ground_left', 'ground_right', 'ground_bottom', 'ground_inner_left', 'ground_inner_right', 'ground_fill']);
+
+/**
+ * Side view ("Auto-Boden"): painting / erasing solid ground on the ground layer re-tiles the
+ * edges around it (grass on top, sides, underside, inner corners) and keeps collision in sync.
+ */
+function applyAutoGround(changed: number[], paintedLayerId: string) {
+  const store = useProject.getState();
+  const p = store.project;
+  const r = p.result;
+  const W = p.map.width;
+  const H = p.map.height;
+  const groundL = p.layers.find((l) => l.role === 'walls');
+  if (!groundL || groundL.id !== paintedLayerId || !changed.length) return;
+  const metas = metaTable(p);
+  const isGroundGid = (g: number) => {
+    const m = metas[g];
+    return !!m && (GROUND_ROLES.has(m.role as TileRole) || (!m.role && !!m.category && m.category.startsWith('wall')));
+  };
+  const data = groundL.data;
+  const solid = (x: number, y: number) => (x < 0 || x >= W || y >= H ? true : y < 0 ? false : isGroundGid(data[y * W + x]));
+  const pools = new TilePools(p.tilesets, 'side_view');
+  const style = p.generator.side?.style === 'cave' ? 'cave' : 'grass';
+  // the style of the painted tile wins (grass / cave)
+  const paintedTag = metas[changed.map((i) => data[i]).find((g) => g) ?? 0]?.tags.find((t) => t === 'grass' || t === 'cave') ?? style;
+  const ring = new Set<number>();
+  for (const i of changed) {
+    const x = i % W;
+    const y = (i / W) | 0;
+    for (let oy = -1; oy <= 1; oy++)
+      for (let ox = -1; ox <= 1; ox++) {
+        const xx = x + ox;
+        const yy = y + oy;
+        if (xx >= 0 && yy >= 0 && xx < W && yy < H) ring.add(yy * W + xx);
+      }
+  }
+  const cells: number[] = [];
+  const gids: number[] = [];
+  const colL = p.layers.find((l) => l.role === 'collision');
+  const collisionGid = pools.pickTagged(new Rng(1), 'special', 'collision');
+  const colCells: number[] = [];
+  const colGids: number[] = [];
+  for (const i of ring) {
+    const x = i % W;
+    const y = (i / W) | 0;
+    const g = data[i];
+    const isGround = isGroundGid(g);
+    if (isGround) {
+      const own = metas[g]?.tags.find((t) => t === 'grass' || t === 'cave') ?? paintedTag;
+      const gid = pools.pickRole(new Rng(hashSeed(`${r?.seed ?? ''}:${i}`)), groundRole(solid, x, y), ['side', own]);
+      if (gid && gid !== g) (cells.push(i), gids.push(gid));
+    }
+    if (colL && collisionGid) (colCells.push(i), colGids.push(isGround ? collisionGid : 0));
+    if (r && r.width === W && r.height === H) {
+      const want = isGround ? CELL_WALL : CELL_ROOM;
+      if (r.cells[i] !== want && r.cells[i] !== CELL_HAZARD) store.strokeStruct(i, want);
+    }
+  }
+  if (cells.length) store.strokeSetLayer(groundL.id, cells, gids);
+  if (colL && colCells.length) store.strokeSetLayer(colL.id, colCells, colGids);
 }

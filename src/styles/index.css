@@ -5204,3 +5204,31 @@ body.is-resizing-y * {
 .sprite-studio.is-mobile .help-tip {
   margin: 8px;
 }
+
+/* side-scroller playtest: jump button (touch) */
+.jump-btn {
+  position: fixed;
+  right: 22px;
+  bottom: calc(28px + env(safe-area-inset-bottom));
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-line);
+  background: rgba(232, 137, 176, 0.28);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 14px;
+  z-index: 60;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.jump-btn:active {
+  background: rgba(232, 137, 176, 0.55);
+}
+.side-intro {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-2);
+}
