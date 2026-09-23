@@ -43,14 +43,46 @@ export function BrushSize() {
   const tool = useEditor((s) => s.tool);
   const size = useEditor((s) => s.brushSize);
   const setSize = useEditor((s) => s.setBrushSize);
+  const eraseRect = useEditor((s) => s.eraseRect);
+  const eraseAll = useEditor((s) => s.eraseAllLayers);
+  const setFlag = useEditor((s) => s.setFlag);
   if (tool !== 'brush' && tool !== 'eraser') return null;
+  const rect = tool === 'eraser' && eraseRect;
   return (
-    <div className="brush-size" role="radiogroup" aria-label="Pinselgröße">
+    <div className="brush-size" role="radiogroup" aria-label={tool === 'eraser' ? 'Radierer' : 'Pinselgröße'}>
       {[1, 2, 3, 5].map((n) => (
-        <button key={n} type="button" role="radio" aria-checked={size === n} className={size === n ? 'is-active' : ''} onClick={() => setSize(n)}>
+        <button
+          key={n}
+          type="button"
+          role="radio"
+          aria-checked={!rect && size === n}
+          className={!rect && size === n ? 'is-active' : ''}
+          onClick={() => {
+            setSize(n);
+            if (tool === 'eraser') setFlag('eraseRect', false);
+          }}
+        >
           {n}
         </button>
       ))}
+      {tool === 'eraser' && (
+        <>
+          <button type="button" role="radio" aria-checked={rect} aria-label="Rechteck radieren" title="Rechteck aufziehen und löschen" className={rect ? 'is-active' : ''} onClick={() => setFlag('eraseRect', true)}>
+            <Icon.Rect size={16} />
+          </button>
+          {rect && (
+            <button
+              type="button"
+              aria-pressed={eraseAll}
+              title="Alle Layer inklusive Objekte löschen (sonst nur der aktive Layer)"
+              className={`brush-all${eraseAll ? ' is-active' : ''}`}
+              onClick={() => setFlag('eraseAllLayers', !eraseAll)}
+            >
+              Alle Layer
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -30,6 +30,7 @@ export function SettingsPanel({ desktop = false }: { desktop?: boolean }) {
           onChange={(v) => e.setFlag('autoWalls', v)}
         />
       </Section>
+      <ClearMap />
       <Section title="Perspektive">
         <Segmented
           label="Perspektive"
@@ -85,6 +86,39 @@ function LearningSection() {
           Gelerntes vergessen
         </Button>
       </div>
+    </Section>
+  );
+}
+
+/** Clear the whole map (all unlocked layers, objects, structure) – one undo step. */
+function ClearMap() {
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <Section title="Map leeren">
+      <p className="hint">Tipp: Radierer → ▭ → „Alle Layer“ löscht einen beliebigen Bereich. Gesperrte Layer bleiben erhalten; Rückgängig ist möglich.</p>
+      {confirm ? (
+        <div className="learn-row">
+          <span>Wirklich alles löschen?</span>
+          <Button
+            variant="danger"
+            onClick={() => {
+              const p = useProject.getState().project;
+              useProject.getState().clearArea({ x: 0, y: 0, w: p.map.width, h: p.map.height });
+              useEditor.getState().toast('Map geleert – Rückgängig ist möglich');
+              setConfirm(false);
+            }}
+          >
+            Löschen
+          </Button>
+          <Button variant="ghost" onClick={() => setConfirm(false)}>
+            Abbrechen
+          </Button>
+        </div>
+      ) : (
+        <Button variant="secondary" block onClick={() => setConfirm(true)}>
+          Ganze Map leeren
+        </Button>
+      )}
     </Section>
   );
 }

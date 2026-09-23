@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { CELL_VOID } from '../types';
 import type { GeneratorSettings, Layer, LayerRole, MapObject, MapSettings, Project, ProjectMode, TerrainSet, TileMeta, Tileset } from '../types';
 import { DEFAULT_MAP, PRESETS, defaultGenerator, defaultTerrainSets } from '../generator/presets';
 import { randomSeed } from '../generator/rng';
@@ -97,6 +98,8 @@ interface ProjectState {
   updateTileset: (id: string, patch: Partial<Pick<Tileset, 'name' | 'active' | 'perspectives'>>) => void;
   setTilesetTileSize: (id: string, size: number) => Promise<void>;
   setTileMeta: (gids: number[], patch: Partial<TileMeta>) => void;
+  /** clear an area on all unlocked layers incl. objects and structure (one undo step) */
+  clearArea: (r: { x: number; y: number; w: number; h: number }) => number;
   /** merge metas into a tileset (automatic assignment, confirm suggestions) */
   mergeTileMetas: (tilesetId: string, tiles: Record<number, TileMeta>) => void;
 
@@ -320,6 +323,40 @@ export const useProject = create<ProjectState>((set, get) => {
           return { ...l, data };
         }),
       }), true);
+    },
+    clearArea: (r) => {
+      let cleared = 0;
+      docChange('Bereich löschen', (p) => {
+        const W = p.map.width;
+        const inRect = (x: number, y: number) => x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h;
+        const layers = p.layers.map((l) => {
+          if (l.locked) return l;
+          const data = l.data.slice();
+          for (let y = r.y; y < r.y + r.h; y++)
+            for (let x = r.x; x < r.x + r.w; x++) {
+              const i = y * W + x;
+              if (data[i]) cleared++;
+              data[i] = 0;
+            }
+          return { ...l, data };
+        });
+        const objects = p.objects.filter((o) => !inRect(o.x, o.y));
+        cleared += p.objects.length - objects.length;
+        // the hand-built / generated structure is cleared too, so auto-walls stay consistent
+        let result = p.result;
+        if (result) {
+          const cells = result.cells.slice();
+          const terrain = result.terrain.slice();
+          for (let y = r.y; y < r.y + r.h; y++)
+            for (let x = r.x; x < r.x + r.w; x++) {
+              cells[y * W + x] = CELL_VOID;
+              terrain[y * W + x] = 0;
+            }
+          result = { ...result, cells, terrain };
+        }
+        return { ...p, layers, objects, result };
+      });
+      return cleared;
     },
     mergeTileMetas: (tilesetId, tiles) => {
       const p = get().project;

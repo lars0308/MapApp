@@ -206,6 +206,8 @@ Griff oder Kopfzeile nach oben/unten wischen (ganz nach unten = schließen), Kop
 
 **Objekte & Verschieben:** Tiles → Objekte → Objekt antippen, dann auf die Map tippen. Der Radierer entfernt Objekte, das Werkzeug **Verschieben** zieht Objekte oder eine Auswahl an eine neue Position.
 
+**Bereich löschen:** Radierer wählen → in der Größenleiste **▭** (Rechteck radieren) → Rechteck aufziehen: löscht den Bereich auf dem aktiven Layer. Mit **Alle Layer** werden alle nicht gesperrten Layer, Objekte und Strukturzellen im Rechteck geleert – ein Zug über die ganze Map leert sie komplett (Ziehen darf außerhalb der Map beginnen). Einstellungen → **Map leeren** → *Ganze Map leeren* macht dasselbe per Knopf. Alles ist mit einem Undo rückgängig zu machen.
+
 **Eigene Tilesets:** Tiles → Tilesets → *PNG-Tileset hochladen*. Tilegröße (16/32/48/64 oder frei) wählen, dann in der Palette Tiles antippen und Rolle (z. B. `wall_front`, `bridge_middle`), Kategorie, Gewichtung, Tags, Kollision und Sortier-Offset setzen. Mit *Mehrfachauswahl* lassen sich viele Tiles auf einmal kategorisieren. Filtert man die Palette nach einer Kategorie, erscheinen Gewichtungs-Slider samt Prozentanteil. Der Generator nutzt alle *aktiven* Tilesets.
 
 ---
@@ -343,6 +345,10 @@ Wichtige Entscheidungen:
 ---
 
 ## Änderungen
+
+**Version 1.6.1 – Rechteck-Radierer**
+
+- Radierer im Rechteck-Modus (▭): Bereich aufziehen und auf dem aktiven Layer löschen; „Alle Layer“ leert alle ungesperrten Layer, Objekte und Struktur im Rechteck. Einstellungen → „Map leeren“ leert die ganze Map. Jeweils ein Undo-Schritt.
 
 **Version 1.6 – exakte Formen, saubere Ecken, lernende Tile-Erkennung**
 

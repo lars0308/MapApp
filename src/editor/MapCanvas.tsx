@@ -281,7 +281,7 @@ export function MapCanvas() {
         mode = 'none';
         return;
       }
-      if (tool === 'eraser') {
+      if (tool === 'eraser' && !editor().eraseRect) {
         const hit = objectAt(objects, cell.x, cell.y);
         if (hit) {
           store().removeObject(hit.id);
@@ -314,6 +314,14 @@ export function MapCanvas() {
       switch (tool) {
         case 'brush':
         case 'eraser':
+          // rectangle eraser: drag an area, released = cleared
+          if (tool === 'eraser' && editor().eraseRect) {
+            mode = 'rect';
+            anchor = cell;
+            R().overlay.preview = rectFromPoints(cell, cell, dims().width, dims().height);
+            R().requestRender();
+            break;
+          }
           if (tool === 'brush' && !selectedGid) {
             editor().toast('Zuerst ein Tile auswählen');
             mode = 'none';
@@ -425,6 +433,17 @@ export function MapCanvas() {
           store().strokeSetLayer(layer.id, dst, vals);
           store().endStroke('Verschieben');
           editor().setSelection(rectFromPoints({ x: sel.x + dx, y: sel.y + dy }, { x: sel.x + dx + sel.w - 1, y: sel.y + dy + sel.h - 1 }, W, H));
+        }
+      } else if (mode === 'rect' && anchor && tool === 'eraser') {
+        const r = rectFromPoints(anchor, cell, W, H);
+        if (r.w > 0 && r.h > 0) {
+          if (editor().eraseAllLayers) {
+            const n = store().clearArea(r);
+            editor().toast(n ? `${r.w} × ${r.h} Felder auf allen Layern gelöscht` : 'Bereich war schon leer');
+          } else if (startStroke()) {
+            store().strokeSet(rectCells(r, W), 0);
+            finishStroke('Radieren');
+          }
         }
       } else if (mode === 'rect' && anchor) {
         const r = rectFromPoints(anchor, cell, W, H);

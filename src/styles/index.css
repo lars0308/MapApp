@@ -3453,3 +3453,13 @@ body.is-resizing-y * {
   font-size: 13px;
   color: var(--text-2);
 }
+.brush-size button {
+  display: grid;
+  place-items: center;
+}
+.brush-size .brush-all {
+  width: auto;
+  padding: 0 10px;
+  font-family: inherit;
+  white-space: nowrap;
+}

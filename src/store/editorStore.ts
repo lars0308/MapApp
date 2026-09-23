@@ -26,13 +26,17 @@ interface EditorState {
   zoom: number;
   toasts: Toast[];
   showCollision: boolean;
+  /** eraser draws a rectangle instead of brush strokes */
+  eraseRect: boolean;
+  /** rectangle eraser clears all (unlocked) layers and objects */
+  eraseAllLayers: boolean;
   showSortPoints: boolean;
   /** re-tile walls automatically while painting ground / doors */
   autoWalls: boolean;
   /** object brush (null = tiles) */
   selectedObject: ObjectType | null;
   playtest: boolean;
-  setFlag: (key: 'showCollision' | 'showSortPoints' | 'autoWalls', value: boolean) => void;
+  setFlag: (key: 'showCollision' | 'showSortPoints' | 'autoWalls' | 'eraseRect' | 'eraseAllLayers', value: boolean) => void;
   selectObject: (t: ObjectType | null) => void;
   setPlaytest: (v: boolean) => void;
   /** new-project setup wizard */
@@ -75,6 +79,8 @@ export const useEditor = create<EditorState>((set, get) => ({
   zoom: 1,
   toasts: [],
   showCollision: false,
+  eraseRect: false,
+  eraseAllLayers: false,
   showSortPoints: false,
   autoWalls: true,
   selectedObject: null,
