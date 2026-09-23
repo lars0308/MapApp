@@ -312,6 +312,40 @@ export const Icon = {
       <circle cx="18" cy="12" r="1.3" fill="currentColor" stroke="none" />
     </Svg>
   ),
+  Person: (p: P) => (
+    <Svg {...p}>
+      <circle cx="12" cy="7" r="3.2" />
+      <path d="M5.5 20c.6-4 3.2-6.2 6.5-6.2s5.9 2.2 6.5 6.2" />
+    </Svg>
+  ),
+  Box: (p: P) => (
+    <Svg {...p}>
+      <path d="M4 8l8-4 8 4v8l-8 4-8-4z" />
+      <path d="M4 8l8 4 8-4M12 12v8" />
+    </Svg>
+  ),
+  Mirror: (p: P) => (
+    <Svg {...p}>
+      <path d="M12 3v18" strokeDasharray="2 2.5" />
+      <path d="M9 7L4 17h5zM15 7l5 10h-5z" />
+    </Svg>
+  ),
+  Line: (p: P) => (
+    <Svg {...p}>
+      <path d="M5 19L19 5" />
+    </Svg>
+  ),
+  Collision: (p: P) => (
+    <Svg {...p}>
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <path d="M4 12l8-8M4 20L20 4M12 20l8-8" />
+    </Svg>
+  ),
+  Home: (p: P) => (
+    <Svg {...p}>
+      <path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" />
+    </Svg>
+  ),
 };
 
 export type IconName = keyof typeof Icon;

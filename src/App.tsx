@@ -10,6 +10,11 @@ import { useEditor } from './store/editorStore';
 import { lastProjectId, loadProject } from './persistence/db';
 import { startAutosave } from './persistence/autosave';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { useApp } from './store/appStore';
+import { StartPage } from './components/StartPage';
+import { SettingsPage } from './components/SettingsPage';
+import { PageShell } from './components/PageShell';
+import { SpriteStudio } from './sprites/SpriteStudio';
 
 /** Wide screens (desktop, tablet landscape) get the three-column editor. */
 export const DESKTOP_QUERY = '(min-width: 1000px) and (min-height: 560px)';
@@ -27,14 +32,14 @@ async function boot() {
   } catch (e) {
     console.warn('Gespeichertes Projekt konnte nicht geladen werden', e);
   }
-  // first start: guided setup instead of an instant map
-  useEditor.getState().openWizard(true);
+  // nothing saved yet: the start page offers "Neues Projekt" / "Projekt öffnen"
 }
 
 export function App() {
   const desktop = useMediaQuery(DESKTOP_QUERY);
   const [ready, setReady] = useState(false);
   const wizardOpen = useEditor((s) => s.wizardOpen);
+  const page = useApp((s) => s.page);
   useShortcuts();
 
   useEffect(() => {
@@ -64,8 +69,18 @@ export function App() {
   }, []);
 
   return (
-    <div className={`app${ready ? ' is-ready' : ''}${wizardOpen ? ' has-wizard' : ''}`}>
-      <ErrorBoundary area="Editor">{desktop ? <DesktopLayout /> : <MobileLayout />}</ErrorBoundary>
+    <div className={`app on-${page}${ready ? ' is-ready' : ''}${wizardOpen ? ' has-wizard' : ''}`}>
+      {page === 'map' ? (
+        <ErrorBoundary area="Editor">{desktop ? <DesktopLayout /> : <MobileLayout />}</ErrorBoundary>
+      ) : (
+        <PageShell desktop={desktop}>
+          <ErrorBoundary area={page === 'project' ? 'Projekt' : page === 'settings' ? 'Einstellungen' : page === 'character' ? 'Charakter bauen' : 'Objekt bauen'} key={page}>
+            {page === 'project' && <StartPage />}
+            {page === 'settings' && <SettingsPage desktop={desktop} />}
+            {(page === 'character' || page === 'object') && <SpriteStudio kind={page} desktop={desktop} />}
+          </ErrorBoundary>
+        </PageShell>
+      )}
       <ErrorBoundary area="Setup-Assistent" onClose={() => useEditor.getState().closeWizard()} closeLabel="Assistent schließen">
         <SetupWizard />
       </ErrorBoundary>

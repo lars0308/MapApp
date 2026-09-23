@@ -226,13 +226,20 @@ export function GenerateButtons({ compact }: { compact?: boolean }) {
   if (manual) return null;
   return (
     <div className={`generate-row${compact ? ' is-compact' : ''}`}>
-      <button type="button" className="btn btn-primary btn-generate" disabled={busy} onClick={() => run()}>
+      <button type="button" className="btn btn-primary btn-generate" disabled={busy} onClick={() => run()} title="Map mit den aktuellen Einstellungen neu erzeugen">
         <Icon.Spark size={18} />
         <span>{busy ? 'Generiere …' : 'Generieren'}</span>
       </button>
-      <button type="button" className="btn btn-secondary btn-newseed" disabled={busy} onClick={() => run({ newSeed: true })} title="Neuer Seed und generieren" aria-label="Neuer Seed">
+      <button
+        type="button"
+        className="btn btn-secondary btn-newseed"
+        disabled={busy}
+        onClick={() => run({ newSeed: true })}
+        title="Neue Variante: gleiche Einstellungen, neuer Zufallswert (Seed) – ergibt eine andere Map"
+        aria-label="Neue Variante"
+      >
         <Icon.Dice size={18} />
-        <span>Neuer Seed</span>
+        {!compact && <span>Neue Variante</span>}
       </button>
     </div>
   );

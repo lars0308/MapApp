@@ -346,6 +346,13 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 1.7 – Reiter, Startseite**
+
+- Neue Kopfzeile mit Reitern: **Projekt · Karte bauen · Charakter bauen · Objekt bauen · Einstellungen**, dazu der runde **▶ Testen**-Knopf (startet den Playtest, wechselt dafür bei Bedarf zur Karte). **Generieren** und der Würfel **Neue Variante** (neuer Seed = gleiche Einstellungen, andere Zufallsverteilung) erscheinen nur auf „Karte bauen“ im automatischen Modus.
+- Die App öffnet mit der Seite **Projekt**: *Neues Projekt* (Setup-Assistent), *Projekt öffnen* (`.mapforge.json` hochladen oder hineinziehen), *Weiter bearbeiten* und die Liste *Zuletzt bearbeitet*. Darunter Name, Speichern und Export des offenen Projekts (vorher im linken Panel bzw. unter „Export“).
+- Einstellungen sind eine eigene Seite (Zahnrad an der Karte führt dorthin). Kollisionen lassen sich direkt an der Karte ein-/ausblenden (Knopf mit Schraffur).
+- Pinselgröße frei 1–32 („…“ neben 1/2/3/5).
+
 **Version 1.6.1 – Rechteck-Radierer**
 
 - Radierer im Rechteck-Modus (▭): Bereich aufziehen und auf dem aktiven Layer löschen; „Alle Layer“ leert alle ungesperrten Layer, Objekte und Struktur im Rechteck. Einstellungen → „Map leeren“ leert die ganze Map. Jeweils ein Undo-Schritt.

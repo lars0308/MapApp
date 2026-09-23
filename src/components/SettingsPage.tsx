@@ -1,0 +1,12 @@
+import { SettingsPanel } from './SettingsPanel';
+
+export function SettingsPage({ desktop }: { desktop: boolean }) {
+  return (
+    <div className="page page-settings">
+      <div className="page-inner">
+        <h1 className="page-title">Einstellungen</h1>
+        <SettingsPanel desktop={desktop} />
+      </div>
+    </div>
+  );
+}

@@ -8,6 +8,7 @@ import { randomSeed } from '../../generator/rng';
 import { COMMON_TILE_SIZES } from '../../tilesets/slicing';
 import { createProject, useProject } from '../../store/projectStore';
 import { useEditor } from '../../store/editorStore';
+import { useApp } from '../../store/appStore';
 import { saveNow } from '../../persistence/autosave';
 import { Button, Chip, IconButton, NumberField, Segmented, Slider, Toggle } from '../ui';
 import { Icon } from '../icons';
@@ -151,6 +152,7 @@ function WizardDialog() {
       await saveNow();
       closeWizard();
       setView('map');
+      useApp.getState().goTo('map');
       toast(draft.mode === 'generate' ? 'Map erstellt' : 'Baukasten geöffnet – Boden malen legt Räume und Wege an, Wände entstehen automatisch', 'success');
     } catch (e) {
       console.error(e);

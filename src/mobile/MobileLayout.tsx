@@ -1,10 +1,10 @@
-import { LogoMark } from '../components/Logo';
+import { MobileTopBar } from '../components/TopBar';
+import { useApp } from '../store/appStore';
 import { Workspace, ViewSwitch } from '../components/Workspace';
 import { GeneratorPanel, GenerateButtons } from '../components/GeneratorPanel';
-import { ExportPanel } from '../export/ExportPanel';
 import { LayersPanel } from '../layers/LayersPanel';
 import { TilesPanel } from '../tilesets/TilesPanel';
-import { ActiveTileChip, BrushSize, ToolButtons, UndoRedo } from '../editor/Toolbar';
+import { ActiveTileChip, BrushSize, CollisionToggle, ToolButtons, UndoRedo } from '../editor/Toolbar';
 import { BottomSheet } from './BottomSheet';
 import { useEditor, type MobilePanel } from '../store/editorStore';
 import { useProject } from '../store/projectStore';
@@ -13,9 +13,7 @@ import { Icon } from '../components/icons';
 import { IconButton } from '../components/ui';
 import { SaveState } from '../components/SaveState';
 import { TerrainPanel } from '../components/TerrainPanel';
-import { SettingsPanel } from '../components/SettingsPanel';
 import { PlaytestOverlay } from '../playtest/PlaytestOverlay';
-import { startPlaytest } from '../playtest/controller';
 
 const NAV: { id: MobilePanel; label: string; icon: (p: { size?: number }) => React.ReactElement }[] = [
   { id: null, label: 'Map', icon: Icon.Map },
@@ -23,7 +21,6 @@ const NAV: { id: MobilePanel; label: string; icon: (p: { size?: number }) => Rea
   { id: 'terrain', label: 'Terrain', icon: Icon.Mountain },
   { id: 'tiles', label: 'Tiles', icon: Icon.Tiles },
   { id: 'layers', label: 'Layer', icon: Icon.Layers },
-  { id: 'export', label: 'Export', icon: Icon.Export },
 ];
 
 const TITLES: Record<Exclude<MobilePanel, null>, string> = {
@@ -42,31 +39,33 @@ export function MobileLayout() {
   const showGrid = useEditor((s) => s.showGrid);
   const toggleGrid = useEditor((s) => s.toggleGrid);
   const playtest = useEditor((s) => s.playtest);
+  const showCollision = useEditor((s) => s.showCollision);
   const run = useProject((s) => s.runGenerate);
   const busy = useProject((s) => s.generating);
   const manual = useProject((s) => s.project.mode === 'manual');
 
   return (
     <div className={`mobile${panel ? ' has-sheet' : ''}${playtest ? ' is-playtest' : ''}`}>
-      <header className="m-top">
-        <LogoMark size={26} />
-        <SaveState />
-        <div className="m-top-actions">
-          <IconButton label="Neues Projekt" onClick={() => useEditor.getState().openWizard()}>
-            <Icon.Plus size={20} />
-          </IconButton>
-          <UndoRedo />
-          <IconButton label="Playtest" active={playtest} onClick={() => startPlaytest()}>
-            <Icon.Play size={18} />
-          </IconButton>
-          {!manual && (
-            <button type="button" className="btn btn-primary m-generate" disabled={busy} onClick={() => run()}>
-              <Icon.Spark size={18} />
-              <span>{busy ? '…' : 'Generieren'}</span>
-            </button>
-          )}
+      <MobileTopBar />
+      {!playtest && (
+        <div className="m-actions">
+          <SaveState />
+          <div className="m-top-actions">
+            <UndoRedo />
+            {!manual && (
+              <>
+                <IconButton label="Neue Variante" onClick={() => run({ newSeed: true })} disabled={busy}>
+                  <Icon.Dice size={19} />
+                </IconButton>
+                <button type="button" className="btn btn-primary m-generate" disabled={busy} onClick={() => run()}>
+                  <Icon.Spark size={18} />
+                  <span>{busy ? '…' : 'Generieren'}</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
-      </header>
+      )}
 
       <main className="m-main">
         <Workspace>
@@ -74,7 +73,8 @@ export function MobileLayout() {
             <IconButton label="Raster" active={showGrid} onClick={toggleGrid}>
               <Icon.Grid size={20} />
             </IconButton>
-            <IconButton label="Einstellungen" active={panel === 'settings'} onClick={() => setPanel(panel === 'settings' ? null : 'settings')}>
+            <CollisionToggle size={20} active={showCollision} onToggle={() => useEditor.getState().setFlag('showCollision', !showCollision)} />
+            <IconButton label="Einstellungen" onClick={() => useApp.getState().goTo('settings')}>
               <Icon.Gear size={20} />
             </IconButton>
             <IconButton label="Einpassen" onClick={() => viewEvents.emit({ type: 'fit' })}>
@@ -104,10 +104,8 @@ export function MobileLayout() {
         >
           {panel === 'generate' && <GeneratorPanel />}
           {panel === 'terrain' && <TerrainPanel />}
-          {panel === 'settings' && <SettingsPanel />}
           {panel === 'tiles' && <TilesPanel />}
           {panel === 'layers' && <LayersPanel />}
-          {panel === 'export' && <ExportPanel />}
         </BottomSheet>
       )}
 

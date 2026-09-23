@@ -3463,3 +3463,340 @@ body.is-resizing-y * {
   font-family: inherit;
   white-space: nowrap;
 }
+
+/* ============================================================
+   Pages: header tabs, start page, settings page
+   ============================================================ */
+.app-topbar {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+}
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.page-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.page-tabs::-webkit-scrollbar {
+  display: none;
+}
+.page-tabs button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 560;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.page-tabs button:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.page-tabs button.is-active {
+  color: var(--accent-hi);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+.page-tabs .tab-short {
+  display: none;
+}
+.btn-play {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+}
+.btn-play:hover {
+  background: var(--accent-hi);
+}
+.btn-play.is-active {
+  background: var(--surface-4);
+  color: var(--text);
+}
+.btn-play svg {
+  transform: translateX(1px);
+}
+.btn-play.is-active svg {
+  transform: none;
+}
+.topbar-view {
+  margin-right: 8px;
+}
+.topbar-view .segmented button {
+  height: 30px;
+  padding: 0 10px;
+}
+/* map page: the header also holds the editor actions → shorter tab labels */
+@media (max-width: 1500px) {
+  .app.on-map .app-topbar .page-tabs .tab-long {
+    display: none;
+  }
+  .app.on-map .app-topbar .page-tabs .tab-short {
+    display: inline;
+  }
+}
+@media (max-width: 1240px) {
+  .app.on-map .app-topbar .save-state {
+    display: none;
+  }
+  .app-topbar .page-tabs button {
+    padding: 0 9px;
+  }
+}
+@media (max-width: 1100px) {
+  .app.on-map .app-topbar .page-tabs button span {
+    display: none;
+  }
+  .app-topbar .page-tabs .tab-long {
+    display: none;
+  }
+  .app-topbar .page-tabs .tab-short {
+    display: inline;
+  }
+}
+
+/* phone header: tabs with icon + tiny label */
+.m-top-pages {
+  gap: 6px;
+  height: 56px;
+  padding: 0 8px;
+}
+.m-top-pages .page-tabs {
+  flex: 1;
+  justify-content: space-between;
+  gap: 0;
+}
+.page-tabs.is-compact button {
+  flex: 1 0 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  height: 50px;
+  min-width: 54px;
+  padding: 0 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.page-tabs.is-compact .tab-long {
+  display: none;
+}
+.page-tabs.is-compact .tab-short {
+  display: inline;
+}
+.m-top-pages .btn-play {
+  width: 42px;
+  height: 42px;
+}
+.m-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 8px 0 12px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+}
+.m-actions .save-state {
+  flex: 1;
+  min-width: 0;
+}
+.m-actions .m-generate {
+  height: 36px;
+}
+
+.page-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--bg);
+}
+.page-shell.is-desktop > .topbar {
+  flex: none;
+  height: 54px;
+}
+.page-main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.page-inner {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 32px 16px 48px;
+}
+.page-title {
+  margin: 0 0 16px;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+.page-settings .panel-scroll {
+  overflow: visible;
+}
+
+.start-hero h1 {
+  margin: 0 0 18px;
+  font-size: 26px;
+  letter-spacing: -0.015em;
+}
+.start-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.start-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 170px;
+  padding: 20px;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.start-card:hover,
+.start-card.is-drop {
+  border-color: var(--accent-line);
+  background: var(--surface-2);
+}
+.start-card strong {
+  font-size: 18px;
+}
+.start-card small {
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.start-card-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 6px;
+  border-radius: 12px;
+  background: var(--surface-3);
+  color: var(--text);
+}
+.start-card.is-primary .start-card-icon {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.start-continue {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--bg-2);
+  color: var(--text-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.start-continue span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.start-continue strong {
+  color: var(--text);
+}
+.start-continue:hover {
+  border-color: var(--accent-line);
+}
+.start-block {
+  margin-top: 36px;
+}
+.start-block h2 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-3);
+}
+.start-block .button-row .btn {
+  flex: 0 0 auto;
+}
+.start-block .panel-scroll {
+  overflow: visible;
+  margin: 18px -16px 0;
+}
+@media (max-width: 600px) {
+  .page-inner {
+    padding-top: 20px;
+  }
+  .start-choices {
+    grid-template-columns: 1fr;
+  }
+  .start-card {
+    min-height: 0;
+    padding: 16px;
+  }
+  .start-hero h1 {
+    font-size: 22px;
+  }
+}
+
+.brush-size .brush-more {
+  width: auto;
+  min-width: 30px;
+  padding: 0 6px;
+}
+.brush-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px 0 4px;
+}
+.brush-slider input {
+  width: 120px;
+}
+.brush-slider span {
+  min-width: 42px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+@media (max-width: 600px) {
+  /* phones: free size slider replaces the fixed sizes while open */
+  .brush-size.has-slider > button[role='radio']:not(.brush-more) {
+    display: none;
+  }
+  .brush-slider input {
+    width: 110px;
+  }
+}

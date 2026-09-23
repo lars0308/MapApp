@@ -5,7 +5,6 @@ import { Button, Section, Segmented, SelectField, Toggle } from '../components/u
 import { Icon } from '../components/icons';
 import { exportGodotPackage, exportGodotScript, exportJson, exportPng, exportProjectFile } from './actions';
 import { pngSize, pngTooLarge } from './pngExport';
-import { ProjectSection } from '../persistence/ProjectSection';
 
 export function ExportPanel() {
   const project = useProject((s) => s.project);
@@ -35,8 +34,6 @@ export function ExportPanel() {
 
   return (
     <div className="panel-scroll">
-      <ProjectSection />
-
       <Section title="Export">
         <Toggle
           label="Schatten-Layer exportieren"

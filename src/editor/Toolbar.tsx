@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { viewEvents } from '../store/events';
@@ -46,10 +47,12 @@ export function BrushSize() {
   const eraseRect = useEditor((s) => s.eraseRect);
   const eraseAll = useEditor((s) => s.eraseAllLayers);
   const setFlag = useEditor((s) => s.setFlag);
+  const [more, setMore] = useState(false);
   if (tool !== 'brush' && tool !== 'eraser') return null;
   const rect = tool === 'eraser' && eraseRect;
+  const big = !rect && ![1, 2, 3, 5].includes(size);
   return (
-    <div className="brush-size" role="radiogroup" aria-label={tool === 'eraser' ? 'Radierer' : 'Pinselgröße'}>
+    <div className={`brush-size${more && !rect ? ' has-slider' : ''}`} role="radiogroup" aria-label={tool === 'eraser' ? 'Radierer' : 'Pinselgröße'}>
       {[1, 2, 3, 5].map((n) => (
         <button
           key={n}
@@ -65,6 +68,26 @@ export function BrushSize() {
           {n}
         </button>
       ))}
+      <button
+        type="button"
+        role="radio"
+        aria-checked={big}
+        aria-label="Größere Pinsel"
+        title="Größe frei wählen (1–32)"
+        className={`brush-more${big || (more && !rect) ? ' is-active' : ''}`}
+        onClick={() => {
+          if (tool === 'eraser') setFlag('eraseRect', false);
+          setMore(!more || rect);
+        }}
+      >
+        {big ? size : '…'}
+      </button>
+      {more && !rect && (
+        <label className="brush-slider">
+          <input type="range" min={1} max={32} value={size} aria-label="Pinselgröße" onChange={(e) => setSize(Number(e.target.value))} style={{ ['--pct' as string]: `${((size - 1) / 31) * 100}%` }} />
+          <span>{size}×{size}</span>
+        </label>
+      )}
       {tool === 'eraser' && (
         <>
           <button type="button" role="radio" aria-checked={rect} aria-label="Rechteck radieren" title="Rechteck aufziehen und löschen" className={rect ? 'is-active' : ''} onClick={() => setFlag('eraseRect', true)}>
@@ -108,9 +131,11 @@ export function ViewControls({ onSettings, settingsOpen }: { onSettings?: () => 
   const showCoords = useEditor((s) => s.showCoords);
   const zoom = useEditor((s) => s.zoom);
   const tileSize = useProject((s) => s.project.map.tileSize);
-  const { toggleGrid, toggleCoords } = useEditor.getState();
+  const showCollision = useEditor((s) => s.showCollision);
+  const { toggleGrid, toggleCoords, setFlag } = useEditor.getState();
   return (
     <div className="view-controls">
+      <CollisionToggle active={showCollision} onToggle={() => setFlag('showCollision', !showCollision)} />
       <IconButton label="Raster" active={showGrid} onClick={toggleGrid}>
         <Icon.Grid size={18} />
       </IconButton>
@@ -139,6 +164,15 @@ export function ViewControls({ onSettings, settingsOpen }: { onSettings?: () => 
         </>
       )}
     </div>
+  );
+}
+
+/** Collision overlay: blocked cells red (walls, water, lava, obstacles). */
+export function CollisionToggle({ active, onToggle, size = 18 }: { active: boolean; onToggle: () => void; size?: number }) {
+  return (
+    <IconButton label="Kollisionen anzeigen" title="Kollisionen anzeigen – nicht begehbare Felder rot" active={active} onClick={onToggle}>
+      <Icon.Collision size={size} />
+    </IconButton>
   );
 }
 

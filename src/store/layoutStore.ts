@@ -3,7 +3,7 @@ import { create } from 'zustand';
 // Desktop workspace layout (side docks, sections, sizes). Mobile keeps its bottom sheets.
 // Stored per browser in localStorage – a convenience, never project data.
 
-export type LeftTab = 'generator' | 'terrain' | 'project' | 'settings';
+export type LeftTab = 'generator' | 'terrain';
 /** panels that can be collapsed / closed / maximized */
 export type PanelId = 'left' | 'layers' | 'tiles';
 
@@ -52,6 +52,8 @@ function load(): DesktopLayout {
     return {
       ...LAYOUT_DEFAULTS,
       ...v,
+      // export and settings moved to their own pages (tabs "Projekt" / "Einstellungen")
+      leftTab: v.leftTab === 'terrain' ? 'terrain' : 'generator',
       panels: {
         left: { ...LAYOUT_DEFAULTS.panels.left, ...v.panels?.left },
         layers: { ...LAYOUT_DEFAULTS.panels.layers, ...v.panels?.layers },

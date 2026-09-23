@@ -1,17 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Logo } from './Logo';
 import { Workspace, ViewSwitch } from './Workspace';
-import { GeneratorPanel, GenerateButtons } from './GeneratorPanel';
-import { ExportPanel } from '../export/ExportPanel';
+import { GeneratorPanel } from './GeneratorPanel';
 import { LayersPanel } from '../layers/LayersPanel';
 import { TilesPanel } from '../tilesets/TilesPanel';
 import { PanelTabs } from './ui';
-import { BrushSize, HoverInfo, ToolButtons, UndoRedo, ViewControls } from '../editor/Toolbar';
-import { SaveState } from './SaveState';
+import { BrushSize, HoverInfo, ToolButtons, ViewControls } from '../editor/Toolbar';
 import { TerrainPanel } from './TerrainPanel';
-import { SettingsPanel } from './SettingsPanel';
 import { PlaytestOverlay } from '../playtest/PlaytestOverlay';
-import { startPlaytest, stopPlaytest } from '../playtest/controller';
+import { TopBar } from './TopBar';
+import { useApp } from '../store/appStore';
 import { Icon } from './icons';
 import { useEditor } from '../store/editorStore';
 import { IconButton } from './ui';
@@ -21,8 +18,6 @@ import { PanelActions, ResizeHandle } from './desktop/Dock';
 const LEFT_TABS: { value: LeftTab; label: string; icon: (p: { size?: number }) => React.ReactElement }[] = [
   { value: 'generator', label: 'Generator', icon: Icon.Sliders },
   { value: 'terrain', label: 'Terrain', icon: Icon.Mountain },
-  { value: 'project', label: 'Export', icon: Icon.Export },
-  { value: 'settings', label: 'Einstellungen', icon: Icon.Gear },
 ];
 const RAIL = 44;
 
@@ -61,47 +56,28 @@ export function DesktopLayout() {
     return () => window.removeEventListener('keydown', on);
   }, [L.maximized]);
 
-  const openSettings = () => {
-    const s = useLayout.getState();
-    if (s.leftTab === 'settings' && !s.panels.left.closed && !s.panels.left.collapsed) s.setLeftTab('generator');
-    else s.show('left', 'settings');
-  };
-  const leftPanel = L.leftTab === 'generator' ? <GeneratorPanel /> : L.leftTab === 'terrain' ? <TerrainPanel /> : L.leftTab === 'project' ? <ExportPanel /> : <SettingsPanel desktop />;
-  const settingsOpen = leftOpen && !leftRail && L.leftTab === 'settings';
+  const leftPanel = L.leftTab === 'terrain' ? <TerrainPanel /> : <GeneratorPanel />;
 
   return (
     <div className={`desktop${L.maximized ? ' has-maximized' : ''}`} style={{ gridTemplateColumns: `${leftW}px minmax(0, 1fr) ${rightW}px` }}>
-      <header className="topbar">
-        <Logo />
-        <div className="topbar-project">
-          <SaveState />
-          <button type="button" className="btn btn-ghost btn-new" onClick={() => useEditor.getState().openWizard()}>
-            <Icon.Plus size={16} />
-            <span>Neues Projekt</span>
-          </button>
-        </div>
-        <div className="topbar-center">
-          <ViewSwitch />
-        </div>
-        <div className="topbar-right">
-          <div className="panel-toggles" role="group" aria-label="Panels ein- und ausblenden">
-            <PanelToggle id="left" label="Linkes Panel" icon={<Icon.PanelLeft size={18} />} />
-            <PanelToggle id="layers" label="Layer-Panel" icon={<Icon.Layers size={18} />} />
-            <PanelToggle id="tiles" label="Tiles-Panel" icon={<Icon.Tiles size={18} />} />
-          </div>
-          <span className="divider" />
-          <UndoRedo />
-          <span className="divider" />
-          <button type="button" className={`btn btn-secondary btn-test${playtest ? ' is-active' : ''}`} onClick={() => (playtest ? stopPlaytest() : startPlaytest())}>
-            <Icon.Play size={16} />
-            <span>{playtest ? 'Beenden' : 'Testen'}</span>
-          </button>
-          <GenerateButtons compact />
-        </div>
-      </header>
+      <TopBar
+        mapActions={
+          <>
+            <div className="topbar-view">
+              <ViewSwitch />
+            </div>
+            <div className="panel-toggles" role="group" aria-label="Panels ein- und ausblenden">
+              <PanelToggle id="left" label="Linkes Panel" icon={<Icon.PanelLeft size={18} />} />
+              <PanelToggle id="layers" label="Layer-Panel" icon={<Icon.Layers size={18} />} />
+              <PanelToggle id="tiles" label="Tiles-Panel" icon={<Icon.Tiles size={18} />} />
+            </div>
+            <span className="divider" />
+          </>
+        }
+      />
 
       {leftOpen && (
-        <aside className={`side side-left${leftRail ? ' is-rail' : ''}${L.maximized === 'left' ? ' is-maximized' : ''}`} aria-label="Generator, Terrain, Export, Einstellungen">
+        <aside className={`side side-left${leftRail ? ' is-rail' : ''}${L.maximized === 'left' ? ' is-maximized' : ''}`} aria-label="Generator und Terrain">
           {leftRail ? (
             <div className="dock-rail">
               <IconButton label="Linkes Panel ausklappen" onClick={() => L.toggleCollapsed('left')}>
@@ -153,9 +129,10 @@ export function DesktopLayout() {
             </>
           )}
           <div className="float-bottom-right">
-            <ViewControls onSettings={openSettings} settingsOpen={settingsOpen} />
+            <ViewControls onSettings={() => useApp.getState().goTo('settings')} />
           </div>
         </Workspace>
+
       </main>
 
       {rightOpen && (
