@@ -3,7 +3,8 @@ import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { viewEvents } from '../store/events';
 import { SPECIALS } from '../components/generatorOptions';
-import { Button } from '../components/ui';
+import { Button, Chip } from '../components/ui';
+import { computeBlocked } from '../editor/collision';
 import { Icon } from '../components/icons';
 import type { Room } from '../types';
 
@@ -23,6 +24,20 @@ export function RoomGraph() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [selected, setSelected] = useState<number | null>(null);
+  const [showTerrain, setShowTerrain] = useState(true);
+  const [showBridges, setShowBridges] = useState(true);
+  const terrains = useProject((s) => s.project.terrains);
+  const revision = useProject((s) => s.revision);
+  // connections whose corridor is blocked on the current (edited) map
+  const blockedConn = useMemo(() => {
+    const p = useProject.getState().project;
+    const out = new Set<number>();
+    if (!p.result) return out;
+    const blocked = computeBlocked(p);
+    for (const c of p.result.connections) if (c.path?.some(([x, y]) => blocked[y * p.map.width + x])) out.add(c.id);
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revision, result]);
 
   useEffect(() => {
     const ro = new ResizeObserver(([e]) => setSize({ w: e.contentRect.width, h: e.contentRect.height }));
@@ -68,12 +83,33 @@ export function RoomGraph() {
       if (!a || !b) continue;
       const hot = selected === c.from || selected === c.to;
       ctx.beginPath();
-      ctx.setLineDash(c.kind === 'main' ? [] : c.kind === 'loop' ? [6, 5] : [2, 5]);
-      ctx.strokeStyle = hot ? '#e889b0' : c.kind === 'main' ? 'rgba(220,215,230,0.42)' : 'rgba(220,215,230,0.28)';
+      const isBlocked = blockedConn.has(c.id);
+      const isBridge = showBridges && c.bridge;
+      ctx.setLineDash(isBlocked ? [3, 4] : c.kind === 'main' ? [] : c.kind === 'loop' ? [6, 5] : [2, 5]);
+      ctx.strokeStyle = hot ? '#e889b0' : isBlocked ? '#e27583' : isBridge ? '#d9b45b' : c.kind === 'main' ? 'rgba(220,215,230,0.42)' : 'rgba(220,215,230,0.28)';
       ctx.lineWidth = hot ? 2.2 : 1.6;
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
       ctx.stroke();
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      if (isBlocked) {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = '#e27583';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(mx - 5, my - 5);
+        ctx.lineTo(mx + 5, my + 5);
+        ctx.moveTo(mx + 5, my - 5);
+        ctx.lineTo(mx - 5, my + 5);
+        ctx.stroke();
+      } else if (isBridge) {
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#d9b45b';
+        ctx.fillRect(mx - 6, my - 4, 12, 8);
+        ctx.fillStyle = '#6b4b30';
+        for (let k = -4; k <= 4; k += 4) ctx.fillRect(mx + k - 1, my - 4, 1, 8);
+      }
     }
     ctx.setLineDash([]);
 
@@ -83,6 +119,16 @@ export function RoomGraph() {
     for (const n of nodes) {
       const color = TYPE_COLOR[n.room.type] ?? '#3a3742';
       const isSel = selected === n.room.id;
+      if (showTerrain) {
+        const tc = terrains.find((t) => t.id === n.room.terrain)?.color;
+        if (tc) {
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, n.r + 4, 0, Math.PI * 2);
+          ctx.strokeStyle = tc;
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        }
+      }
       ctx.beginPath();
       ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
       ctx.fillStyle = n.room.type === 'normal' ? '#24222b' : color;
@@ -99,7 +145,7 @@ export function RoomGraph() {
         ctx.fillText(TYPE_LABEL[n.room.type], n.x, n.y + n.r + 11);
       }
     }
-  }, [nodes, result, selected, size]);
+  }, [nodes, result, selected, size, showTerrain, showBridges, blockedConn, terrains]);
 
   const onPointerUp = (e: React.PointerEvent) => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -126,6 +172,22 @@ export function RoomGraph() {
         <span>
           <i className="lg-line is-dotted" /> Alternative
         </span>
+        {showBridges && (
+          <span>
+            <i className="lg-line is-bridge" /> Brücke
+          </span>
+        )}
+        <span>
+          <i className="lg-line is-blocked" /> gesperrt
+        </span>
+      </div>
+      <div className="graph-toggles">
+        <Chip active={showTerrain} onClick={() => setShowTerrain(!showTerrain)}>
+          Terrain
+        </Chip>
+        <Chip active={showBridges} onClick={() => setShowBridges(!showBridges)}>
+          Brücken
+        </Chip>
       </div>
       {room && (
         <div className="graph-card">
@@ -136,7 +198,8 @@ export function RoomGraph() {
             </strong>
           </div>
           <p className="muted">
-            {room.width}×{room.height} · {room.area} Felder · verbunden mit {room.connections.join(', ') || '–'}
+            {room.width}×{room.height} · {room.area} Felder · Terrain {terrains.find((t) => t.id === room.terrain)?.name ?? '–'} · verbunden mit{' '}
+            {room.connections.join(', ') || '–'}
           </p>
           <Button
             variant="primary"

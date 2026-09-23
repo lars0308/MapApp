@@ -1,23 +1,30 @@
-import type { GenerationResult, Layer, MapSettings, Tileset } from '../types';
+import type { GenerationResult, Layer, MapObject, MapSettings, Tileset } from '../types';
 
 export interface DocSnapshot {
   map: MapSettings;
   layers: Layer[];
   activeLayerId: string;
   result: GenerationResult | null;
+  objects: MapObject[];
   /** only captured for tileset operations */
   tilesets?: Tileset[];
   nextGid?: number;
+}
+
+export interface CellChanges {
+  layerId: string;
+  idx: Uint32Array;
+  before: Uint32Array;
+  after: Uint32Array;
 }
 
 export type HistoryEntry =
   | {
       kind: 'cells';
       label: string;
-      layerId: string;
-      idx: Uint32Array;
-      before: Uint32Array;
-      after: Uint32Array;
+      changes: CellChanges[];
+      /** structural grid changes (auto walls) */
+      struct?: { idx: Uint32Array; before: Uint8Array; after: Uint8Array };
     }
   | { kind: 'doc'; label: string; before: DocSnapshot; after: DocSnapshot };
 
@@ -30,7 +37,7 @@ export function cloneLayers(layers: Layer[]): Layer[] {
 }
 
 function entrySize(e: HistoryEntry): number {
-  if (e.kind === 'cells') return e.idx.byteLength * 3;
+  if (e.kind === 'cells') return e.changes.reduce((n, c) => n + c.idx.byteLength * 3, 0);
   const size = (s: DocSnapshot) => s.layers.reduce((n, l) => n + l.data.byteLength, 0);
   return size(e.before) + size(e.after);
 }

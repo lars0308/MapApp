@@ -66,6 +66,7 @@ function LayerRow({ layer, active, isTop, isBottom, canDelete }: { layer: Layer;
             <span className="layer-name">
               {layer.name}
               {ROLE_LABEL[layer.role] !== layer.name && <small>{ROLE_LABEL[layer.role]}</small>}
+              {layer.ySort && <small className="ysort-badge" title="Y-Sort aktiv">Y</small>}
             </span>
           )}
         </button>
@@ -93,6 +94,15 @@ function LayerRow({ layer, active, isTop, isBottom, canDelete }: { layer: Layer;
           >
             <Icon.Pencil size={18} />
           </IconButton>
+          <button
+            type="button"
+            className={`icon-btn ysort-toggle${layer.ySort ? ' is-active' : ''}`}
+            aria-pressed={layer.ySort}
+            title="Y-Sort: mit Objekten und Charakteren nach Y sortieren"
+            onClick={() => s.setLayerYSort(layer.id, !layer.ySort)}
+          >
+            Y
+          </button>
           <IconButton
             label="Duplizieren"
             onClick={() => {

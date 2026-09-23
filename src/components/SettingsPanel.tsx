@@ -1,0 +1,47 @@
+import { useEditor } from '../store/editorStore';
+import { useProject } from '../store/projectStore';
+import { PERSPECTIVES, type Perspective } from '../types';
+import { PERSPECTIVE_INFO } from '../generator/perspective';
+import { Button, Section, Segmented, Toggle } from './ui';
+import { Icon } from './icons';
+import { startPlaytest } from '../playtest/controller';
+
+/** View / editor settings (mobile sheet, desktop popover). */
+export function SettingsPanel() {
+  const e = useEditor();
+  const map = useProject((s) => s.project.map);
+  const setMapOptions = useProject((s) => s.setMapOptions);
+  return (
+    <div className="panel-scroll">
+      <Section title="Ansicht">
+        <Toggle label="Raster" checked={e.showGrid} onChange={() => e.toggleGrid()} />
+        <Toggle label="Koordinaten" checked={e.showCoords} onChange={() => e.toggleCoords()} />
+        <Toggle label="Kollisionen anzeigen" description="Nicht begehbare Felder rot markieren" checked={e.showCollision} onChange={(v) => e.setFlag('showCollision', v)} />
+        <Toggle label="Sortierpunkte anzeigen" description="Y-Sort-Ursprung von Objekten und Charakter" checked={e.showSortPoints} onChange={(v) => e.setFlag('showSortPoints', v)} />
+      </Section>
+      <Section title="Bearbeiten">
+        <Toggle
+          label="Auto-Wände"
+          description="Boden malen/löschen oder Tür setzen passt Wände, Ecken und Kollision automatisch an"
+          checked={e.autoWalls}
+          onChange={(v) => e.setFlag('autoWalls', v)}
+        />
+      </Section>
+      <Section title="Perspektive">
+        <Segmented
+          label="Perspektive"
+          value={map.perspective}
+          options={PERSPECTIVES.map((p: Perspective) => ({ value: p, label: PERSPECTIVE_INFO[p].label.replace(' / Isometric-like', '') }))}
+          onChange={(perspective) => setMapOptions({ perspective })}
+        />
+        <Toggle label="Schatten" checked={map.shadows} onChange={(shadows) => setMapOptions({ shadows })} />
+        <p className="hint">Wirkt beim nächsten Generieren.</p>
+      </Section>
+      <Section title="Test">
+        <Button variant="primary" block icon={<Icon.Play size={16} />} onClick={() => startPlaytest()}>
+          Playtest starten
+        </Button>
+      </Section>
+    </div>
+  );
+}

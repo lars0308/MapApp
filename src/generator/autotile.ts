@@ -1,13 +1,19 @@
-import { CELL_VOID, CELL_WALL, type Perspective, type TileCategory } from '../types';
+import { CELL_VOID, CELL_WALL, TILE_ROLES, type Perspective, type TileRole } from '../types';
 import { PERSPECTIVE_INFO } from './perspective';
 import type { Grid } from './corridors';
 
-// Rule-based tile role resolution ("auto-tiling light").
-// Every wall / floor cell gets a role derived from its neighbourhood. The roles are
-// mapped to tile categories (+ preferred tags). A future terrain system can replace
-// `wallRequest` while keeping the masks and roles computed here.
+// Rule-based auto-tiling for walls.
+//
+// Every wall cell is classified from its 8-neighbourhood:
+//   - which orthogonal neighbours are wall cells (4-bit connection mask)
+//   - on which sides the room / floor lies
+// → wall_horizontal / wall_vertical / wall_top … / corners / inner corners /
+//   end caps / T-junctions / cross.
+// In 3/4 perspectives walls with floor directly below become visible fronts
+// (1 or 2 rows); the cells above them become the wall's upper edge. Front cells
+// are treated as "room side" for the classification of the surrounding walls,
+// so side walls continue up to the cap row (raised side walls, closed corners).
 
-// wall neighbour bits (clockwise from north)
 export const N = 1,
   NE = 2,
   E = 4,
@@ -17,141 +23,148 @@ export const N = 1,
   W = 64,
   NW = 128;
 
-export enum WallRole {
-  None = 0,
-  Top = 1, // flat wall / upper edge (cap)
-  Bottom = 2,
-  Left = 3,
-  Right = 4,
-  Inner = 5,
-  Outer = 6,
-  FrontBase = 7, // visible wall face, lowest row
-  FrontUpper = 8, // visible wall face, rows above
-}
+export const NO_ROLE = 255;
+export const roleIndex = (r: TileRole) => TILE_ROLES.indexOf(r);
+export const roleAt = (i: number): TileRole | null => (i === NO_ROLE ? null : TILE_ROLES[i]);
 
-export interface RoleRequest {
-  cats: TileCategory[];
-  prefer?: string;
-  avoid?: string[];
-}
+const C_N = 1,
+  C_E = 2,
+  C_S = 4,
+  C_W = 8;
 
-const WALL_ORDER: TileCategory[] = ['wallTop', 'wallBottom', 'wallLeft', 'wallRight'];
-const withFallback = (first: TileCategory[]): TileCategory[] => [...first, ...WALL_ORDER.filter((c) => !first.includes(c))];
-
-export function wallRequest(role: WallRole, perspective: Perspective): RoleRequest {
-  const side = PERSPECTIVE_INFO[perspective].sideFaces;
-  switch (role) {
-    case WallRole.FrontBase:
-      return { cats: ['wallFront', ...withFallback(['wallTop'])], prefer: 'base', avoid: ['upper'] };
-    case WallRole.FrontUpper:
-      return { cats: ['wallFront', ...withFallback(['wallTop'])], prefer: 'upper', avoid: ['base'] };
-    case WallRole.Top:
-      return { cats: withFallback(['wallTop']) };
-    case WallRole.Bottom:
-      return { cats: withFallback(['wallBottom']) };
-    case WallRole.Left:
-      return side ? { cats: withFallback(['wallLeft']), prefer: 'side' } : { cats: withFallback(['wallLeft']), avoid: ['side'] };
-    case WallRole.Right:
-      return side ? { cats: withFallback(['wallRight']), prefer: 'side' } : { cats: withFallback(['wallRight']), avoid: ['side'] };
-    case WallRole.Inner:
-      return { cats: ['innerCorner', 'outerCorner', ...WALL_ORDER] };
-    case WallRole.Outer:
-      return { cats: ['outerCorner', 'innerCorner', ...WALL_ORDER] };
-    default:
-      return { cats: [] };
+/** Wall role from connection mask + room sides. */
+export function classifyWall(conn: number, room: { n: boolean; e: boolean; s: boolean; w: boolean }): TileRole {
+  const count = +!!(conn & C_N) + +!!(conn & C_E) + +!!(conn & C_S) + +!!(conn & C_W);
+  if (count === 4) return 'junction_cross';
+  if (count === 3) {
+    if (!(conn & C_W)) return 'junction_t_right';
+    if (!(conn & C_E)) return 'junction_t_left';
+    if (!(conn & C_N)) return 'junction_t_down';
+    return 'junction_t_up';
   }
+  if (count === 2) {
+    if (conn === (C_E | C_W)) {
+      if (room.s && !room.n) return 'wall_top';
+      if (room.n && !room.s) return 'wall_bottom';
+      return 'wall_horizontal';
+    }
+    if (conn === (C_N | C_S)) {
+      if (room.e && !room.w) return 'wall_left';
+      if (room.w && !room.e) return 'wall_right';
+      return 'wall_vertical';
+    }
+    // L-shaped: inner corner when the floor lies on the two open sides
+    if (conn === (C_E | C_S)) return room.n || room.w ? 'inner_corner_top_left' : 'corner_top_left';
+    if (conn === (C_W | C_S)) return room.n || room.e ? 'inner_corner_top_right' : 'corner_top_right';
+    if (conn === (C_E | C_N)) return room.s || room.w ? 'inner_corner_bottom_left' : 'corner_bottom_left';
+    return room.s || room.e ? 'inner_corner_bottom_right' : 'corner_bottom_right';
+  }
+  if (count === 1) {
+    if (conn & C_S) return 'end_cap_top';
+    if (conn & C_N) return 'end_cap_bottom';
+    if (conn & C_E) return 'end_cap_left';
+    return 'end_cap_right';
+  }
+  // isolated wall piece
+  return room.s ? 'end_cap_bottom' : 'end_cap_top';
 }
 
-/** Base role of a wall cell from its 8-neighbour walkable mask. */
-function baseRole(m: number, faces: boolean): WallRole {
-  const n = !!(m & N);
-  const s = !!(m & S);
-  const e = !!(m & E);
-  const w = !!(m & W);
-  if (s && faces) return WallRole.FrontBase;
-  const orth = +n + +s + +e + +w;
-  if (orth >= 2 && !(n && s && !e && !w) && !(e && w && !n && !s)) return WallRole.Inner;
-  if (s) return WallRole.Top;
-  if (n) return WallRole.Bottom;
-  if (e) return WallRole.Left;
-  if (w) return WallRole.Right;
-  return WallRole.Outer;
-}
-
-export interface AutoTileResult {
-  wallRoles: Uint8Array;
+export interface WallStructure {
+  /** TILE_ROLES index per cell, NO_ROLE = none */
+  roles: Uint8Array;
+  /** 1 = wall front, 2 = upper wall front (y-sorted "WallsFront" layer) */
+  front: Uint8Array;
   /** shadow tag per cell ('' = none) */
   shadows: ('' | 'top' | 'side' | 'corner')[];
   floorMask: Uint8Array;
 }
 
 /**
- * Resolve wall roles for the perspective. In 3/4 views walls facing the camera
- * get a visible front (1 or 2 rows) and a cap above; this may turn void cells
- * above the front into wall cells.
+ * Resolve wall roles. In 3/4 views this may turn void cells above fronts into
+ * wall cells (the wall's upper edge) – call it before doors/objects are placed.
  */
-export function resolveAutoTiles(g: Grid, wallMask: Uint8Array, perspective: Perspective, shadows: boolean): AutoTileResult {
+export function resolveWalls(g: Grid, perspective: Perspective, shadows: boolean): WallStructure {
   const { W, H, cells } = g;
   const info = PERSPECTIVE_INFO[perspective];
   const faces = info.faceRows > 0;
-  const roles = new Uint8Array(W * H);
-
-  for (let i = 0; i < W * H; i++) if (cells[i] === CELL_WALL) roles[i] = baseRole(wallMask[i], faces);
+  const front = new Uint8Array(W * H);
+  const idx = (x: number, y: number) => y * W + x;
+  const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H;
+  const walkable = (x: number, y: number) => inside(x, y) && cells[idx(x, y)] !== CELL_VOID && cells[idx(x, y)] !== CELL_WALL;
 
   if (faces) {
-    const bases: number[] = [];
-    for (let i = 0; i < W * H; i++) if (roles[i] === WallRole.FrontBase) bases.push(i);
-    const free = (i: number) => cells[i] === CELL_VOID || (cells[i] === CELL_WALL && (roles[i] === WallRole.Outer || roles[i] === WallRole.Top));
-    for (const b of bases) {
-      const x = b % W;
-      let y = ((b / W) | 0) - 1;
-      // extra face rows (45°)
-      for (let k = 1; k < info.faceRows && y >= 0; k++, y--) {
-        const i = y * W + x;
-        if (!free(i)) break;
-        cells[i] = CELL_WALL;
-        roles[i] = WallRole.FrontUpper;
-      }
-      // wall cap above the face
-      if (y >= 0) {
-        const i = y * W + x;
-        if (free(i)) {
-          cells[i] = CELL_WALL;
-          roles[i] = WallRole.Top;
+    // fronts: wall cells with floor directly below, extended upwards; cap above
+    for (let y = H - 1; y >= 0; y--)
+      for (let x = 0; x < W; x++) {
+        const i = idx(x, y);
+        if (cells[i] !== CELL_WALL || front[i] || !walkable(x, y + 1)) continue;
+        front[i] = 1;
+        let yy = y - 1;
+        for (let k = 1; k < info.faceRows && yy >= 0; k++, yy--) {
+          const j = idx(x, yy);
+          if (cells[j] === CELL_VOID || (cells[j] === CELL_WALL && !walkable(x, yy + 1) && !front[j])) {
+            cells[j] = CELL_WALL;
+            front[j] = 2;
+          } else break;
         }
+        if (yy >= 0 && cells[idx(x, yy)] === CELL_VOID) cells[idx(x, yy)] = CELL_WALL;
       }
-    }
-  }
-
-  if (faces) {
-    // close the outline next to raised walls (outer corners beside caps / upper faces)
-    const raised = (i: number) => roles[i] === WallRole.Top || roles[i] === WallRole.FrontUpper;
+    // close the outline beside raised caps (void cell between a cap and a side wall)
     for (let y = H - 2; y >= 0; y--)
       for (let x = 1; x < W - 1; x++) {
-        const i = y * W + x;
+        const i = idx(x, y);
         if (cells[i] !== CELL_VOID || cells[i + W] !== CELL_WALL) continue;
-        if (raised(i - 1) || raised(i + 1)) {
-          cells[i] = CELL_WALL;
-          roles[i] = WallRole.Outer;
-        }
+        const capBeside = (cells[i - 1] === CELL_WALL && !front[i - 1]) || (cells[i + 1] === CELL_WALL && !front[i + 1]);
+        const frontNear = front[i + W - 1] || front[i + W + 1] || front[i + W] || front[i - 1] || front[i + 1];
+        if (capBeside && frontNear) cells[i] = CELL_WALL;
       }
   }
 
-  const walk = (x: number, y: number) =>
-    x >= 0 && y >= 0 && x < W && y < H && cells[y * W + x] !== CELL_VOID && cells[y * W + x] !== CELL_WALL;
-  const wall = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && cells[y * W + x] === CELL_WALL;
+  const solid = (x: number, y: number) => inside(x, y) && cells[idx(x, y)] === CELL_WALL && !front[idx(x, y)];
+  const roomSide = (x: number, y: number) => walkable(x, y) || (inside(x, y) && front[idx(x, y)] > 0);
 
-  const floorMask = new Uint8Array(W * H);
-  const shadowTags: AutoTileResult['shadows'] = new Array(W * H).fill('');
+  const roles = new Uint8Array(W * H).fill(NO_ROLE);
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
-      if (!walk(x, y)) continue;
-      const i = y * W + x;
-      floorMask[i] = (walk(x, y - 1) ? 1 : 0) | (walk(x + 1, y) ? 2 : 0) | (walk(x, y + 1) ? 4 : 0) | (walk(x - 1, y) ? 8 : 0);
+      const i = idx(x, y);
+      if (cells[i] !== CELL_WALL) continue;
+      if (front[i]) {
+        roles[i] = roleIndex(front[i] === 2 ? 'wall_front_upper' : 'wall_front');
+        continue;
+      }
+      const conn = (solid(x, y - 1) ? C_N : 0) | (solid(x + 1, y) ? C_E : 0) | (solid(x, y + 1) ? C_S : 0) | (solid(x - 1, y) ? C_W : 0);
+      const role = classifyWall(conn, { n: roomSide(x, y - 1), e: roomSide(x + 1, y), s: roomSide(x, y + 1), w: roomSide(x - 1, y) });
+      roles[i] = roleIndex(role);
+    }
+
+  const floorMask = new Uint8Array(W * H);
+  const shadowTags: WallStructure['shadows'] = new Array(W * H).fill('');
+  const wall = (x: number, y: number) => inside(x, y) && cells[idx(x, y)] === CELL_WALL;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (!walkable(x, y)) continue;
+      const i = idx(x, y);
+      floorMask[i] = (walkable(x, y - 1) ? 1 : 0) | (walkable(x + 1, y) ? 2 : 0) | (walkable(x, y + 1) ? 4 : 0) | (walkable(x - 1, y) ? 8 : 0);
       if (!shadows) continue;
       const top = wall(x, y - 1);
       const left = faces && wall(x - 1, y);
       shadowTags[i] = top && left ? 'corner' : top ? 'top' : left ? 'side' : '';
     }
-  return { wallRoles: roles, shadows: shadowTags, floorMask };
+  return { roles, front, shadows: shadowTags, floorMask };
+}
+
+/** 8-neighbour walkable mask of a wall cell (exported for later terrain systems). */
+export function wallNeighbourMask(g: Grid, x: number, y: number): number {
+  const { W, H, cells } = g;
+  const walk = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < W && yy < H && cells[yy * W + xx] !== CELL_VOID && cells[yy * W + xx] !== CELL_WALL;
+  return (
+    (walk(x, y - 1) ? N : 0) |
+    (walk(x + 1, y - 1) ? NE : 0) |
+    (walk(x + 1, y) ? E : 0) |
+    (walk(x + 1, y + 1) ? SE : 0) |
+    (walk(x, y + 1) ? S : 0) |
+    (walk(x - 1, y + 1) ? SW : 0) |
+    (walk(x - 1, y) ? W : 0) |
+    (walk(x - 1, y - 1) ? NW : 0)
+  );
 }

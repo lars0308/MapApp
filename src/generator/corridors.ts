@@ -19,6 +19,7 @@ export interface CarvedCorridor {
   kind: GraphEdge['kind'];
   width: number;
   length: number;
+  path: [number, number][];
 }
 
 const DX = [1, -1, 0, 0];
@@ -330,7 +331,7 @@ export function carveCorridors(
       path = path.concat(i === 0 ? seg : seg.slice(1));
     }
     carve(g, path, width);
-    out.push({ a: e.a, b: e.b, kind: e.kind, width, length: path.length });
+    out.push({ a: e.a, b: e.b, kind: e.kind, width, length: path.length, path });
   }
   return out;
 }

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import type { GeneratorSettings, MapSettings, Perspective, RoomShape, SpecialRoomType } from '../../types';
+import type { GeneratorSettings, MapSettings, Perspective, RoomShape, SpecialRoomType, TerrainSet } from '../../types';
 import { PERSPECTIVES } from '../../types';
-import { DEFAULT_MAP, defaultGenerator } from '../../generator/presets';
+import { DEFAULT_MAP, defaultGenerator, defaultTerrainSets } from '../../generator/presets';
+import { TerrainFields } from '../TerrainFields';
 import { PERSPECTIVE_INFO, requiredRooms } from '../../generator/perspective';
 import { randomSeed } from '../../generator/rng';
 import { COMMON_TILE_SIZES } from '../../tilesets/slicing';
@@ -14,7 +15,7 @@ import { PerspectivePreview } from './PerspectivePreview';
 import { RoomCountGuard } from '../RoomCountGuard';
 import { SHAPES, CORRIDOR_OPTS, SPECIALS } from '../generatorOptions';
 
-const STEPS = ['Ansicht', 'Map', 'Räume', 'Wege', 'Spezialräume', 'Ausstattung', 'Zusammenfassung'] as const;
+const STEPS = ['Perspektive', 'Map', 'Räume', 'Wege', 'Spezialräume', 'Gelände', 'Ausstattung', 'Zusammenfassung'] as const;
 
 const SPECIAL_HINT: Record<SpecialRoomType, string> = {
   start: 'Startpunkt des Spielers',
@@ -32,10 +33,16 @@ interface Draft {
   name: string;
   map: MapSettings;
   gen: GeneratorSettings;
+  terrains: TerrainSet[];
 }
 
 function freshDraft(): Draft {
-  return { name: 'Neues Projekt', map: { ...DEFAULT_MAP, perspective: 'top_down', shadows: true }, gen: defaultGenerator(randomSeed()) };
+  return {
+    name: 'Neues Projekt',
+    map: { ...DEFAULT_MAP, perspective: 'low_top_down', shadows: true },
+    gen: defaultGenerator(randomSeed()),
+    terrains: defaultTerrainSets(),
+  };
 }
 
 export function SetupWizard() {
@@ -84,7 +91,7 @@ function WizardDialog() {
       // keep the current project, except the untouched placeholder on first start
       if (!firstRun) await saveNow();
       const store = useProject.getState();
-      store.loadProject(createProject(draft.name.trim() || 'Neues Projekt', { map: draft.map, generator: gen }));
+      store.loadProject(createProject(draft.name.trim() || 'Neues Projekt', { map: draft.map, generator: gen, terrains: draft.terrains }));
       await useProject.getState().runGenerate();
       await saveNow();
       closeWizard();
@@ -271,24 +278,49 @@ function WizardDialog() {
           )}
 
           {step === 5 && (
+            <StepSection title="Gelände">
+              <div className="field">
+                <label>Terrain-Sets für Räume</label>
+                <div className="chips">
+                  {draft.terrains.map((t) => (
+                    <Chip
+                      key={t.id}
+                      color={t.color}
+                      active={t.active}
+                      onClick={() => {
+                        const next = draft.terrains.map((x) => (x.id === t.id ? { ...x, active: !x.active } : x));
+                        if (next.some((x) => x.active)) setDraft((d) => ({ ...d, terrains: next }));
+                      }}
+                    >
+                      {t.name}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+              <TerrainFields value={gen.terrain} onChange={(terrain) => setGen({ terrain })} />
+            </StepSection>
+          )}
+
+          {step === 6 && (
             <StepSection
               title="Ausstattung"
               aside={
-                <Button variant="ghost" onClick={() => setStep(6)}>
+                <Button variant="ghost" onClick={() => setStep(7)}>
                   Später konfigurieren
                 </Button>
               }
             >
               <Slider label="Boden-Varianten" value={gen.floorVariation} unit="%" onChange={(v) => setGen({ floorVariation: v })} />
               <Slider label="Deko" value={gen.decoDensity} unit="%" onChange={(v) => setGen({ decoDensity: v })} />
-              <Slider label="Hindernisse" value={gen.obstacleDensity} unit="%" onChange={(v) => setGen({ obstacleDensity: v })} />
-              <Toggle label="Lava" checked={gen.lava} onChange={(v) => setGen({ lava: v })} />
-              <Toggle label="Wasser" checked={gen.water} onChange={(v) => setGen({ water: v })} />
-              {(gen.lava || gen.water) && <Slider label="Menge Lava / Wasser" value={gen.hazards} unit="%" onChange={(v) => setGen({ hazards: v })} />}
+              <Slider label="Kleine Hindernisse" value={gen.obstacleDensity} unit="%" onChange={(v) => setGen({ obstacleDensity: v })} />
+              <Slider label="Bäume" value={gen.objects.trees} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, trees: v } })} />
+              <Slider label="Große Felsen" value={gen.objects.rocks} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, rocks: v } })} />
+              <Slider label="Torbögen" value={gen.objects.arches} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, arches: v } })} />
+              <Toggle label="Säulen in großen Hallen" checked={gen.objects.pillars} onChange={(pillars) => setGen({ objects: { ...gen.objects, pillars } })} />
             </StepSection>
           )}
 
-          {step === 6 && <Summary draft={draft} onName={(name) => setDraft((d) => ({ ...d, name }))} onFixRooms={(n) => setGen({ roomCount: n })} />}
+          {step === 7 && <Summary draft={draft} onName={(name) => setDraft((d) => ({ ...d, name }))} onFixRooms={(n) => setGen({ roomCount: n })} />}
         </div>
 
         <footer className="wizard-foot">
@@ -345,7 +377,17 @@ function Summary({ draft, onName, onFixRooms }: { draft: Draft; onName: (n: stri
   const { map, gen } = draft;
   const specials = SPECIALS.filter((s) => gen.specials[s.id]).map((s) => s.label);
   const shapes = SHAPES.filter((s) => gen.shapes[s.id]).map((s) => s.label);
-  const hazards = [gen.lava && 'Lava', gen.water && 'Wasser'].filter(Boolean).join(', ') || 'keine';
+  const t = gen.terrain;
+  const terrainList =
+    [
+      t.water.enabled && `Wasser ${t.water.amount} %`,
+      t.lava.enabled && `Lava ${t.lava.amount} %`,
+      t.abyss.enabled && `Abgründe ${t.abyss.amount} %`,
+      t.cliffs.enabled && `Klippen ${t.cliffs.amount} %`,
+      t.bridges && 'Brücken',
+    ]
+      .filter(Boolean)
+      .join(', ') || 'nur Boden';
   const rows: [string, string][] = [
     ['Perspektive', PERSPECTIVE_INFO[map.perspective].label + (map.shadows ? ' · mit Schatten' : '')],
     ['Map', `${map.width} × ${map.height} Tiles`],
@@ -358,7 +400,9 @@ function Summary({ draft, onName, onFixRooms }: { draft: Draft; onName: (n: stri
     ['Verwinkelung', `${gen.twistiness} %`],
     ['Direktheit', `${100 - gen.directness} % Umwege`],
     ['Vernetzung', `${gen.connectivity} %`],
-    ['Ausstattung', `Deko ${gen.decoDensity} % · Hindernisse ${gen.obstacleDensity} % · ${hazards}`],
+    ['Gelände', terrainList],
+    ['Terrains', draft.terrains.filter((x) => x.active).map((x) => x.name).join(', ')],
+    ['Ausstattung', `Deko ${gen.decoDensity} % · Bäume ${gen.objects.trees} % · Felsen ${gen.objects.rocks} %`],
     ['Seed', gen.seed],
   ];
   return (

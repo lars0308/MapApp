@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import type { Selection, ToolId } from '../types';
+import type { ObjectType, Selection, ToolId } from '../types';
 
-export type MobilePanel = 'generate' | 'tiles' | 'layers' | 'export' | null;
+export type MobilePanel = 'generate' | 'terrain' | 'tiles' | 'layers' | 'export' | 'settings' | null;
 export type ViewMode = 'map' | 'graph';
 
 export interface Toast {
@@ -25,6 +25,16 @@ interface EditorState {
   hoverCell: { x: number; y: number } | null;
   zoom: number;
   toasts: Toast[];
+  showCollision: boolean;
+  showSortPoints: boolean;
+  /** re-tile walls automatically while painting ground / doors */
+  autoWalls: boolean;
+  /** object brush (null = tiles) */
+  selectedObject: ObjectType | null;
+  playtest: boolean;
+  setFlag: (key: 'showCollision' | 'showSortPoints' | 'autoWalls', value: boolean) => void;
+  selectObject: (t: ObjectType | null) => void;
+  setPlaytest: (v: boolean) => void;
   /** new-project setup wizard */
   wizardOpen: boolean;
   /** opened automatically on first start (closing it creates a demo map) */
@@ -64,15 +74,24 @@ export const useEditor = create<EditorState>((set, get) => ({
   hoverCell: null,
   zoom: 1,
   toasts: [],
+  showCollision: false,
+  showSortPoints: false,
+  autoWalls: true,
+  selectedObject: null,
+  playtest: false,
+  setFlag: (key, value) => set({ [key]: value } as Partial<EditorState>),
+  selectObject: (selectedObject) =>
+    set({ selectedObject, tool: selectedObject && get().tool !== 'eraser' && get().tool !== 'move' ? 'brush' : get().tool }),
+  setPlaytest: (playtest) => set({ playtest, mobilePanel: null, selection: null }),
   wizardOpen: false,
   wizardFirstRun: false,
   openWizard: (firstRun = false) => set({ wizardOpen: true, wizardFirstRun: firstRun, mobilePanel: null }),
   closeWizard: () => set({ wizardOpen: false, wizardFirstRun: false }),
-  setTool: (tool) => set({ tool, selection: tool === 'select' ? get().selection : null }),
+  setTool: (tool) => set({ tool, selection: tool === 'select' || tool === 'move' ? get().selection : null }),
   setBrushSize: (brushSize) => set({ brushSize }),
   selectTile: (gid) => {
     const { tool } = get();
-    set({ selectedGid: gid, tool: tool === 'eraser' || tool === 'pipette' || tool === 'hand' ? 'brush' : tool });
+    set({ selectedGid: gid, selectedObject: null, tool: tool === 'eraser' || tool === 'pipette' || tool === 'hand' ? 'brush' : tool });
   },
   toggleMark: (gid) => {
     const m = get().markedGids;

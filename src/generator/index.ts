@@ -1,61 +1,68 @@
 import {
   CELL_CORRIDOR,
-  CELL_HAZARD,
   CELL_ROOM,
   CELL_VOID,
   CELL_WALL,
+  T_ABYSS,
+  T_BRIDGE,
+  T_CLIFF,
+  T_LAVA,
+  T_NONE,
+  T_PLATEAU,
+  T_STAIRS,
+  T_TRANSITION,
+  T_WATER,
   type Connection,
   type Door,
   type GenerationResult,
   type GeneratorSettings,
   type Layer,
   type LayerRole,
+  type MapObject,
   type MapSettings,
   type Room,
   type SpawnPoint,
   type SpawnType,
   type SpecialRoomType,
-  type TileCategory,
+  type TerrainSet,
+  type TileRole,
   type Tileset,
 } from '../types';
-import { Rng } from './rng';
-import { placeRooms, type PlacedRoom } from './rooms';
+import { Rng, weightedIndex } from './rng';
+import { placeRooms } from './rooms';
 import { buildGraph } from './graph';
 import { carveBranches, carveCorridors, computeNearRoom, type Grid } from './corridors';
 import { assignSpecialRooms } from './specials';
 import { TilePools } from '../tilesets/tilePools';
-import { WallRole, resolveAutoTiles, wallRequest } from './autotile';
+import { NO_ROLE, resolveWalls, roleAt, wallNeighbourMask } from './autotile';
 import { requiredRooms } from './perspective';
+import { createTerrainState, placeTerrain, placeTransitions } from './terrain';
+import { placeObjects, type ObjectContext } from './objectsGen';
+import { OBJECT_DEFS } from '../objects/defs';
+import { isWalkable } from './nav';
 
 export interface GenerateInput {
   settings: GeneratorSettings;
   map: MapSettings;
   tilesets: Tileset[];
   layers: Pick<Layer, 'id' | 'role'>[];
+  terrains?: TerrainSet[];
 }
 
 export interface GenerateOutput {
   result: GenerationResult;
   /** new data for generator-owned layers (by layer id) */
   layerData: Record<string, Uint32Array>;
+  objects: MapObject[];
 }
 
-// wall neighbour bits (clockwise from north)
-const N = 1,
-  NE = 2,
-  E = 4,
-  SE = 8,
-  S = 16,
-  SW = 32,
-  W_ = 64,
-  NW = 128;
-
-const HAZARD_CATS: TileCategory[] = ['lava', 'water', 'abyss'];
+const LIQUID_ROLE: Record<number, TileRole> = { [T_WATER]: 'water', [T_LAVA]: 'lava', [T_ABYSS]: 'abyss' };
 
 export function generate(input: GenerateInput): GenerateOutput {
   const { settings: s, map } = input;
   const W = Math.max(16, map.width);
   const H = Math.max(16, map.height);
+  const perspective = map.perspective ?? 'top_down';
   const root = Rng.fromString(s.seed);
   const rRooms = root.fork(11);
   const rGraph = root.fork(23);
@@ -64,7 +71,9 @@ export function generate(input: GenerateInput): GenerateOutput {
   const rSpecial = root.fork(53);
   const rTiles = root.fork(67);
   const rDeco = root.fork(79);
-  const rHazard = root.fork(83);
+  const rTerrain = root.fork(83);
+  const rObjects = root.fork(97);
+  const rRoomTerrain = root.fork(101);
   const warnings: string[] = [];
 
   const grid: Grid = {
@@ -93,87 +102,82 @@ export function generate(input: GenerateInput): GenerateOutput {
   const corridors = carveCorridors(grid, placed, edges, s, rCorr);
   const deadEnds = carveBranches(grid, s, rBranch, placed.length);
 
-  // 11: automatic walls (+ neighbour mask for later auto-tiling)
-  const wallMask = new Uint8Array(W * H);
-  const walk = (x: number, y: number) =>
-    x >= 0 && y >= 0 && x < W && y < H && grid.cells[y * W + x] !== CELL_VOID && grid.cells[y * W + x] !== CELL_WALL;
+  // special rooms (start is needed to validate terrain reachability)
+  const specials = assignSpecialRooms(placed, edges, s, rSpecial);
+  const missingSpecials = requiredRooms(s.specials) - specials.size;
+  if (missingSpecials > 0) warnings.push(`${missingSpecials} Spezialraum/-räume ohne freien Raum – Raumanzahl erhöhen.`);
+  const startRoom = [...specials.entries()].find(([, t]) => t === 'start')?.[0] ?? 0;
+
+  // room terrains (reusable terrain sets, weighted)
+  const terrainSets = (input.terrains ?? []).filter((t) => t.active);
+  const corridorTerrain = terrainSets[0]?.id ?? 'terrain_stone';
+  const roomTerrain = placed.map(() => {
+    if (!terrainSets.length) return corridorTerrain;
+    return terrainSets[weightedIndex(rRoomTerrain, terrainSets.map((t) => t.weight))]?.id ?? corridorTerrain;
+  });
+  const terrainTag = (id: string) => input.terrains?.find((t) => t.id === id)?.tag ?? 'stone';
+
+  // terrain: crossings with bridges, plateaus with cliffs, pools (validated)
+  const ts = createTerrainState(W, H);
+  const terrainResult = placeTerrain(grid, ts, placed, corridors, s.terrain, perspective, startRoom, rTerrain);
+  if (s.terrain.transitions.enabled) placeTransitions(grid, ts, roomTerrain, corridorTerrain, s.terrain.transitions.amount, rTerrain);
+  warnings.push(...ts.warnings);
+
+  // 11: walls + auto-tile roles (fronts/caps in 3/4 views), shadow + floor masks
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       const i = y * W + x;
       if (grid.cells[i] !== CELL_VOID) continue;
-      let m = 0;
-      if (walk(x, y - 1)) m |= N;
-      if (walk(x + 1, y - 1)) m |= NE;
-      if (walk(x + 1, y)) m |= E;
-      if (walk(x + 1, y + 1)) m |= SE;
-      if (walk(x, y + 1)) m |= S;
-      if (walk(x - 1, y + 1)) m |= SW;
-      if (walk(x - 1, y)) m |= W_;
-      if (walk(x - 1, y - 1)) m |= NW;
-      if (m) wallMask[i] = m;
+      for (let oy = -1; oy <= 1; oy++)
+        for (let ox = -1; ox <= 1; ox++) {
+          const xx = x + ox;
+          const yy = y + oy;
+          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+          const c = grid.cells[yy * W + xx];
+          if (c !== CELL_VOID && c !== CELL_WALL) grid.cells[i] = CELL_WALL;
+        }
     }
-  for (let i = 0; i < W * H; i++) if (wallMask[i]) grid.cells[i] = CELL_WALL;
+  const walls = resolveWalls(grid, perspective, map.shadows ?? false);
+  const wallMask = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) if (grid.cells[i] === CELL_WALL) wallMask[i] = wallNeighbourMask(grid, i % W, (i / W) | 0);
 
-  // 11b: perspective-aware wall roles (fronts, caps), shadow + floor masks
-  const perspective = map.perspective ?? 'top_down';
-  const auto = resolveAutoTiles(grid, wallMask, perspective, map.shadows ?? false);
-
-  // 12: doors where corridors meet rooms (narrow openings only)
-  const doors = findDoors(grid);
+  // 12: doors where corridors meet rooms (narrow openings only) + door frames
+  const doors = findDoors(grid).filter((d) => {
+    const t = ts.terrain[d.y * W + d.x];
+    return t === T_NONE || t === T_TRANSITION;
+  });
   const doorSet = new Set(doors.map((d) => d.y * W + d.x));
 
-  // 13: special rooms
-  const specials = assignSpecialRooms(placed, edges, s, rSpecial);
-
   const pools = new TilePools(input.tilesets, perspective);
-  const missingSpecials = requiredRooms(s.specials) - specials.size;
-  if (missingSpecials > 0)
-    warnings.push(`${missingSpecials} Spezialraum/-räume ohne freien Raum – Raumanzahl erhöhen.`);
   if (!pools.has('floor')) warnings.push('Keine aktive Kachel der Kategorie „Boden“ – Boden-Layer bleibt leer.');
 
-  // hazards (lava / water / abyss pools inside larger rooms)
-  const hazardCats = HAZARD_CATS.filter((c) => pools.has(c) && s[c as 'lava' | 'water' | 'abyss'] !== false);
-  const hazardType = new Map<number, TileCategory>();
-  if (s.hazards > 0 && hazardCats.length) {
-    const count = Math.round((s.hazards / 100) * placed.length * 0.5);
-    const cands = rHazard.shuffle(placed.filter((r) => specials.get(r.id) !== 'start'));
-    let made = 0;
-    for (const r of cands) {
-      if (made >= count) break;
-      if (makePool(grid, r, rHazard, s.hazards, hazardType, rHazard.pick(hazardCats))) made++;
-    }
-  }
+  // objects (validated so that no path is blocked)
+  const reserved = new Set<number>(ts.reserved);
+  for (const d of doors) for (let oy = -2; oy <= 2; oy++) for (let ox = -2; ox <= 2; ox++) reserved.add((d.y + oy) * W + d.x + ox);
+  const octx: ObjectContext = { g: grid, terrain: ts.terrain, reserved, occupied: new Uint8Array(W * H) };
+  const objects = placeObjects(octx, placed, (id) => specials.get(id) ?? 'normal', s, rObjects);
 
-  // objects: pillars in halls, obstacles in room interiors
-  const objects = new Map<number, TileCategory>();
-  const reserved = new Set<number>();
-  for (const r of placed) reserved.add(r.cy * W + r.cx);
-  for (const d of doors) {
-    for (let oy = -2; oy <= 2; oy++) for (let ox = -2; ox <= 2; ox++) reserved.add((d.y + oy) * W + d.x + ox);
-  }
-  for (const r of placed) {
-    if (r.shape !== 'hall' || !pools.resolve(['pillar', 'obstacle'])) continue;
-    const step = r.w > 18 ? 5 : 4;
-    for (let y = r.y + 2; y < r.y + r.h - 2; y += step)
-      for (let x = r.x + 2; x < r.x + r.w - 2; x += step) {
-        const i = y * W + x;
-        if (isInterior(grid, x, y, 2) && !reserved.has(i)) objects.set(i, 'pillar');
-      }
-  }
+  // small obstacles (single tiles) in room interiors
+  const obstacles = new Set<number>();
   if (s.obstacleDensity > 0 && pools.has('obstacle')) {
-    const p = (s.obstacleDensity / 100) * 0.09;
+    const p = (s.obstacleDensity / 100) * 0.07;
     for (let y = 1; y < H - 1; y++)
       for (let x = 1; x < W - 1; x++) {
         const i = y * W + x;
-        if (grid.cells[i] !== CELL_ROOM || reserved.has(i) || !isInterior(grid, x, y, 1)) continue;
+        if (grid.cells[i] !== CELL_ROOM || ts.terrain[i] !== T_NONE || reserved.has(i) || octx.occupied[i] || !isInterior(grid, ts.terrain, x, y, 1)) continue;
         let blocked = false;
-        for (let oy = -1; oy <= 1 && !blocked; oy++)
-          for (let ox = -1; ox <= 1; ox++) if (objects.has((y + oy) * W + x + ox)) blocked = true;
-        if (!blocked && rDeco.chance(p)) objects.set(i, 'obstacle');
+        for (let oy = -1; oy <= 1 && !blocked; oy++) for (let ox = -1; ox <= 1; ox++) if (obstacles.has((y + oy) * W + x + ox)) blocked = true;
+        if (!blocked && rDeco.chance(p)) obstacles.add(i);
       }
   }
 
   // rooms & connections for the data model
+  const roomDoors = new Map<number, { x: number; y: number }[]>();
+  for (const d of doors) {
+    const list = roomDoors.get(d.roomId) ?? [];
+    list.push({ x: d.x, y: d.y });
+    roomDoors.set(d.roomId, list);
+  }
   const rooms: Room[] = placed.map((r) => {
     const type = specials.get(r.id) ?? 'normal';
     return {
@@ -192,6 +196,8 @@ export function generate(input: GenerateInput): GenerateOutput {
       isEnd: type === 'end',
       isBoss: type === 'boss',
       special: type === 'normal' || type === 'start' || type === 'end' ? null : type,
+      terrain: roomTerrain[r.id],
+      doors: roomDoors.get(r.id) ?? [],
     };
   });
   const connections: Connection[] = corridors.map((c, i) => ({
@@ -201,6 +207,9 @@ export function generate(input: GenerateInput): GenerateOutput {
     kind: c.kind,
     width: c.width,
     length: c.length,
+    path: c.path,
+    door: doors.some((d) => (d.roomId === c.a || d.roomId === c.b) && c.path.some(([x, y]) => Math.abs(x - d.x) + Math.abs(y - d.y) <= c.width)),
+    bridge: ts.bridgedConnections.has(i) || c.path.some(([x, y]) => ts.terrain[y * W + x] === T_BRIDGE),
   }));
   for (const c of connections) {
     if (!rooms[c.from].connections.includes(c.to)) rooms[c.from].connections.push(c.to);
@@ -216,21 +225,15 @@ export function generate(input: GenerateInput): GenerateOutput {
     ['merchant', 'npc'],
     ['quest', 'quest'],
   ];
+  const free = (i: number) => isWalkable(grid.cells, ts.terrain, i) && !octx.occupied[i] && !obstacles.has(i);
   for (const [roomType, spawnType] of spawnFor) {
     const room = rooms.find((r) => r.type === roomType);
     if (!room) continue;
-    const [sx, sy] = spawnCell(grid, room, objects);
-    spawnPoints.push({
-      id: `${spawnType}_${room.id}`,
-      type: spawnType,
-      x: sx,
-      y: sy,
-      roomId: room.id,
-      properties: roomType === 'boss' ? { boss: true } : {},
-    });
+    const [sx, sy] = spawnCell(W, room, free);
+    spawnPoints.push({ id: `${spawnType}_${room.id}`, type: spawnType, x: sx, y: sy, roomId: room.id, properties: roomType === 'boss' ? { boss: true } : {} });
   }
 
-  // 14: paint layers with weighted tile variants
+  // 14: paint layers
   const byRole = new Map<LayerRole, Uint32Array>();
   const layerData: Record<string, Uint32Array> = {};
   for (const l of input.layers) {
@@ -239,70 +242,155 @@ export function generate(input: GenerateInput): GenerateOutput {
     byRole.set(l.role, arr);
     layerData[l.id] = arr;
   }
-  const floorL = byRole.get('floor');
-  const pathL = byRole.get('paths');
-  const shadowL = byRole.get('shadow');
-  const wallL = byRole.get('walls');
-  const objL = byRole.get('objects');
-  const decoL = byRole.get('deco');
-  const colL = byRole.get('collision');
-  const gameL = byRole.get('gameplay');
-  const spawnL = byRole.get('spawn');
+  const L = (r: LayerRole) => byRole.get(r);
+  const floorL = L('floor');
+  const detailL = L('groundDetails') ?? L('floor');
+  const pathL = L('paths');
+  const shadowL = L('shadow');
+  const wallL = L('walls');
+  const frontL = L('wallsFront') ?? L('walls');
+  const objL = L('objects');
+  const decoL = L('deco');
+  const colL = L('collision');
+  const gameL = L('gameplay');
+  const spawnL = L('spawn');
 
   const variation = s.floorVariation / 100;
-  const edgeFloor = pools.hasTag('floor', 'edge');
   const collisionGid = pools.pickTagged(rTiles, 'special', 'collision');
-
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      const i = y * W + x;
-      const c = grid.cells[i];
-      if (c === CELL_ROOM || c === CELL_CORRIDOR) {
-        if (floorL) {
-          const variant = pools.has('floorVariant') && rTiles.chance(variation);
-          // edge-aware floor: tiles tagged "edge" go to cells at the border of a floor area
-          const edge = auto.floorMask[i] !== 15;
-          floorL[i] = variant
-            ? pools.pick(rTiles, ['floorVariant', 'floor'])
-            : edgeFloor
-              ? pools.pickPref(rTiles, ['floor'], edge ? 'edge' : undefined, edge ? undefined : ['edge'])
-              : pools.pick(rTiles, ['floor']);
-        }
-        const sh = auto.shadows[i];
-        if (sh && shadowL) shadowL[i] = pools.pickPref(rTiles, ['shadow'], sh);
-        if (c === CELL_CORRIDOR && pathL) pathL[i] = pools.pick(rTiles, ['path']);
-      } else if (c === CELL_HAZARD) {
-        if (floorL) floorL[i] = pools.pick(rTiles, [hazardType.get(i) ?? 'lava', ...HAZARD_CATS]);
-        if (colL && collisionGid) colL[i] = collisionGid;
-      } else if (c === CELL_WALL) {
-        if (wallL) {
-          const req = wallRequest(auto.wallRoles[i] as WallRole, perspective);
-          wallL[i] = pools.pickPref(rTiles, req.cats, req.prefer, req.avoid);
-        }
-        if (colL && collisionGid) colL[i] = collisionGid;
-      }
+  const block = (i: number) => {
+    if (colL && collisionGid) colL[i] = collisionGid;
+  };
+  const tagAt = (i: number) => {
+    const rid = grid.roomId[i];
+    return terrainTag(rid >= 0 ? roomTerrain[rid] : corridorTerrain);
+  };
+  const walk = (i: number) => grid.cells[i] !== CELL_VOID && grid.cells[i] !== CELL_WALL;
+  const floorTile = (i: number) => {
+    if (pools.has('floorVariant') && rTiles.chance(variation)) return pools.pick(rTiles, ['floorVariant', 'floor']);
+    // edge-aware floor when the tileset provides edge roles
+    const edge: TileRole | null = !walk(i - W) ? 'floor_edge_top' : !walk(i + W) ? 'floor_edge_bottom' : !walk(i - 1) ? 'floor_edge_left' : !walk(i + 1) ? 'floor_edge_right' : null;
+    if (edge && pools.hasRole(edge)) return pools.pickRole(rTiles, edge, [tagAt(i)]);
+    return pools.pickPref(rTiles, ['floor'], tagAt(i));
+  };
+  const liquidTile = (i: number, type: number) => {
+    if (type === T_ABYSS && pools.hasRole('abyss_edge')) {
+      const above = i - W;
+      const aboveT = ts.terrain[above] === T_BRIDGE ? ts.bridges.get(above)?.under : ts.terrain[above];
+      if (aboveT !== T_ABYSS) return pools.pickRole(rTiles, 'abyss_edge');
     }
+    return pools.pickRole(rTiles, LIQUID_ROLE[type] ?? 'abyss');
+  };
+
+  // ground, paths, bridges, liquids, shadows
+  for (let i = 0; i < W * H; i++) {
+    const c = grid.cells[i];
+    if (c === CELL_VOID || c === CELL_WALL) continue;
+    const t = ts.terrain[i];
+    if (floorL) {
+      if (t === T_WATER || t === T_LAVA || t === T_ABYSS) floorL[i] = liquidTile(i, t);
+      else if (t === T_BRIDGE) floorL[i] = liquidTile(i, ts.bridges.get(i)?.under ?? T_ABYSS);
+      else if (ts.heights[i] > 0) floorL[i] = pools.pickRole(rTiles, 'raised_floor', [tagAt(i)]);
+      else floorL[i] = floorTile(i);
+    }
+    if (t === T_WATER || t === T_LAVA || t === T_ABYSS) block(i);
+    if (t === T_BRIDGE) {
+      const b = ts.bridges.get(i)!;
+      if (pathL) pathL[i] = pools.pickRole(rTiles, b.role, [b.orient]);
+    } else if (c === CELL_CORRIDOR && pathL && t !== T_WATER && t !== T_LAVA && t !== T_ABYSS) pathL[i] = pools.pick(rTiles, ['path']);
+    if (t === T_TRANSITION && detailL && pools.hasRole('transition')) detailL[i] = pools.pickRole(rTiles, 'transition');
+    const sh = walls.shadows[i];
+    if (sh && shadowL && t !== T_ABYSS) shadowL[i] = pools.pickRole(rTiles, 'shadow', [sh]);
+  }
+
+  // plateaus: rims (overlay), faces (y-sorted), stairs, cliff shadows
+  for (const p of terrainResult.plateaus) {
+    const faceBottom = p.y1 + p.faceRows;
+    for (let y = p.y0; y <= faceBottom; y++)
+      for (let x = p.x0; x <= p.x1; x++) {
+        const i = y * W + x;
+        let role: TileRole | null = null;
+        let prefer: string[] | undefined;
+        const onTop = y <= p.y1;
+        if (ts.terrain[i] === T_STAIRS) {
+          if (detailL) detailL[i] = pools.pickRole(rTiles, 'stairs');
+          continue;
+        }
+        if (onTop) {
+          const n = y === p.y0;
+          const s2 = p.faceRows === 0 && y === p.y1;
+          const w = x === p.x0;
+          const e = x === p.x1;
+          if (n && w) (role = 'cliff_outer_corner'), (prefer = ['left']);
+          else if (n && e) (role = 'cliff_outer_corner'), (prefer = ['right']);
+          else if (s2 && w) (role = 'cliff_inner_corner'), (prefer = ['left']);
+          else if (s2 && e) (role = 'cliff_inner_corner'), (prefer = ['right']);
+          else if (n) role = 'cliff_top';
+          else if (s2) role = 'cliff_bottom';
+          else if (w) role = 'cliff_left';
+          else if (e) role = 'cliff_right';
+          if (role && detailL) detailL[i] = pools.pickRole(rTiles, role, prefer);
+        } else {
+          role = p.faceRows === 2 && y === faceBottom ? 'cliff_bottom' : 'cliff_front';
+          if (frontL) frontL[i] = pools.pickRole(rTiles, role);
+        }
+        if (ts.terrain[i] === T_CLIFF) block(i);
+      }
+    // shadow cast below the cliff
+    if (shadowL)
+      for (let x = p.x0; x <= p.x1; x++) {
+        const i = (faceBottom + 1) * W + x;
+        if (i < W * H && walk(i) && ts.terrain[i] !== T_STAIRS) shadowL[i] = pools.pickRole(rTiles, 'cliff_shadow', ['top']);
+      }
+  }
+
+  // walls (back / front) + door frames
+  const roleOverride = new Map<number, TileRole>();
+  const doorOrient = new Map<number, string>();
+  for (const d of doors) {
+    const i = d.y * W + d.x;
+    const horizontalWall = grid.cells[i - 1] === CELL_WALL || grid.cells[i + 1] === CELL_WALL || doorSet.has(i - 1) || doorSet.has(i + 1);
+    const roomBelow = grid.cells[i + W] === CELL_ROOM;
+    if (horizontalWall) {
+      doorOrient.set(i, roomBelow && walls.front[i - 1] + walls.front[i + 1] > 0 ? 'front' : 'h');
+      if (!doorSet.has(i - 1) && grid.cells[i - 1] === CELL_WALL) roleOverride.set(i - 1, 'door_frame_left');
+      if (!doorSet.has(i + 1) && grid.cells[i + 1] === CELL_WALL) roleOverride.set(i + 1, 'door_frame_right');
+    } else doorOrient.set(i, 'v');
+  }
+  for (let i = 0; i < W * H; i++) {
+    if (grid.cells[i] !== CELL_WALL) continue;
+    block(i);
+    const override = roleOverride.get(i);
+    const role = override ?? roleAt(walls.roles[i]);
+    if (!role) continue;
+    const isFront = walls.front[i] > 0;
+    const layer = isFront ? frontL : wallL;
+    if (!layer) continue;
+    let gid = pools.pickRole(rTiles, role, override ? [isFront ? 'front' : 'top'] : undefined);
+    // frames without matching tiles fall back to the plain wall role
+    if (override && !pools.hasRole(override) && walls.roles[i] !== NO_ROLE) gid = pools.pickRole(rTiles, roleAt(walls.roles[i])!);
+    layer[i] = gid;
+  }
 
   if (objL) {
-    for (const i of doorSet) objL[i] = pools.pick(rTiles, ['door']);
-    for (const [i, cat] of objects) {
-      objL[i] = pools.pick(rTiles, cat === 'pillar' ? ['pillar', 'obstacle'] : ['obstacle']);
-      if (colL && collisionGid) colL[i] = collisionGid;
+    for (const i of doorSet) objL[i] = pools.pickRole(rTiles, 'door', [doorOrient.get(i) ?? 'h']);
+    for (const i of obstacles) {
+      objL[i] = pools.pick(rTiles, ['obstacle']);
+      block(i);
     }
   }
+  for (const o of objects) for (const [dx, dy] of OBJECT_DEFS[o.type].collision) block((o.y + dy) * W + o.x + dx);
 
   if (decoL && s.decoDensity > 0 && pools.has('deco')) {
     const p = (s.decoDensity / 100) * 0.14;
     for (let i = 0; i < W * H; i++) {
       const c = grid.cells[i];
-      if ((c !== CELL_ROOM && c !== CELL_CORRIDOR) || doorSet.has(i) || objects.has(i)) continue;
-      // corridors get fewer decorations than rooms
+      if ((c !== CELL_ROOM && c !== CELL_CORRIDOR) || doorSet.has(i) || obstacles.has(i) || octx.occupied[i]) continue;
+      if (ts.terrain[i] !== T_NONE && ts.terrain[i] !== T_PLATEAU) continue;
       if (rDeco.chance(c === CELL_ROOM ? p : p * 0.35)) decoL[i] = pools.pick(rDeco, ['deco']);
     }
   }
 
   // gameplay markers for special rooms
-  const markerCells = new Set<number>();
   if (gameL) {
     for (const r of rooms) {
       if (r.type === 'normal' || r.type === 'start') continue;
@@ -313,7 +401,6 @@ export function generate(input: GenerateInput): GenerateOutput {
       if (!gid) gid = pools.pickTagged(rTiles, 'special', 'marker');
       if (gid) {
         gameL[i] = gid;
-        markerCells.add(i);
         if (decoL) decoL[i] = 0;
       }
     }
@@ -327,7 +414,6 @@ export function generate(input: GenerateInput): GenerateOutput {
       if (decoL) decoL[i] = 0;
     }
   }
-  void markerCells;
 
   const result: GenerationResult = {
     seed: s.seed,
@@ -340,20 +426,23 @@ export function generate(input: GenerateInput): GenerateOutput {
     spawnPoints,
     cells: grid.cells,
     wallMask,
-    floorMask: auto.floorMask,
+    floorMask: walls.floorMask,
+    terrain: ts.terrain,
+    heights: ts.heights,
     perspective,
     warnings,
   };
-  return { result, layerData };
+  return { result, layerData, objects };
 }
 
-function isInterior(g: Grid, x: number, y: number, r: number): boolean {
+function isInterior(g: Grid, terrain: Uint8Array, x: number, y: number, r: number): boolean {
   for (let oy = -r; oy <= r; oy++)
     for (let ox = -r; ox <= r; ox++) {
       const nx = x + ox;
       const ny = y + oy;
       if (nx < 0 || ny < 0 || nx >= g.W || ny >= g.H) return false;
-      if (g.cells[ny * g.W + nx] !== CELL_ROOM) return false;
+      const i = ny * g.W + nx;
+      if (g.cells[i] !== CELL_ROOM || terrain[i] !== T_NONE) return false;
     }
   return true;
 }
@@ -389,7 +478,7 @@ function findDoors(g: Grid): Door[] {
         }
     }
     if (comp.length > 3) continue;
-    // a door needs solid (non-floor) cells on both sides of the opening
+    // a door needs solid wall cells on both sides of the opening
     const xs = comp.map((c) => c % W);
     const ys = comp.map((c) => (c / W) | 0);
     const horizontal = new Set(ys).size === 1;
@@ -399,64 +488,28 @@ function findDoors(g: Grid): Door[] {
     const maxX = Math.max(...xs);
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
-    const solid = (x: number, y: number) => g.cells[y * W + x] === CELL_VOID || g.cells[y * W + x] === CELL_WALL;
-    const ok = horizontal
-      ? solid(minX - 1, minY) && solid(maxX + 1, minY)
-      : solid(minX, minY - 1) && solid(minX, maxY + 1);
+    const solid = (x: number, y: number) => g.cells[y * W + x] === CELL_WALL;
+    const ok = horizontal ? solid(minX - 1, minY) && solid(maxX + 1, minY) : solid(minX, minY - 1) && solid(minX, maxY + 1);
     if (!ok) continue;
     for (const c of comp) doors.push({ x: c % W, y: (c / W) | 0, roomId: rid });
   }
   return doors;
 }
 
-function makePool(
-  g: Grid,
-  r: PlacedRoom,
-  rng: Rng,
-  intensity: number,
-  out: Map<number, TileCategory>,
-  cat: TileCategory,
-): boolean {
-  const cands: number[] = [];
-  for (let y = r.y; y < r.y + r.h; y++)
-    for (let x = r.x; x < r.x + r.w; x++) {
-      if (Math.abs(x - r.cx) <= 1 && Math.abs(y - r.cy) <= 1) continue;
-      if (isInterior(g, x, y, 2)) cands.push(y * g.W + x);
-    }
-  if (cands.length < 4) return false;
-  const size = rng.int(3, 4 + Math.round(intensity / 12));
-  const pool = [rng.pick(cands)];
-  const candSet = new Set(cands);
-  const inPool = new Set(pool);
-  for (let k = 0; k < size * 4 && pool.length < size; k++) {
-    const c = rng.pick(pool);
-    const j = c + rng.pick([1, -1, g.W, -g.W]);
-    if (candSet.has(j) && !inPool.has(j)) {
-      pool.push(j);
-      inPool.add(j);
-    }
-  }
-  for (const c of pool) {
-    g.cells[c] = CELL_HAZARD;
-    out.set(c, cat);
-  }
-  return true;
-}
-
-function spawnCell(g: Grid, room: Room, objects: Map<number, TileCategory>): [number, number] {
-  const { W } = g;
-  // one cell left/right of the centre so it does not overlap gameplay markers
+function spawnCell(W: number, room: Room, free: (i: number) => boolean): [number, number] {
   for (const [ox, oy] of [
     [-1, 0],
     [1, 0],
     [0, 1],
     [0, -1],
     [0, 0],
+    [-2, 0],
+    [2, 0],
   ]) {
     const x = room.centerX + ox;
     const y = room.centerY + oy;
-    const i = y * W + x;
-    if (g.cells[i] === CELL_ROOM && !objects.has(i)) return [x, y];
+    if (free(y * W + x)) return [x, y];
   }
   return [room.centerX, room.centerY];
 }
+

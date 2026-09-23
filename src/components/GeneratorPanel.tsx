@@ -187,13 +187,14 @@ export function GeneratorPanel() {
       </Section>
 
       <Section title="Ausstattung" defaultOpen={false}>
-        <Toggle label="Lava" checked={g.lava} onChange={(lava) => update({ lava })} />
-        <Toggle label="Wasser" checked={g.water} onChange={(water) => update({ water })} />
-        <Toggle label="Abgrund" checked={g.abyss} onChange={(abyss) => update({ abyss })} />
         <Slider label="Boden-Varianten" value={g.floorVariation} unit=" %" onChange={(v) => update({ floorVariation: v })} />
         <Slider label="Deko" value={g.decoDensity} unit=" %" onChange={(v) => update({ decoDensity: v })} />
-        <Slider label="Hindernisse" value={g.obstacleDensity} unit=" %" onChange={(v) => update({ obstacleDensity: v })} />
-        <Slider label="Menge Lava / Wasser / Abgrund" value={g.hazards} unit=" %" onChange={(v) => update({ hazards: v })} />
+        <Slider label="Kleine Hindernisse" value={g.obstacleDensity} unit=" %" onChange={(v) => update({ obstacleDensity: v })} />
+        <Slider label="Bäume" value={g.objects.trees} unit=" %" onChange={(v) => update({ objects: { ...g.objects, trees: v } })} />
+        <Slider label="Große Felsen" value={g.objects.rocks} unit=" %" onChange={(v) => update({ objects: { ...g.objects, rocks: v } })} />
+        <Slider label="Torbögen" value={g.objects.arches} unit=" %" onChange={(v) => update({ objects: { ...g.objects, arches: v } })} />
+        <Toggle label="Säulen in großen Hallen" checked={g.objects.pillars} onChange={(pillars) => update({ objects: { ...g.objects, pillars } })} />
+        <p className="hint">Wasser, Lava, Abgründe, Klippen und Brücken: Panel „Terrain“.</p>
       </Section>
     </div>
   );

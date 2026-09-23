@@ -1,8 +1,11 @@
 import { useMemo, useRef, useState } from 'react';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
-import type { Perspective, TileCategory, Tileset } from '../types';
-import { PERSPECTIVES } from '../types';
+import type { Perspective, TileCategory, TileRole, Tileset } from '../types';
+import { PERSPECTIVES, TILE_ROLES } from '../types';
+import { OBJECT_DEFS, OBJECT_TYPES } from '../objects/defs';
+import { ObjectThumb } from '../objects/ObjectThumb';
+import { tileBlocks } from '../editor/collision';
 import { PERSPECTIVE_INFO } from '../generator/perspective';
 import { CATEGORIES, CATEGORY_LABEL, SUGGESTED_TAGS } from './categories';
 import { TileThumb } from './TileThumb';
@@ -11,7 +14,7 @@ import { Button, Chip, IconButton, NumberField, PanelTabs, Segmented, Slider, To
 import { Icon } from '../components/icons';
 import { readFileAsDataUrl } from '../utils/download';
 
-type Tab = 'palette' | 'tilesets';
+type Tab = 'palette' | 'objects' | 'tilesets';
 
 export function TilesPanel() {
   const [tab, setTab] = useState<Tab>('palette');
@@ -20,12 +23,13 @@ export function TilesPanel() {
       <PanelTabs
         tabs={[
           { value: 'palette', label: 'Palette' },
+          { value: 'objects', label: 'Objekte' },
           { value: 'tilesets', label: 'Tilesets' },
         ]}
         value={tab}
         onChange={setTab}
       />
-      {tab === 'palette' ? <Palette /> : <TilesetManager />}
+      {tab === 'palette' ? <Palette /> : tab === 'objects' ? <ObjectPalette /> : <TilesetManager />}
     </div>
   );
 }
@@ -225,6 +229,38 @@ function TileInspector({ gids }: { gids: number[] }) {
           ))}
         </select>
       </div>
+      <div className="field">
+        <label htmlFor="tile-role">Rolle (Auto-Tile)</label>
+        <select
+          id="tile-role"
+          className="select mono"
+          value={resolved.every((r) => r.ts.tiles[r.index]?.role === meta.role) ? (meta.role ?? '') : 'mixed'}
+          onChange={(e) => setTileMeta(gids, { role: (e.target.value || undefined) as TileRole | undefined })}
+        >
+          <option value="">— keine —</option>
+          {TILE_ROLES.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="grid-2">
+        <div className="field">
+          <label htmlFor="tile-col">Kollision</label>
+          <select
+            id="tile-col"
+            className="select"
+            value={meta.collision === undefined ? 'auto' : meta.collision ? 'yes' : 'no'}
+            onChange={(e) => setTileMeta(gids, { collision: e.target.value === 'auto' ? undefined : e.target.value === 'yes' })}
+          >
+            <option value="auto">Auto ({tileBlocks({ ...meta, collision: undefined }) ? 'ja' : 'nein'})</option>
+            <option value="yes">Ja</option>
+            <option value="no">Nein</option>
+          </select>
+        </div>
+        <NumberField label="Sortier-Offset" value={meta.sortOffset ?? 0} min={0} max={4} suffix="Tiles" onChange={(v) => setTileMeta(gids, { sortOffset: v || undefined })} />
+      </div>
       <Slider label="Gewichtung" value={meta.weight} onChange={(v) => setTileMeta(gids, { weight: v })} />
       <div className="field">
         <label>Tags</label>
@@ -384,6 +420,35 @@ function TilesetCard({ ts }: { ts: Tileset }) {
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ---------------------------- objects ---------------------------- */
+
+function ObjectPalette() {
+  const selected = useEditor((s) => s.selectedObject);
+  const selectObject = useEditor((s) => s.selectObject);
+  const objects = useProject((s) => s.project.objects);
+  return (
+    <div className="palette">
+      <p className="hint">Antippen = als Pinsel wählen und auf die Map tippen. Radierer entfernt, „Verschieben“ zieht Objekte. Objekte werden nach ihrem Fußpunkt Y-sortiert.</p>
+      <div className="object-grid">
+        {OBJECT_TYPES.map((t) => {
+          const d = OBJECT_DEFS[t];
+          return (
+            <button key={t} type="button" className={`object-cell${selected === t ? ' is-selected' : ''}`} aria-pressed={selected === t} onClick={() => selectObject(selected === t ? null : t)}>
+              <ObjectThumb type={t} size={56} />
+              <span>{d.label}</span>
+              <small className="muted">
+                {d.w}×{d.h} · {d.collision.length ? 'Kollision' : 'frei'}
+                {d.overheadRows ? ' · Overhead' : ''}
+              </small>
+            </button>
+          );
+        })}
+      </div>
+      <p className="muted small">{objects.length} Objekte auf der Map</p>
     </div>
   );
 }

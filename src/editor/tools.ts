@@ -13,6 +13,7 @@ export const TOOLS: ToolInfo[] = [
   { id: 'rect', label: 'Rechteck', key: 'R' },
   { id: 'pipette', label: 'Pipette', key: 'I' },
   { id: 'select', label: 'Auswahl', key: 'M' },
+  { id: 'move', label: 'Verschieben', key: 'V' },
   { id: 'hand', label: 'Hand', key: 'H' },
 ];
 

@@ -23,6 +23,8 @@ export class GidTable {
   sx: Uint16Array;
   sy: Uint16Array;
   size: Uint16Array;
+  /** y-sort offset in rows (tall tiles) */
+  sortOff: Int8Array;
   imgs: (HTMLImageElement | null)[] = [];
   private sources: Tileset[];
 
@@ -34,6 +36,7 @@ export class GidTable {
     this.sx = new Uint16Array(max);
     this.sy = new Uint16Array(max);
     this.size = new Uint16Array(max);
+    this.sortOff = new Int8Array(max);
     tilesets.forEach((ts, k) => {
       this.imgs.push(imageFor(ts));
       const n = ts.columns * ts.rows;
@@ -43,6 +46,7 @@ export class GidTable {
         this.sx[g] = (i % ts.columns) * ts.tileSize;
         this.sy[g] = Math.floor(i / ts.columns) * ts.tileSize;
         this.size[g] = ts.tileSize;
+        this.sortOff[g] = ts.tiles[i]?.sortOffset ?? 0;
       }
     });
   }

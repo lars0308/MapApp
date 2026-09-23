@@ -1,7 +1,7 @@
 import type { Project } from '../types';
 import { downloadBlob, downloadText, safeFileName } from '../utils/download';
 import { serializeProject, PROJECT_EXTENSION } from '../persistence/projectFile';
-import { buildGodotData, scaledTilesetPng, tilesetImageName } from './godotJson';
+import { OBJECTS_IMAGE, buildGodotData, scaledObjectsPng, scaledTilesetPng, tilesetImageName } from './godotJson';
 import { renderMapPng, type PngOptions } from './pngExport';
 import { createZip, type ZipEntry } from './zip';
 import { GODOT_LOADER_FILENAME, GODOT_LOADER_SCRIPT, GODOT_README } from './godotScript';
@@ -29,7 +29,10 @@ export async function exportGodotPackage(p: Project, includeShadows = true) {
     { path: `${folder}/${GODOT_LOADER_FILENAME}`, data: GODOT_LOADER_SCRIPT },
     { path: `${folder}/README.md`, data: GODOT_README },
   ];
-  for (const ts of p.tilesets) {
+  const objectsPng = await scaledObjectsPng(p.map.tileSize);
+  entries.push({ path: `${folder}/${OBJECTS_IMAGE}`, data: new Uint8Array(await objectsPng.arrayBuffer()) });
+  const exportedIds = new Set(data.tilesets.map((t) => t.id));
+  for (const ts of p.tilesets.filter((t) => exportedIds.has(t.id))) {
     const png = await scaledTilesetPng(ts, p.map.tileSize);
     entries.push({ path: `${folder}/tilesets/${tilesetImageName(ts)}`, data: new Uint8Array(await png.arrayBuffer()) });
   }

@@ -1,4 +1,6 @@
-import type { Layer, Selection, Tileset } from '../types';
+import type { Layer, MapObject, Selection, Tileset } from '../types';
+import { OBJECT_DEFS, OBJECT_ATLAS_TILE, objectAtlas } from '../objects/defs';
+import { drawCharacter, type CharacterState } from './character';
 import { GidTable, drawGid } from './tileAtlas';
 import { clamp } from '../utils/math';
 
@@ -26,6 +28,11 @@ export interface Overlay {
   showGrid: boolean;
   showCoords: boolean;
   activeTool: string;
+  /** blocked cells (collision debug overlay) */
+  collision: Uint8Array | null;
+  showSortPoints: boolean;
+  /** object under the pointer (move tool) */
+  objectHighlight: string | null;
 }
 
 interface Chunk {
@@ -69,7 +76,12 @@ export class MapRenderer {
     showGrid: true,
     showCoords: false,
     activeTool: 'brush',
+    collision: null,
+    showSortPoints: false,
+    objectHighlight: null,
   };
+  objects: MapObject[] = [];
+  character: CharacterState | null = null;
   onCameraChange?: (cam: Camera) => void;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -151,6 +163,17 @@ export class MapRenderer {
     this.cameraChanged();
   }
 
+  /** keep a world point in the view centre (playtest camera) */
+  follow(x: number, y: number, snap = false) {
+    const tx = x - this.viewW / this.cam.zoom / 2;
+    const ty = y - this.viewH / this.cam.zoom / 2;
+    const k = snap ? 1 : 0.18;
+    this.cam.x += (tx - this.cam.x) * k;
+    this.cam.y += (ty - this.cam.y) * k;
+    this.onCameraChange?.(this.cam);
+    this.requestRender();
+  }
+
   zoomAt(sx: number, sy: number, factor: number) {
     const z = clamp(this.cam.zoom * factor, this.minZoom, this.maxZoom);
     const wx = this.cam.x + sx / this.cam.zoom;
@@ -212,8 +235,12 @@ export class MapRenderer {
     const cy0 = Math.floor(ci / this.chunkCols) * CHUNK;
     const x1 = Math.min(this.W, cx0 + CHUNK);
     const y1 = Math.min(this.H, cy0 + CHUNK);
-    for (const layer of this.layers) {
+    const firstYs = this.layers.findIndex((l) => l.visible && l.ySort);
+    for (let li = 0; li < this.layers.length; li++) {
+      const layer = this.layers[li];
       if (!layer.visible) continue;
+      // non-sorted layers above the y-sorted group are drawn after objects (not cached)
+      if (firstYs >= 0 && li > firstYs && !layer.ySort) continue;
       const d = layer.data;
       for (let y = cy0; y < y1; y++)
         for (let x = cx0; x < x1; x++) {
@@ -246,6 +273,61 @@ export class MapRenderer {
     const x1 = Math.min(this.W, Math.ceil(cam.x + this.viewW / z));
     const y1 = Math.min(this.H, Math.ceil(cam.y + this.viewH / z));
 
+    // layer groups: before the y-sorted pass, y-sorted, after it
+    const firstYs = this.layers.findIndex((l) => l.visible && l.ySort);
+    const pre: Layer[] = [];
+    const ys: Layer[] = [];
+    const post: Layer[] = [];
+    this.layers.forEach((l, i) => {
+      if (!l.visible) return;
+      if (l.ySort) ys.push(l);
+      else if (firstYs < 0 || i < firstYs) pre.push(l);
+      else post.push(l);
+    });
+
+    const drawLayerDirect = (layer: Layer) => {
+      const d = layer.data;
+      for (let y = y0; y < y1; y++) {
+        const dy = sy(y);
+        const dh = sy(y + 1) - dy;
+        for (let x = x0; x < x1; x++) {
+          const g = d[y * this.W + x];
+          if (!g) continue;
+          const dx = sx(x);
+          drawGid(ctx, this.table, g, dx, dy, sx(x + 1) - dx, dh);
+        }
+      }
+    };
+
+    // sortable items: y-sorted tiles, objects, test character
+    type Item = { key: number; draw: () => void };
+    const items: Item[] = [];
+    const overhead: (() => void)[] = [];
+    const atlas = this.objects.length ? objectAtlas().canvas : null;
+    const A = OBJECT_ATLAS_TILE;
+    for (const o of this.objects) {
+      const def = OBJECT_DEFS[o.type];
+      if (!def) continue;
+      const top = o.y - def.h + 1;
+      if (o.x + def.w < x0 || o.x > x1 || o.y + 1 < y0 || top > y1) continue;
+      const drawRows = (r0: number, r1: number) => {
+        if (!atlas || r1 <= r0) return;
+        const dx = sx(o.x);
+        const dy = sy(top + r0);
+        ctx.drawImage(atlas, def.sx * A, (def.sy + r0) * A, def.w * A, (r1 - r0) * A, dx, dy, sx(o.x + def.w) - dx, sy(top + r1) - dy);
+      };
+      items.push({ key: o.y + 1, draw: () => drawRows(def.overheadRows, def.h) });
+      if (def.overheadRows) overhead.push(() => drawRows(0, def.overheadRows));
+      if (this.overlay.objectHighlight === o.id)
+        overhead.push(() => {
+          ctx.strokeStyle = COLORS.accent;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(sx(o.x) + 1, sy(top) + 1, sx(o.x + def.w) - sx(o.x) - 2, sy(o.y + 1) - sy(top) - 2);
+        });
+    }
+    const ch = this.character;
+    if (ch) items.push({ key: ch.y, draw: () => drawCharacter(ctx, ch, sx, sy, z) });
+
     if (z < this.cachePpt) {
       const cx0 = Math.floor(x0 / CHUNK);
       const cy0 = Math.floor(y0 / CHUNK);
@@ -264,21 +346,59 @@ export class MapRenderer {
           ctx.drawImage(canvas, dx, dy, sx(cx * CHUNK + CHUNK) - dx, sy(cy * CHUNK + CHUNK) - dy);
         }
       ctx.imageSmoothingEnabled = false;
+      // zoomed out: the cache already holds all y-sorted tiles; objects go on top
+      items.sort((a, b) => a.key - b.key);
+      for (const it of items) it.draw();
+      for (const f of overhead) f();
     } else {
-      for (const layer of this.layers) {
-        if (!layer.visible) continue;
+      for (const layer of pre) drawLayerDirect(layer);
+      // y-sorted pass: tiles are keyed by the bottom edge of their row (+ sort offset)
+      const yEnd = Math.min(this.H, y1 + 3);
+      for (const layer of ys) {
         const d = layer.data;
-        for (let y = y0; y < y1; y++) {
-          const dy = sy(y);
-          const dh = sy(y + 1) - dy;
+        for (let y = y0; y < yEnd; y++)
           for (let x = x0; x < x1; x++) {
             const g = d[y * this.W + x];
             if (!g) continue;
-            const dx = sx(x);
-            drawGid(ctx, this.table, g, dx, dy, sx(x + 1) - dx, dh);
+            const off = g < this.table.sortOff.length ? this.table.sortOff[g] : 0;
+            items.push({
+              key: y + 1 + off - 0.001,
+              draw: () => {
+                const dx = sx(x);
+                const dy = sy(y);
+                drawGid(ctx, this.table, g, dx, dy, sx(x + 1) - dx, sy(y + 1) - dy);
+              },
+            });
           }
-        }
       }
+      items.sort((a, b) => a.key - b.key);
+      for (const it of items) it.draw();
+      for (const f of overhead) f();
+    }
+    // layers above the y-sorted pass (overhead, markers, collision) – never cached
+    for (const layer of post) drawLayerDirect(layer);
+
+    if (this.overlay.collision) {
+      const c = this.overlay.collision;
+      ctx.fillStyle = 'rgba(230, 80, 100, 0.32)';
+      for (let y = y0; y < y1; y++)
+        for (let x = x0; x < x1; x++) if (c[y * this.W + x]) ctx.fillRect(sx(x), sy(y), sx(x + 1) - sx(x), sy(y + 1) - sy(y));
+    }
+    if (this.overlay.showSortPoints) {
+      ctx.strokeStyle = COLORS.accent;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (const o of this.objects) {
+        const def = OBJECT_DEFS[o.type];
+        const py = sy(o.y + 1) - 1;
+        ctx.moveTo(sx(o.x) + 2, py);
+        ctx.lineTo(sx(o.x + def.w) - 2, py);
+      }
+      if (ch) {
+        ctx.moveTo(sx(ch.x - 0.4), sy(ch.y));
+        ctx.lineTo(sx(ch.x + 0.4), sy(ch.y));
+      }
+      ctx.stroke();
     }
 
     // grid

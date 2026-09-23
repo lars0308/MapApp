@@ -1,4 +1,4 @@
-import type { GeneratorSettings, MapSettings } from '../types';
+import type { GeneratorSettings, MapSettings, TerrainSet, TerrainSettings } from '../types';
 import { randomSeed } from './rng';
 
 export const DEFAULT_MAP: MapSettings = { width: 80, height: 80, tileSize: 32, perspective: 'top_down', shadows: true };
@@ -36,11 +36,28 @@ export function defaultGenerator(seed = randomSeed()): GeneratorSettings {
     floorVariation: 12,
     decoDensity: 30,
     obstacleDensity: 20,
-    hazards: 20,
-    lava: true,
-    water: true,
-    abyss: false,
+    terrain: defaultTerrain(),
+    objects: { trees: 15, rocks: 20, arches: 30, pillars: true },
   };
+}
+
+export function defaultTerrain(): TerrainSettings {
+  return {
+    water: { enabled: true, amount: 20 },
+    lava: { enabled: false, amount: 10 },
+    abyss: { enabled: true, amount: 15, minSize: 4, maxSize: 14, islands: true, bridges: true, inRooms: true, betweenRooms: true },
+    cliffs: { enabled: true, amount: 25 },
+    bridges: true,
+    transitions: { enabled: true, amount: 50 },
+  };
+}
+
+export function defaultTerrainSets(): TerrainSet[] {
+  return [
+    { id: 'terrain_stone', name: 'Stein', tag: 'stone', color: '#8a8595', weight: 70, active: true },
+    { id: 'terrain_wood', name: 'Holz', tag: 'wood', color: '#b08354', weight: 20, active: true },
+    { id: 'terrain_sand', name: 'Sand', tag: 'sand', color: '#d2b77a', weight: 10, active: false },
+  ];
 }
 
 export interface Preset {

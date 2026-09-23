@@ -1,22 +1,25 @@
 import { create } from 'zustand';
-import type { GeneratorSettings, Layer, LayerRole, MapSettings, Project, TileMeta, Tileset } from '../types';
-import { DEFAULT_MAP, PRESETS, defaultGenerator } from '../generator/presets';
+import type { GeneratorSettings, Layer, LayerRole, MapObject, MapSettings, Project, TerrainSet, TileMeta, Tileset } from '../types';
+import { DEFAULT_MAP, PRESETS, defaultGenerator, defaultTerrainSets } from '../generator/presets';
 import { randomSeed } from '../generator/rng';
 import { generate } from '../generator';
 import { createDemoTileset } from '../tilesets/demoTileset';
+import { createDemoAutotileSets } from '../tilesets/demoAutotiles';
 import { findEmptyTiles } from '../tilesets/slicing';
 import { LAYER_COLORS, createDefaultLayers, createLayer, resizeData } from '../layers/defaults';
 import { uid } from '../utils/id';
 import { clamp } from '../utils/math';
-import { History, cloneLayers, type DocSnapshot } from './history';
+import { History, cloneLayers, type DocSnapshot, type HistoryEntry } from './history';
 import { mapEvents } from './events';
 
 export function createProject(
   name = 'Neues Projekt',
-  opts: { map?: Partial<MapSettings>; generator?: GeneratorSettings } = {},
+  opts: { map?: Partial<MapSettings>; generator?: GeneratorSettings; terrains?: TerrainSet[] } = {},
 ): Project {
   const map: MapSettings = { ...DEFAULT_MAP, ...opts.map };
   const demo = createDemoTileset(1);
+  const auto = createDemoAutotileSets(1 + demo.columns * demo.rows);
+  const last = auto[auto.length - 1];
   const layers = createDefaultLayers(map.width * map.height);
   const now = Date.now();
   return {
@@ -27,17 +30,21 @@ export function createProject(
     updatedAt: now,
     map,
     generator: opts.generator ? { ...opts.generator } : defaultGenerator(),
-    tilesets: [demo],
-    nextGid: 1 + demo.columns * demo.rows,
+    tilesets: [demo, ...auto],
+    nextGid: last.firstGid + last.columns * last.rows,
     layers,
     activeLayerId: layers[0].id,
     result: null,
+    terrains: opts.terrains ?? defaultTerrainSets(),
+    objects: [],
   };
 }
 
 interface Stroke {
   layerId: string;
-  before: Map<number, number>;
+  /** layerId → (cell → value before the stroke) */
+  before: Map<string, Map<number, number>>;
+  structBefore: Map<number, number>;
 }
 
 interface ProjectState {
@@ -66,6 +73,12 @@ interface ProjectState {
   setTilesetTileSize: (id: string, size: number) => Promise<void>;
   setTileMeta: (gids: number[], patch: Partial<TileMeta>) => void;
 
+  addObject: (o: Omit<MapObject, 'id'>) => void;
+  removeObject: (id: string) => void;
+  moveObject: (id: string, x: number, y: number) => void;
+  setTerrains: (t: TerrainSet[]) => void;
+  setLayerYSort: (id: string, v: boolean) => void;
+
   setActiveLayer: (id: string) => void;
   addLayer: () => void;
   removeLayer: (id: string) => void;
@@ -78,6 +91,11 @@ interface ProjectState {
 
   beginStroke: (layerId: string) => boolean;
   strokeSet: (cells: number[], gid: number) => void;
+  /** write into any layer as part of the running stroke (auto walls) */
+  strokeSetLayer: (layerId: string, cells: number[], gids: number[] | number) => void;
+  /** change the structural grid as part of the running stroke */
+  strokeStruct: (cell: number, value: number) => void;
+  strokeCells: () => number[];
   endStroke: (label: string) => void;
   cancelStroke: () => void;
 
@@ -94,6 +112,7 @@ function snapshot(p: Project, withTilesets = false): DocSnapshot {
     layers: cloneLayers(p.layers),
     activeLayerId: p.activeLayerId,
     result: p.result,
+    objects: p.objects,
     ...(withTilesets ? { tilesets: p.tilesets, nextGid: p.nextGid } : {}),
   };
 }
@@ -125,9 +144,24 @@ export const useProject = create<ProjectState>((set, get) => {
       layers: cloneLayers(s.layers),
       activeLayerId: s.activeLayerId,
       result: s.result,
+      objects: s.objects ?? p.objects,
       ...(s.tilesets ? { tilesets: s.tilesets, nextGid: s.nextGid ?? p.nextGid } : {}),
     });
     mapEvents.emit({ type: 'all' });
+  };
+
+  const applyCells = (e: Extract<HistoryEntry, { kind: 'cells' }>, which: 'before' | 'after') => {
+    const p = get().project;
+    const cells: number[] = [];
+    for (const c of e.changes) {
+      const layer = p.layers.find((l) => l.id === c.layerId);
+      if (!layer) continue;
+      c.idx.forEach((i, k) => (layer.data[i] = c[which][k]));
+      cells.push(...c.idx);
+    }
+    if (e.struct && p.result) e.struct.idx.forEach((i, k) => (p.result!.cells[i] = e.struct![which][k]));
+    mapEvents.emit({ type: 'cells', cells });
+    touch(p);
   };
 
   const mapLayers = (fn: (l: Layer) => Layer) => {
@@ -192,11 +226,12 @@ export const useProject = create<ProjectState>((set, get) => {
       await new Promise((r) => setTimeout(r, 16));
       try {
         const p = get().project;
-        const out = generate({ settings: p.generator, map: p.map, tilesets: p.tilesets, layers: p.layers });
+        const out = generate({ settings: p.generator, map: p.map, tilesets: p.tilesets, layers: p.layers, terrains: p.terrains });
         docChange('Generieren', (p) => ({
           ...p,
           layers: p.layers.map((l) => (out.layerData[l.id] ? { ...l, data: out.layerData[l.id] } : l)),
           result: out.result,
+          objects: out.objects,
         }));
       } finally {
         set({ generating: false });
@@ -264,6 +299,17 @@ export const useProject = create<ProjectState>((set, get) => {
       touch({ ...p, tilesets });
     },
 
+    addObject: (o) =>
+      docChange('Objekt setzen', (p) => ({ ...p, objects: [...p.objects, { ...o, id: uid('obj') }] })),
+    removeObject: (id) => docChange('Objekt löschen', (p) => ({ ...p, objects: p.objects.filter((o) => o.id !== id) })),
+    moveObject: (id, x, y) =>
+      docChange('Objekt verschieben', (p) => ({ ...p, objects: p.objects.map((o) => (o.id === id ? { ...o, x, y } : o)) })),
+    setTerrains: (terrains) => touch({ ...get().project, terrains }),
+    setLayerYSort: (id, v) => {
+      mapLayers((l) => (l.id === id ? { ...l, ySort: v } : l));
+      mapEvents.emit({ type: 'all' });
+    },
+
     setActiveLayer: (id) => {
       const p = get().project;
       if (p.activeLayerId !== id) set({ project: { ...p, activeLayerId: id } });
@@ -321,45 +367,71 @@ export const useProject = create<ProjectState>((set, get) => {
     beginStroke: (layerId) => {
       const layer = get().project.layers.find((l) => l.id === layerId);
       if (!layer || layer.locked) return false;
-      stroke = { layerId, before: new Map() };
+      stroke = { layerId, before: new Map(), structBefore: new Map() };
       return true;
     },
     strokeSet: (cells, gid) => {
+      if (stroke) get().strokeSetLayer(stroke.layerId, cells, gid);
+    },
+    strokeSetLayer: (layerId, cells, gids) => {
       if (!stroke) return;
-      const layer = get().project.layers.find((l) => l.id === stroke!.layerId);
+      const layer = get().project.layers.find((l) => l.id === layerId);
       if (!layer) return;
+      let before = stroke.before.get(layerId);
+      if (!before) stroke.before.set(layerId, (before = new Map()));
       const changed: number[] = [];
-      for (const i of cells) {
-        if (i < 0 || i >= layer.data.length || layer.data[i] === gid) continue;
-        if (!stroke.before.has(i)) stroke.before.set(i, layer.data[i]);
+      cells.forEach((i, k) => {
+        const gid = typeof gids === 'number' ? gids : gids[k];
+        if (i < 0 || i >= layer.data.length || layer.data[i] === gid) return;
+        if (!before!.has(i)) before!.set(i, layer.data[i]);
         layer.data[i] = gid;
         changed.push(i);
-      }
+      });
       if (changed.length) mapEvents.emit({ type: 'cells', cells: changed });
     },
+    strokeStruct: (cell, value) => {
+      const r = get().project.result;
+      if (!stroke || !r || cell < 0 || cell >= r.cells.length || r.cells[cell] === value) return;
+      if (!stroke.structBefore.has(cell)) stroke.structBefore.set(cell, r.cells[cell]);
+      r.cells[cell] = value;
+    },
+    strokeCells: () => (stroke ? [...(stroke.before.get(stroke.layerId)?.keys() ?? [])] : []),
     endStroke: (label) => {
       const s = stroke;
       stroke = null;
-      if (!s || !s.before.size) return;
-      const layer = get().project.layers.find((l) => l.id === s.layerId);
-      if (!layer) return;
-      const idx = Uint32Array.from(s.before.keys());
-      const before = Uint32Array.from(s.before.values());
-      const after = idx.map((i) => layer.data[i]);
-      history.push({ kind: 'cells', label, layerId: s.layerId, idx, before, after });
-      touch(get().project);
+      if (!s) return;
+      const p = get().project;
+      const changes = [];
+      for (const [layerId, before] of s.before) {
+        const layer = p.layers.find((l) => l.id === layerId);
+        if (!layer || !before.size) continue;
+        const idx = Uint32Array.from(before.keys());
+        changes.push({ layerId, idx, before: Uint32Array.from(before.values()), after: idx.map((i) => layer.data[i]) });
+      }
+      if (!changes.length && !s.structBefore.size) return;
+      let struct;
+      if (s.structBefore.size && p.result) {
+        const idx = Uint32Array.from(s.structBefore.keys());
+        struct = { idx, before: Uint8Array.from(s.structBefore.values()), after: Uint8Array.from(idx, (i) => p.result!.cells[i]) };
+      }
+      history.push({ kind: 'cells', label, changes, struct });
+      touch(p);
     },
     cancelStroke: () => {
       const s = stroke;
       stroke = null;
       if (!s) return;
-      const layer = get().project.layers.find((l) => l.id === s.layerId);
-      if (!layer) return;
+      const p = get().project;
       const cells: number[] = [];
-      for (const [i, v] of s.before) {
-        layer.data[i] = v;
-        cells.push(i);
+      for (const [layerId, before] of s.before) {
+        const layer = p.layers.find((l) => l.id === layerId);
+        if (!layer) continue;
+        for (const [i, v] of before) {
+          layer.data[i] = v;
+          cells.push(i);
+        }
       }
+      if (p.result) for (const [i, v] of s.structBefore) p.result.cells[i] = v;
       if (cells.length) mapEvents.emit({ type: 'cells', cells });
     },
 
@@ -368,28 +440,14 @@ export const useProject = create<ProjectState>((set, get) => {
       if (!e) return;
       history.redoStack.push(e);
       if (e.kind === 'doc') restore(e.before);
-      else {
-        const layer = get().project.layers.find((l) => l.id === e.layerId);
-        if (layer) {
-          e.idx.forEach((i, k) => (layer.data[i] = e.before[k]));
-          mapEvents.emit({ type: 'cells', cells: Array.from(e.idx) });
-        }
-        touch(get().project);
-      }
+      else applyCells(e, 'before');
     },
     redo: () => {
       const e = history.redoStack.pop();
       if (!e) return;
       history.undoStack.push(e);
       if (e.kind === 'doc') restore(e.after);
-      else {
-        const layer = get().project.layers.find((l) => l.id === e.layerId);
-        if (layer) {
-          e.idx.forEach((i, k) => (layer.data[i] = e.after[k]));
-          mapEvents.emit({ type: 'cells', cells: Array.from(e.idx) });
-        }
-        touch(get().project);
-      }
+      else applyCells(e, 'after');
     },
   };
 });

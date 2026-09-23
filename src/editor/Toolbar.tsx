@@ -7,7 +7,9 @@ import { TOOLS } from './tools';
 import type { ToolId } from '../types';
 import { resolveGid } from '../tilesets/slicing';
 import { TileThumb } from '../tilesets/TileThumb';
+import { ObjectThumb } from '../objects/ObjectThumb';
 import { rectCells } from './tools';
+import { applyAutoWalls } from './autoWalls';
 
 const TOOL_ICON: Record<ToolId, (p: { size?: number }) => React.ReactElement> = {
   brush: Icon.Brush,
@@ -16,6 +18,7 @@ const TOOL_ICON: Record<ToolId, (p: { size?: number }) => React.ReactElement> = 
   rect: Icon.Rect,
   pipette: Icon.Pipette,
   select: Icon.Select,
+  move: Icon.Move,
   hand: Icon.Hand,
 };
 
@@ -68,7 +71,7 @@ export function UndoRedo() {
   );
 }
 
-export function ViewControls() {
+export function ViewControls({ onSettings, settingsOpen }: { onSettings?: () => void; settingsOpen?: boolean }) {
   const showGrid = useEditor((s) => s.showGrid);
   const showCoords = useEditor((s) => s.showCoords);
   const zoom = useEditor((s) => s.zoom);
@@ -95,6 +98,14 @@ export function ViewControls() {
       <IconButton label="Einpassen" onClick={() => viewEvents.emit({ type: 'fit' })}>
         <Icon.Fit size={18} />
       </IconButton>
+      {onSettings && (
+        <>
+          <span className="divider" />
+          <IconButton label="Einstellungen" active={settingsOpen} onClick={onSettings}>
+            <Icon.Gear size={18} />
+          </IconButton>
+        </>
+      )}
     </div>
   );
 }
@@ -105,9 +116,10 @@ export function ActiveTileChip({ onClick }: { onClick?: () => void }) {
   const tilesets = useProject((s) => s.project.tilesets);
   const layer = useProject((s) => s.project.layers.find((l) => l.id === s.project.activeLayerId));
   const r = resolveGid(tilesets, gid);
+  const obj = useEditor((s) => s.selectedObject);
   return (
     <button type="button" className="active-tile" onClick={onClick} title="Aktives Tile und Layer">
-      {r ? <TileThumb ts={r.ts} index={r.index} size={28} /> : <span className="tile-thumb is-empty" />}
+      {obj ? <ObjectThumb type={obj} size={28} /> : r ? <TileThumb ts={r.ts} index={r.index} size={28} /> : <span className="tile-thumb is-empty" />}
       <span className="active-tile-layer">
         <span className="layer-color" style={{ background: layer?.color }} />
         {layer?.name ?? '–'}
@@ -132,6 +144,7 @@ export function SelectionActions() {
     }
     if (!s.beginStroke(layer.id)) return;
     s.strokeSet(rectCells(sel, p.map.width), gid);
+    if (useEditor.getState().autoWalls) applyAutoWalls(s.strokeCells(), layer.id);
     s.endStroke(label);
   };
   const gid = useEditor.getState().selectedGid;

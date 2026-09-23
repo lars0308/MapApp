@@ -4,8 +4,24 @@ import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { mapEvents, viewEvents } from '../store/events';
 import { brushCells, floodCells, lineCells, rectCells, rectFromPoints } from './tools';
+import { setRenderer } from './rendererRef';
+import { computeBlocked } from './collision';
+import { applyAutoWalls } from './autoWalls';
+import { OBJECT_DEFS } from '../objects/defs';
+import type { MapObject } from '../types';
 
-type Mode = 'none' | 'paint' | 'pan' | 'pinch' | 'rect' | 'select' | 'tap';
+/** Top-most object whose sprite covers the cell. */
+export function objectAt(objects: MapObject[], x: number, y: number): MapObject | null {
+  let best: MapObject | null = null;
+  for (const o of objects) {
+    const d = OBJECT_DEFS[o.type];
+    if (!d) continue;
+    if (x >= o.x && x < o.x + d.w && y <= o.y && y > o.y - d.h && (!best || o.y >= best.y)) best = o;
+  }
+  return best;
+}
+
+type Mode = 'none' | 'paint' | 'pan' | 'pinch' | 'rect' | 'select' | 'tap' | 'moveSel' | 'moveObj';
 
 interface Pt {
   x: number;
@@ -46,6 +62,7 @@ export function MapCanvas() {
     const wrap = wrapRef.current!;
     const r = new MapRenderer(canvas);
     rendererRef.current = r;
+    setRenderer(r);
     let zoomTimer = 0;
     r.onCameraChange = (cam) => {
       if (zoomTimer) return;
@@ -57,6 +74,7 @@ export function MapCanvas() {
 
     const p = useProject.getState().project;
     r.setDocument(p.map.width, p.map.height, p.layers, p.tilesets);
+    r.objects = p.objects;
 
     let fitted = false;
     const ro = new ResizeObserver(() => {
@@ -79,12 +97,27 @@ export function MapCanvas() {
       if (p.layers !== prev.layers || tilesetsChanged || sizeChanged) {
         r.setDocument(p.map.width, p.map.height, p.layers, tilesetsChanged ? p.tilesets : null);
       }
+      if (p.objects !== prev.objects) {
+        r.objects = p.objects;
+        r.requestRender();
+      }
       if (sizeChanged || projectSwitched) r.fit();
       prev = p;
+      if (useEditor.getState().showCollision) scheduleCollision();
     });
+    // collision debug overlay (recomputed lazily)
+    let colTimer = 0;
+    const scheduleCollision = () => {
+      clearTimeout(colTimer);
+      colTimer = window.setTimeout(() => {
+        r.overlay.collision = useEditor.getState().showCollision ? computeBlocked(useProject.getState().project) : null;
+        r.requestRender();
+      }, 80);
+    };
     const unsubMap = mapEvents.on((e) => {
       if (e.type === 'all') r.invalidateAll();
       else r.invalidateCells(e.cells);
+      if (useEditor.getState().showCollision) scheduleCollision();
     });
     const unsubView = viewEvents.on((e) => {
       if (e.type === 'fit') r.fit();
@@ -107,7 +140,9 @@ export function MapCanvas() {
       r.overlay.showCoords = e.showCoords;
       r.overlay.selection = e.selection;
       r.overlay.brushSize = e.brushSize;
-      r.overlay.activeTool = e.tool;
+      r.overlay.activeTool = e.playtest ? 'hand' : e.tool;
+      r.overlay.showSortPoints = e.showSortPoints;
+      if (e.showCollision !== !!r.overlay.collision) scheduleCollision();
       r.requestRender();
     };
     syncOverlay();
@@ -120,7 +155,9 @@ export function MapCanvas() {
       unsubView();
       unsubEditor();
       r.destroy();
+      setRenderer(null);
       clearTimeout(zoomTimer);
+      clearTimeout(colTimer);
     };
   }, []);
 
@@ -135,6 +172,8 @@ export function MapCanvas() {
     let downPos: Pt | null = null;
     let pinch: { dist: number; center: Pt } | null = null;
     let spaceDown = false;
+    let movingObject: MapObject | null = null;
+    let moveDelta: Pt = { x: 0, y: 0 };
 
     const R = () => rendererRef.current!;
     const local = (e: PointerEvent | WheelEvent): Pt => {
@@ -174,8 +213,15 @@ export function MapCanvas() {
       lastCell = c;
     };
 
+    /** end a stroke; with "Auto-Wände" the walls around painted ground / doors are re-tiled */
+    const finishStroke = (label: string) => {
+      const s = store();
+      if (editor().autoWalls) applyAutoWalls(s.strokeCells(), s.project.activeLayerId);
+      s.endStroke(label);
+    };
+
     const endInteraction = () => {
-      if (mode === 'paint') store().endStroke(editor().tool === 'eraser' ? 'Radieren' : 'Malen');
+      if (mode === 'paint') finishStroke(editor().tool === 'eraser' ? 'Radieren' : 'Malen');
       mode = 'none';
       lastCell = null;
       anchor = null;
@@ -187,7 +233,7 @@ export function MapCanvas() {
       if (mode === 'paint') {
         // a second finger shortly after the first → user wants to navigate, not paint
         if (performance.now() - modeStart < 350) store().cancelStroke();
-        else store().endStroke('Malen');
+        else finishStroke('Malen');
       }
       mode = 'none';
       lastCell = null;
@@ -211,10 +257,15 @@ export function MapCanvas() {
       }
       if (pointers.size > 2) return;
 
-      const { tool, selectedGid } = editor();
+      const { tool, selectedGid, selectedObject, playtest } = editor();
       const cell = R().screenToCell(pt.x, pt.y);
       downPos = pt;
       modeStart = performance.now();
+      // playtest: the map is only navigated (pinch / wheel), the character is steered by keys / joystick
+      if (playtest) {
+        mode = 'none';
+        return;
+      }
 
       if (e.button === 1 || e.button === 2 || spaceDown || tool === 'hand') {
         mode = 'pan';
@@ -222,6 +273,43 @@ export function MapCanvas() {
         return;
       }
       if (e.pointerType !== 'mouse') setHover(cell);
+
+      const objects = store().project.objects;
+      if (tool === 'brush' && selectedObject) {
+        const def = OBJECT_DEFS[selectedObject];
+        if (R().inBounds(cell.x, cell.y)) store().addObject({ type: selectedObject, x: cell.x - Math.floor((def.w - 1) / 2), y: cell.y });
+        mode = 'none';
+        return;
+      }
+      if (tool === 'eraser') {
+        const hit = objectAt(objects, cell.x, cell.y);
+        if (hit) {
+          store().removeObject(hit.id);
+          mode = 'none';
+          return;
+        }
+      }
+      if (tool === 'move') {
+        const sel = editor().selection;
+        if (sel && cell.x >= sel.x && cell.y >= sel.y && cell.x < sel.x + sel.w && cell.y < sel.y + sel.h) {
+          mode = 'moveSel';
+          anchor = cell;
+          return;
+        }
+        const hit = objectAt(objects, cell.x, cell.y);
+        if (hit) {
+          mode = 'moveObj';
+          movingObject = hit;
+          anchor = cell;
+          moveDelta = { x: 0, y: 0 };
+          R().overlay.objectHighlight = hit.id;
+          R().requestRender();
+          return;
+        }
+        editor().toast('Auswahl oder Objekt ziehen');
+        mode = 'none';
+        return;
+      }
 
       switch (tool) {
         case 'brush':
@@ -284,6 +372,15 @@ export function MapCanvas() {
         R().requestRender();
       } else if (mode === 'select' && anchor) {
         editor().setSelection(rectFromPoints(anchor, cell, W, H));
+      } else if (mode === 'moveSel' && anchor) {
+        const sel = editor().selection!;
+        R().overlay.preview = { x: sel.x + cell.x - anchor.x, y: sel.y + cell.y - anchor.y, w: sel.w, h: sel.h };
+        R().requestRender();
+      } else if (mode === 'moveObj' && anchor && movingObject) {
+        moveDelta = { x: cell.x - anchor.x, y: cell.y - anchor.y };
+        const mo = movingObject;
+        R().objects = store().project.objects.map((o) => (o.id === mo.id ? { ...o, x: mo.x + moveDelta.x, y: mo.y + moveDelta.y } : o));
+        R().requestRender();
       }
     };
 
@@ -300,12 +397,41 @@ export function MapCanvas() {
       const { width: W, height: H } = dims();
       const { tool, selectedGid } = editor();
 
-      if (mode === 'rect' && anchor) {
+      if (mode === 'moveObj' && movingObject) {
+        if (moveDelta.x || moveDelta.y) store().moveObject(movingObject.id, movingObject.x + moveDelta.x, movingObject.y + moveDelta.y);
+        R().objects = store().project.objects;
+        R().overlay.objectHighlight = null;
+        movingObject = null;
+      } else if (mode === 'moveSel' && anchor) {
+        const sel = editor().selection!;
+        const dx = cell.x - anchor.x;
+        const dy = cell.y - anchor.y;
+        if ((dx || dy) && startStroke()) {
+          const p = store().project;
+          const layer = p.layers.find((l) => l.id === p.activeLayerId)!;
+          const src = rectCells(sel, W);
+          const values = src.map((i) => layer.data[i]);
+          store().strokeSet(src, 0);
+          const dst: number[] = [];
+          const vals: number[] = [];
+          src.forEach((i, k) => {
+            const x = (i % W) + dx;
+            const y = Math.floor(i / W) + dy;
+            if (x >= 0 && y >= 0 && x < W && y < H) {
+              dst.push(y * W + x);
+              vals.push(values[k]);
+            }
+          });
+          store().strokeSetLayer(layer.id, dst, vals);
+          store().endStroke('Verschieben');
+          editor().setSelection(rectFromPoints({ x: sel.x + dx, y: sel.y + dy }, { x: sel.x + dx + sel.w - 1, y: sel.y + dy + sel.h - 1 }, W, H));
+        }
+      } else if (mode === 'rect' && anchor) {
         const r = rectFromPoints(anchor, cell, W, H);
         if (!selectedGid) editor().toast('Zuerst ein Tile auswählen');
         else if (r.w > 0 && r.h > 0 && startStroke()) {
           store().strokeSet(rectCells(r, W), selectedGid);
-          store().endStroke('Rechteck');
+          finishStroke('Rechteck');
         }
       } else if (mode === 'select' && anchor) {
         const r = rectFromPoints(anchor, cell, W, H);
@@ -317,7 +443,7 @@ export function MapCanvas() {
             const p = store().project;
             const layer = p.layers.find((l) => l.id === p.activeLayerId)!;
             store().strokeSet(floodCells(layer.data, W, H, cell.x, cell.y, editor().selection), selectedGid);
-            store().endStroke('Füllen');
+            finishStroke('Füllen');
           }
         } else if (tool === 'pipette') {
           if (pickTile(cell.x, cell.y)) editor().toast('Tile übernommen');

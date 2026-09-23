@@ -13,10 +13,12 @@ interface FileLayer extends Omit<Layer, 'data'> {
   data: number[];
 }
 
-interface FileResult extends Omit<GenerationResult, 'cells' | 'wallMask' | 'floorMask'> {
+interface FileResult extends Omit<GenerationResult, 'cells' | 'wallMask' | 'floorMask' | 'terrain' | 'heights'> {
   cells: number[];
   wallMask: number[];
   floorMask?: number[];
+  terrain?: number[];
+  heights?: number[];
 }
 
 interface ProjectFile {
@@ -42,6 +44,8 @@ export function serializeProject(p: Project): string {
             cells: rleEncode(p.result.cells),
             wallMask: rleEncode(p.result.wallMask),
             floorMask: rleEncode(p.result.floorMask ?? new Uint8Array(0)),
+            terrain: rleEncode(p.result.terrain ?? new Uint8Array(0)),
+            heights: rleEncode(p.result.heights ?? new Uint8Array(0)),
           }
         : null,
     },
@@ -66,6 +70,8 @@ export function deserializeProject(text: string): Project {
         cells: rleDecode(fp.result.cells, new Uint8Array(fp.result.width * fp.result.height)),
         wallMask: rleDecode(fp.result.wallMask, new Uint8Array(fp.result.width * fp.result.height)),
         floorMask: rleDecode(fp.result.floorMask ?? [], new Uint8Array(fp.result.width * fp.result.height)),
+        terrain: rleDecode(fp.result.terrain ?? [], new Uint8Array(fp.result.width * fp.result.height)),
+        heights: rleDecode(fp.result.heights ?? [], new Uint8Array(fp.result.width * fp.result.height)),
         perspective: fp.result.perspective ?? fp.map.perspective ?? 'top_down',
       }
     : null;

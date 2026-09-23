@@ -8,11 +8,17 @@ import { TilesPanel } from '../tilesets/TilesPanel';
 import { PanelTabs } from './ui';
 import { BrushSize, HoverInfo, ToolButtons, UndoRedo, ViewControls } from '../editor/Toolbar';
 import { SaveState } from './SaveState';
+import { TerrainPanel } from './TerrainPanel';
+import { SettingsPanel } from './SettingsPanel';
+import { PlaytestOverlay } from '../playtest/PlaytestOverlay';
+import { startPlaytest, stopPlaytest } from '../playtest/controller';
 import { Icon } from './icons';
 import { useEditor } from '../store/editorStore';
 
 export function DesktopLayout() {
-  const [left, setLeft] = useState<'generator' | 'project'>('generator');
+  const [left, setLeft] = useState<'generator' | 'terrain' | 'project'>('generator');
+  const playtest = useEditor((s) => s.playtest);
+  const [settings, setSettings] = useState(false);
   return (
     <div className="desktop">
       <header className="topbar">
@@ -30,6 +36,10 @@ export function DesktopLayout() {
         <div className="topbar-right">
           <UndoRedo />
           <span className="divider" />
+          <button type="button" className={`btn btn-secondary btn-test${playtest ? ' is-active' : ''}`} onClick={() => (playtest ? stopPlaytest() : startPlaytest())}>
+            <Icon.Play size={16} />
+            <span>{playtest ? 'Beenden' : 'Testen'}</span>
+          </button>
           <GenerateButtons compact />
         </div>
       </header>
@@ -38,26 +48,37 @@ export function DesktopLayout() {
         <PanelTabs
           tabs={[
             { value: 'generator', label: 'Generator' },
+            { value: 'terrain', label: 'Terrain' },
             { value: 'project', label: 'Projekt & Export' },
           ]}
           value={left}
           onChange={setLeft}
         />
-        {left === 'generator' ? <GeneratorPanel /> : <ExportPanel />}
+        {left === 'generator' ? <GeneratorPanel /> : left === 'terrain' ? <TerrainPanel /> : <ExportPanel />}
       </aside>
 
       <main className="center">
         <Workspace>
-          <div className="float-tools" role="toolbar" aria-label="Werkzeuge">
-            <ToolButtons withKeys />
-          </div>
-          <div className="float-bottom-left">
-            <BrushSize />
-            <HoverInfo />
-          </div>
+          <PlaytestOverlay touch={false} />
+          {!playtest && (
+            <>
+              <div className="float-tools" role="toolbar" aria-label="Werkzeuge">
+                <ToolButtons withKeys />
+              </div>
+              <div className="float-bottom-left">
+                <BrushSize />
+                <HoverInfo />
+              </div>
+            </>
+          )}
           <div className="float-bottom-right">
-            <ViewControls />
+            <ViewControls onSettings={() => setSettings(!settings)} settingsOpen={settings} />
           </div>
+          {settings && (
+            <div className="settings-popover">
+              <SettingsPanel />
+            </div>
+          )}
         </Workspace>
       </main>
 
