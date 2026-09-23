@@ -5,6 +5,7 @@ import { useProject } from '../store/projectStore';
 import { Segmented } from './ui';
 import { SelectionActions } from '../editor/Toolbar';
 import type { ReactNode } from 'react';
+import { BuildKitStart } from './BuildKitStart';
 
 export function ViewSwitch() {
   const view = useEditor((s) => s.view);
@@ -31,6 +32,7 @@ export function Workspace({ children }: { children?: ReactNode }) {
       <MapCanvas />
       {view === 'graph' && <RoomGraph />}
       {view === 'map' && <SelectionActions />}
+      {view === 'map' && <BuildKitStart />}
       {view === 'map' && children}
       {generating && <div className="busy-bar" />}
     </div>

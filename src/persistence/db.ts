@@ -1,5 +1,6 @@
 import type { Project, Tileset } from '../types';
 import { migrateProject } from './migrate';
+import { useEditor } from '../store/editorStore';
 
 // Minimal promise wrapper around IndexedDB.
 // Projects are stored as structured clones (typed arrays are supported natively).
@@ -21,10 +22,17 @@ export interface ProjectSummary {
 }
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+let blockedNotified = false;
+/** open request waits for another tab – fail fast instead of waiting again */
+let blocked = false;
 
-function open(): Promise<IDBDatabase> {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
+/** How long the UI waits for the database before carrying on without it. */
+const OPEN_TIMEOUT = 4000;
+export const DB_BLOCKED_MESSAGE =
+  'MapForge ist noch in einem anderen Tab oder als installierte App (ältere Version) geöffnet und blockiert den Speicher. Bitte dort schließen – bis dahin wird nicht gespeichert.';
+
+function connect(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
     if (!('indexedDB' in window)) {
       reject(new Error('IndexedDB nicht verfügbar'));
       return;
@@ -36,11 +44,38 @@ function open(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(META)) db.createObjectStore(META);
       if (!db.objectStoreNames.contains(LIBRARY)) db.createObjectStore(LIBRARY, { keyPath: 'id' });
     };
-    req.onsuccess = () => resolve(req.result);
+    // an older version holds the database open in another tab: tell the user once
+    req.onblocked = () => {
+      blocked = true;
+      if (blockedNotified) return;
+      blockedNotified = true;
+      useEditor.getState().toast(DB_BLOCKED_MESSAGE, 'error');
+    };
+    req.onsuccess = () => {
+      blocked = false;
+      const db = req.result;
+      // a newer version in another tab wants to upgrade: release the connection instead of blocking it
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
   });
-  dbPromise.catch(() => (dbPromise = null));
-  return dbPromise;
+}
+
+function open(): Promise<IDBDatabase> {
+  if (!dbPromise) {
+    dbPromise = connect();
+    dbPromise.catch(() => (dbPromise = null));
+  }
+  // never let the UI hang on a blocked database (the pending open keeps running)
+  if (blocked) return Promise.reject(new Error(DB_BLOCKED_MESSAGE));
+  return Promise.race([
+    dbPromise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(DB_BLOCKED_MESSAGE)), OPEN_TIMEOUT)),
+  ]);
 }
 
 function tx<T>(store: string, mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {

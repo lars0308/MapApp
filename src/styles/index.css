@@ -3077,3 +3077,81 @@ body.is-resizing-y * {
 .dock-head .panel-tabs {
   border-bottom: 0;
 }
+
+/* error boundary: visible message instead of a blank screen */
+.error-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--bg);
+}
+.error-card {
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid var(--line-2);
+  background: var(--bg-2);
+  color: var(--text);
+}
+.error-card p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13px;
+}
+.error-card pre {
+  margin: 0;
+  padding: 10px;
+  max-height: 160px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--surface);
+  color: #f0b36b;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* manual build mode, empty map: start card */
+.buildkit-start {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  width: min(420px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--accent);
+  background: rgba(17, 17, 21, 0.94);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+.buildkit-start strong {
+  color: var(--accent-hi);
+}
+.buildkit-start p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.buildkit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.buildkit-actions .btn {
+  flex: 1 1 auto;
+}

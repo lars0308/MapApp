@@ -149,6 +149,9 @@ function WizardDialog() {
       closeWizard();
       setView('map');
       toast(draft.mode === 'generate' ? 'Map erstellt' : 'Baukasten geöffnet – Boden malen legt Räume und Wege an, Wände entstehen automatisch', 'success');
+    } catch (e) {
+      console.error(e);
+      toast(`Projekt konnte nicht erstellt werden: ${e instanceof Error ? e.message : String(e)}`, 'error');
     } finally {
       setBusy(false);
     }

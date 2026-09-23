@@ -9,6 +9,7 @@ import { useProject } from './store/projectStore';
 import { useEditor } from './store/editorStore';
 import { lastProjectId, loadProject } from './persistence/db';
 import { startAutosave } from './persistence/autosave';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 /** Wide screens (desktop, tablet landscape) get the three-column editor. */
 export const DESKTOP_QUERY = '(min-width: 1000px) and (min-height: 560px)';
@@ -63,8 +64,10 @@ export function App() {
 
   return (
     <div className={`app${ready ? ' is-ready' : ''}`}>
-      {desktop ? <DesktopLayout /> : <MobileLayout />}
-      <SetupWizard />
+      <ErrorBoundary area="Editor">{desktop ? <DesktopLayout /> : <MobileLayout />}</ErrorBoundary>
+      <ErrorBoundary area="Setup-Assistent" onClose={() => useEditor.getState().closeWizard()} closeLabel="Assistent schließen">
+        <SetupWizard />
+      </ErrorBoundary>
       <Toasts />
     </div>
   );

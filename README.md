@@ -344,6 +344,12 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 1.4.1 – Stabilität**
+
+- Fehleranzeige statt schwarzem Bildschirm: Abstürze in Editor oder Assistent zeigen die Fehlermeldung mit „Fehler kopieren“, „Erneut versuchen“, „Assistent schließen“, „Neu laden“. Der letzte Fehler bleibt gespeichert und erscheint nach dem Neuladen als Hinweis.
+- Datenbank: Ist eine ältere MapForge-Version noch in einem anderen Tab / als App geöffnet, hängt die App nicht mehr (Timeout, Hinweis), „Map erstellen“ / „Baukasten öffnen“ laufen trotzdem durch; alte Verbindungen geben die Datenbank für neuere Versionen frei.
+- Manueller Modus: leere Map zeigt eine Startkarte (Startraum anlegen · Raum aufziehen · Automatisch generieren) statt einer dunklen, leeren Fläche.
+
 **Version 1.4 – flexible Desktop-Panels**
 
 - Seitenpanels per Drag in der Breite, Layer/Tiles in der Höhe änderbar, einklappen (Icon-Leiste), schließen/öffnen über die Topbar, maximieren (Esc/Klick daneben stellt wieder her), Doppelklick = Standardgröße, Layout zurücksetzen.
