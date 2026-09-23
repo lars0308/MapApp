@@ -3167,3 +3167,108 @@ body.is-resizing-y * {
     visibility: hidden;
   }
 }
+
+/* tile assignment labels (palette, upload editor) */
+.tile-grid.has-labels {
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+}
+.tile-grid.has-labels .tile-cell {
+  place-items: start center;
+  padding-top: 4px;
+  aspect-ratio: auto;
+  min-height: 66px;
+}
+.tile-label {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  padding: 1px 2px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-size: 9.5px;
+  line-height: 1.25;
+  font-weight: 650;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #101014;
+  pointer-events: none;
+}
+.tile-label.g-floor {
+  background: #7fd49a;
+}
+.tile-label.g-wall {
+  background: #b9a4f2;
+}
+.tile-label.g-liquid {
+  background: #74bdf0;
+}
+.tile-label.g-passage {
+  background: #ecb772;
+}
+.tile-label.g-object {
+  background: #dcd476;
+}
+.tile-label.g-other {
+  background: #a9a9b4;
+}
+/* suggestion (not yet confirmed): outlined instead of filled */
+.tile-label.is-auto {
+  background: rgba(12, 12, 15, 0.82) !important;
+  border-style: dashed;
+}
+.tile-label.is-auto.g-floor {
+  color: #7fd49a;
+  border-color: #7fd49a;
+}
+.tile-label.is-auto.g-wall {
+  color: #b9a4f2;
+  border-color: #b9a4f2;
+}
+.tile-label.is-auto.g-liquid {
+  color: #74bdf0;
+  border-color: #74bdf0;
+}
+.tile-label.is-auto.g-passage {
+  color: #ecb772;
+  border-color: #ecb772;
+}
+.tile-label.is-auto.g-object {
+  color: #dcd476;
+  border-color: #dcd476;
+}
+.tile-label.is-auto.g-other {
+  color: #a9a9b4;
+  border-color: #a9a9b4;
+}
+.tile-label.is-none {
+  left: auto;
+  width: 16px;
+  background: rgba(12, 12, 15, 0.8);
+  border-color: var(--line-2);
+  color: var(--text-3);
+}
+.assign-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.assign-summary p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.assign-none {
+  color: #f0b36b;
+}
+.assign-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

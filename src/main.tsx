@@ -8,10 +8,11 @@ import { viewEvents } from './store/events';
 import * as playtest from './playtest/controller';
 import { computeBlocked, metaTable } from './editor/collision';
 import { getRenderer } from './editor/rendererRef';
+import { autoAssign } from './tilesets/autoAssign';
 import { ErrorBoundary, rememberError, takeLastError } from './components/ErrorBoundary';
 
 // small debugging handle (used by automated browser tests)
-(window as unknown as Record<string, unknown>).__MAPFORGE__ = { project: useProject, editor: useEditor, view: viewEvents, playtest, computeBlocked, metaTable, renderer: getRenderer };
+(window as unknown as Record<string, unknown>).__MAPFORGE__ = { project: useProject, editor: useEditor, view: viewEvents, playtest, computeBlocked, metaTable, renderer: getRenderer, autoAssign };
 
 // errors outside React rendering (event handlers, promises) become a visible message instead of silence
 const report = (area: string, err: unknown) => {

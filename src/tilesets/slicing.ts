@@ -90,6 +90,8 @@ export function applyTileMeta(tilesets: Tileset[], gids: number[], patch: Partia
       const cur = tiles[idx] ?? { tags: [], weight: 50 };
       tiles[idx] = { ...cur, ...patch };
       if (patch.category === undefined && 'category' in patch) delete tiles[idx].category;
+      // any manual edit confirms an automatic suggestion
+      if (!('auto' in patch)) delete tiles[idx].auto;
     }
     return { ...ts, tiles };
   });

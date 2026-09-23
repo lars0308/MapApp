@@ -96,6 +96,8 @@ interface ProjectState {
   updateTileset: (id: string, patch: Partial<Pick<Tileset, 'name' | 'active' | 'perspectives'>>) => void;
   setTilesetTileSize: (id: string, size: number) => Promise<void>;
   setTileMeta: (gids: number[], patch: Partial<TileMeta>) => void;
+  /** merge metas into a tileset (automatic assignment, confirm suggestions) */
+  mergeTileMetas: (tilesetId: string, tiles: Record<number, TileMeta>) => void;
 
   addObject: (o: Omit<MapObject, 'id'>) => void;
   removeObject: (id: string) => void;
@@ -317,6 +319,10 @@ export const useProject = create<ProjectState>((set, get) => {
           return { ...l, data };
         }),
       }), true);
+    },
+    mergeTileMetas: (tilesetId, tiles) => {
+      const p = get().project;
+      touch({ ...p, tilesets: p.tilesets.map((t) => (t.id === tilesetId ? { ...t, tiles: { ...t.tiles, ...tiles } } : t)) });
     },
     setTileMeta: (gids, patch) => {
       const p = get().project;

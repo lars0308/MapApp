@@ -7,6 +7,8 @@ import { summarizeTileset } from '../../tilesets/library';
 import { applyTileMeta, COMMON_TILE_SIZES, createTilesetFromFile, findEmptyTiles } from '../../tilesets/slicing';
 import { tilesetSupports } from '../../tilesets/tilePools';
 import { TileThumb } from '../../tilesets/TileThumb';
+import { AssignSummary, TileLabel, confirmedMetas, suggestMetas } from '../../tilesets/TileLabel';
+import { autoAssign } from '../../tilesets/autoAssign';
 import { TileInspector } from '../../tilesets/TilesPanel';
 import { useEditor } from '../../store/editorStore';
 import { readFileAsDataUrl } from '../../utils/download';
@@ -213,7 +215,8 @@ function UploadEditor({
       // draft gids start at 1 (own id space, only used inside the wizard)
       const ts = await createTilesetFromFile(f.name.replace(/\.[^.]+$/, ''), dataUrl, 16, 1);
       setDetected(ts.tileSize);
-      setUpload({ ...ts, perspectives: [perspective] });
+      // first guess for every tile – the user only corrects
+      setUpload({ ...ts, perspectives: [perspective], tiles: await autoAssign(ts) });
       setMarked([]);
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Upload fehlgeschlagen', 'error');
@@ -226,7 +229,8 @@ function UploadEditor({
   const reslice = async (size: number) => {
     if (!upload || size === upload.tileSize) return;
     const { columns, rows, empty } = await findEmptyTiles(upload.dataUrl, size);
-    setUpload({ ...upload, tileSize: size, columns, rows, emptyTiles: empty, tiles: {} });
+    const resliced = { ...upload, tileSize: size, columns, rows, emptyTiles: empty, tiles: {} };
+    setUpload({ ...resliced, tiles: await autoAssign(resliced) });
     setMarked([]);
   };
 
@@ -306,7 +310,7 @@ function UploadEditor({
         <label>
           Tiles <span className="muted">· {indices.length} Tiles, {sum.roles.length} Rollen zugewiesen – antippen zum Markieren</span>
         </label>
-        <div className="tile-grid upload-grid" role="listbox" aria-label="Tiles des neuen Tilesets" aria-multiselectable="true">
+        <div className="tile-grid upload-grid has-labels" role="listbox" aria-label="Tiles des neuen Tilesets" aria-multiselectable="true">
           {indices.map((i) => {
             const on = marked.includes(i + 1);
             const meta = upload.tiles[i];
@@ -321,7 +325,7 @@ function UploadEditor({
                 onClick={() => setMarked(on ? marked.filter((g) => g !== i + 1) : [...marked, i + 1])}
               >
                 <TileThumb ts={upload} index={i} size={40} />
-                {(meta?.role || meta?.category) && <span className="tile-cat-dot" />}
+                <TileLabel meta={meta} />
               </button>
             );
           })}
@@ -332,6 +336,17 @@ function UploadEditor({
           </Button>
         )}
       </div>
+      <AssignSummary
+        ts={upload}
+        busy={busy}
+        onAuto={() => {
+          setBusy(true);
+          void suggestMetas(upload)
+            .then((tiles) => setUpload({ ...upload, tiles: { ...upload.tiles, ...tiles } }))
+            .finally(() => setBusy(false));
+        }}
+        onConfirm={() => setUpload({ ...upload, tiles: { ...upload.tiles, ...confirmedMetas(upload.tiles) } })}
+      />
       <TileInspector gids={marked} tilesets={[upload]} onMeta={onMeta} />
       <p className="hint">
         Rolle = Verwendung im Generator (z. B. <code>floor_center</code>, <code>wall_top</code>, <code>wall_front</code>). Material-Tags von Böden (z. B. <code>#grass</code>) werden

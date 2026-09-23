@@ -344,6 +344,13 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 1.5 – automatische Tile-Zuordnung**
+
+- Beim Hochladen (Setup-Assistent und Tiles → Tilesets) wird jedes Tile automatisch erkannt: Boden (mit Material-Tag stone/grass/sand/wood), Wände (helle Kante zeigt zum Boden → Wand ↑/↓/←/→, Durchgangswand, Innenecke, Endstück, Kreuzung), Außenecken (heller Eckpunkt), Wandfront, Bodenrand, Wasser, Lava, Abgrund, Brücke, Deko/Hindernis (Form auf Transparenz). Trefferquote auf den Demo-Tilesets 65–83 % (nach Gruppe).
+- Jedes Tile zeigt seine Zuordnung als Label („Boden“, „Wand ↑“, „Ecke ┌“ …), farbig nach Gruppe (grün Boden, lila Wände/Ecken, blau Wasser/Lava/Abgrund, orange Türen/Brücken/Treppen, gelb Objekte, „?“ = ohne Zuordnung). Gestrichelt = automatischer Vorschlag, ausgefüllt = bestätigt; jede Änderung im Inspektor bestätigt das Tile.
+- Übersicht pro Tileset („20 Boden · 8 Wände/Ecken · 3 ohne Zuordnung“) mit „Automatisch zuordnen“ (erkennt nur Unzugeordnetes und unbestätigte Vorschläge neu, eigene Zuordnungen bleiben) und „Vorschläge bestätigen“. In der Palette per Schalter „Zuordnung“ ein-/ausblendbar; Filter „Ohne Kategorie“ zeigt nicht zugeordnete Tiles.
+- Neu: `tilesets/autoAssign.ts`, `tilesets/TileLabel.tsx`.
+
 **Version 1.4.1 – Stabilität**
 
 - **Fehler behoben: schwarzer Bildschirm nach „Weiter“ im Setup** (u. a. Chrome 153 auf Android, Fehler „l is not a function“). Ursache: `useEffect(() => bodyRef.current?.scrollTo(...))` gab den Rückgabewert von `scrollTo()` zurück; neue Chrome-Versionen liefern dort ein Promise, das React beim Schrittwechsel als Aufräumfunktion aufrief. Alle Effekte geben jetzt nichts mehr zurück. Das war auch die Ursache des früher gemeldeten „schwarzen Bildschirms nach Low Top-Down“.

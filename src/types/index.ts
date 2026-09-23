@@ -106,6 +106,8 @@ export interface TileMeta {
   collision?: boolean;
   /** tall tiles: rows below this tile where its y-sort origin lies */
   sortOffset?: number;
+  /** category/role was suggested automatically and not yet confirmed or edited */
+  auto?: boolean;
 }
 
 export interface Tileset {

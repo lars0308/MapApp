@@ -9,6 +9,8 @@ import { tileBlocks } from '../editor/collision';
 import { PERSPECTIVE_INFO } from '../generator/perspective';
 import { CATEGORIES, CATEGORY_LABEL, SUGGESTED_TAGS } from './categories';
 import { TileThumb } from './TileThumb';
+import { AssignSummary, TileLabel, assignmentStats, confirmedMetas, suggestMetas } from './TileLabel';
+import { autoAssign } from './autoAssign';
 import { resolveGid, createTilesetFromFile, COMMON_TILE_SIZES } from './slicing';
 import { Button, Chip, IconButton, NumberField, PanelTabs, Segmented, Slider, Toggle } from '../components/ui';
 import { Icon } from '../components/icons';
@@ -52,6 +54,21 @@ function Palette() {
   const [tsFilter, setTsFilter] = useState('all');
   const [catFilter, setCatFilter] = useState<'all' | 'none' | TileCategory>('all');
   const [tagFilter, setTagFilter] = useState('all');
+  const [labels, setLabels] = useState(() => {
+    try {
+      return localStorage.getItem('mapforge.tileLabels') !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const toggleLabels = (v: boolean) => {
+    setLabels(v);
+    try {
+      localStorage.setItem('mapforge.tileLabels', v ? '1' : '0');
+    } catch {
+      // not remembered
+    }
+  };
 
   const allTags = useMemo(() => {
     const set = new Set<string>();
@@ -68,7 +85,7 @@ function Palette() {
       for (let i = 0; i < ts.columns * ts.rows; i++) {
         if (empty.has(i)) continue;
         const meta = ts.tiles[i];
-        if (catFilter === 'none' && meta?.category) continue;
+        if (catFilter === 'none' && (meta?.category || meta?.role)) continue;
         if (catFilter !== 'all' && catFilter !== 'none' && meta?.category !== catFilter) continue;
         if (tagFilter !== 'all' && !meta?.tags.includes(tagFilter)) continue;
         out.push({ ts, index: i, gid: ts.firstGid + i });
@@ -111,10 +128,11 @@ function Palette() {
 
       <div className="palette-bar">
         <span className="muted">{items.length} Tiles</span>
+        <Toggle label="Zuordnung" checked={labels} onChange={toggleLabels} />
         <Toggle label="Mehrfachauswahl" checked={multi} onChange={setMultiSelect} />
       </div>
 
-      <div className="tile-grid" role="listbox" aria-label="Tiles">
+      <div className={`tile-grid${labels ? ' has-labels' : ''}`} role="listbox" aria-label="Tiles">
         {items.map((it) => {
           const isSel = multi ? marked.includes(it.gid) : it.gid === selectedGid;
           const cat = it.ts.tiles[it.index]?.category;
@@ -129,7 +147,7 @@ function Palette() {
               onClick={() => (multi ? toggleMark(it.gid) : selectTile(it.gid))}
             >
               <TileThumb ts={it.ts} index={it.index} size={40} />
-              {cat && <span className="tile-cat-dot" />}
+              {labels ? <TileLabel meta={it.ts.tiles[it.index]} /> : cat && <span className="tile-cat-dot" />}
             </button>
           );
         })}
@@ -319,8 +337,11 @@ function TilesetManager() {
         const dataUrl = await readFileAsDataUrl(f);
         const nextGid = useProject.getState().project.nextGid;
         const ts = await createTilesetFromFile(f.name.replace(/\.[^.]+$/, ''), dataUrl, tileSize, nextGid);
+        // first guess for every tile (floor, walls, corners …) – shown as suggestions
+        ts.tiles = await autoAssign(ts);
         addTileset(ts);
-        toast(`${ts.name}: ${ts.columns * ts.rows - ts.emptyTiles.length} Tiles (${ts.tileSize} px)`, 'success');
+        const st = assignmentStats(ts);
+        toast(`${ts.name}: ${ts.columns * ts.rows - ts.emptyTiles.length} Tiles (${ts.tileSize} px), ${st.auto} automatisch zugeordnet – bitte in der Palette prüfen`, 'success');
       }
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Upload fehlgeschlagen', 'error');
@@ -346,6 +367,8 @@ function TilesetManager() {
 
 function TilesetCard({ ts }: { ts: Tileset }) {
   const toast = useEditor((s) => s.toast);
+  const mergeTileMetas = useProject((s) => s.mergeTileMetas);
+  const [detecting, setDetecting] = useState(false);
   const updateTileset = useProject((s) => s.updateTileset);
   const removeTileset = useProject((s) => s.removeTileset);
   const setTilesetTileSize = useProject((s) => s.setTilesetTileSize);
@@ -374,6 +397,20 @@ function TilesetCard({ ts }: { ts: Tileset }) {
         </div>
       </div>
       <Toggle label="Aktiv" description="Im Generator und in der Palette verwenden" checked={ts.active} onChange={(v) => updateTileset(ts.id, { active: v })} />
+      <AssignSummary
+        ts={ts}
+        busy={detecting}
+        onAuto={() => {
+          setDetecting(true);
+          void suggestMetas(ts)
+            .then((tiles) => {
+              mergeTileMetas(ts.id, tiles);
+              toast(`${Object.keys(tiles).length} Tiles automatisch zugeordnet`, 'success');
+            })
+            .finally(() => setDetecting(false));
+        }}
+        onConfirm={() => mergeTileMetas(ts.id, confirmedMetas(ts.tiles))}
+      />
       <div className="field">
         <label>Geeignet für</label>
         <div className="chips">
