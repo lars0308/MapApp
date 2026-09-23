@@ -1,3 +1,4 @@
+import { animsFor, buildSheet } from './sprites/animation';
 import { StrictMode } from 'react';
 import { DEMO_PARTS, composeView, useSprites } from './sprites/store';
 import { useApp } from './store/appStore';
@@ -16,7 +17,7 @@ import { detectTileSize } from './tilesets/slicing';
 import { ErrorBoundary, rememberError, takeLastError } from './components/ErrorBoundary';
 
 // small debugging handle (used by automated browser tests)
-(window as unknown as Record<string, unknown>).__MAPFORGE__ = { project: useProject, editor: useEditor, view: viewEvents, playtest, computeBlocked, metaTable, renderer: getRenderer, autoAssign, learning, detectTileSize, sprites: useSprites, spriteParts: DEMO_PARTS, composeView, app: useApp };
+(window as unknown as Record<string, unknown>).__MAPFORGE__ = { project: useProject, editor: useEditor, view: viewEvents, playtest, computeBlocked, metaTable, renderer: getRenderer, autoAssign, learning, detectTileSize, sprites: useSprites, spriteParts: DEMO_PARTS, composeView, app: useApp, anim: { animsFor, buildSheet } };
 
 // errors outside React rendering (event handlers, promises) become a visible message instead of silence
 const report = (area: string, err: unknown) => {

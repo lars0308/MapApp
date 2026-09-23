@@ -8,12 +8,19 @@ import { S } from './painter';
 // moves the regions a little (breathing, walking, jumping …). Works for drawn layers too,
 // because regions come from the body measurements, not from the parts.
 
-export type Region = 'head' | 'torso' | 'armL' | 'armR' | 'legL' | 'legR' | 'ground' | 'effect';
+export type Region = 'head' | 'torso' | 'armL' | 'armR' | 'legL' | 'legR' | 'ground' | 'effect' | 'weapon';
 type Off = { x: number; y: number };
 
 export interface Pose {
-  /** offset per region */
+  /** offset per region (the weapon also follows armR) */
   off?: Partial<Record<Region, Off>>;
+  /**
+   * rotation per region in degrees, clockwise: arms turn around the shoulder, legs around the hip,
+   * the head around the neck, the weapon around the grip (and then with the arm).
+   */
+  rot?: Partial<Record<Region, number>>;
+  /** rotate the whole figure around the feet (degrees, clockwise) – falling over, wobbling */
+  spin?: number;
   /** added to every region except the ground shadow */
   all?: Off;
   /** lean: horizontal shift per pixel above the feet */
@@ -31,6 +38,8 @@ export interface Pose {
   dust?: number;
   /** squash (< 1) / stretch (> 1) towards the feet */
   squash?: number;
+  /** motion trail behind the weapon tip: degrees of the swing (+ clockwise, − counter-clockwise) */
+  trail?: number;
 }
 
 export interface AnimDef {
@@ -50,6 +59,9 @@ const o = (x: number, y: number): Off => ({ x, y });
 
 export const ANIMATIONS: AnimDef[] = [
   // ---------------------------------------------------------------- characters
+  // Angles: clockwise in degrees. Front view: the weapon arm is on the right, −90 lifts it
+  // sideways, −160 over the head. Side view (facing right): −90 = arm forward, +90 = back.
+  // "weapon" turns the weapon in the hand on top of the arm (keeps a sword upright while the arm moves).
   {
     id: 'idle',
     label: 'Atmen',
@@ -65,7 +77,7 @@ export const ANIMATIONS: AnimDef[] = [
     kind: 'character',
     fps: 8,
     loop: true,
-    hint: 'Beine abwechselnd, Arme schwingen gegengleich',
+    hint: 'Beine abwechselnd, Arme schwingen gegengleich – von der Seite mit 8 Bildern und echtem Schritt',
     poses: [
       { off: { legL: o(0, -1), armL: o(0, 1), armR: o(0, -1) } },
       { off: { head: o(0, 1), torso: o(0, 1), armL: o(0, 1), armR: o(0, 1) } },
@@ -73,10 +85,15 @@ export const ANIMATIONS: AnimDef[] = [
       { off: { head: o(0, 1), torso: o(0, 1), armL: o(0, 1), armR: o(0, 1) } },
     ],
     side: [
-      { off: { legL: o(1, 0), legR: o(-1, 0), armR: o(-1, 0) } },
-      { off: { head: o(0, 1), torso: o(0, 1), armR: o(0, 1) } },
-      { off: { legL: o(-1, 0), legR: o(1, 0), armR: o(1, 0) } },
-      { off: { head: o(0, 1), torso: o(0, 1), armR: o(0, 1) } },
+      // contact – down – passing – up, then the other leg
+      { rot: { legR: -26, legL: 24, armR: 22, weapon: -18 }, all: o(0, 1) },
+      { rot: { legR: -14, legL: 16, armR: 12, weapon: -10 }, all: o(0, 1), off: { head: o(0, 1) } },
+      { rot: { legR: 2, legL: -4, armR: 0 }, off: { legL: o(0, -1) } },
+      { rot: { legR: 14, legL: -14, armR: -12, weapon: 10 }, all: o(0, -1) },
+      { rot: { legR: 24, legL: -26, armR: -22, weapon: 18 }, all: o(0, 1) },
+      { rot: { legR: 16, legL: -14, armR: -12, weapon: 10 }, all: o(0, 1), off: { head: o(0, 1) } },
+      { rot: { legR: -4, legL: 2, armR: 0 }, off: { legR: o(0, -1) } },
+      { rot: { legR: -14, legL: 14, armR: 12, weapon: -10 }, all: o(0, -1) },
     ],
   },
   {
@@ -85,7 +102,7 @@ export const ANIMATIONS: AnimDef[] = [
     kind: 'character',
     fps: 12,
     loop: true,
-    hint: 'Schneller, höhere Knie, stärkerer Armschwung',
+    hint: 'Schneller, höhere Knie, stärkerer Armschwung, Staub – von der Seite nach vorn gelehnt',
     poses: [
       { all: o(0, -1), off: { legL: o(0, -2), armL: o(0, 2), armR: o(0, -2) } },
       { off: { head: o(0, 1), torso: o(0, 1), armL: o(0, 1), armR: o(0, 1) } },
@@ -93,26 +110,38 @@ export const ANIMATIONS: AnimDef[] = [
       { off: { head: o(0, 1), torso: o(0, 1), armL: o(0, 1), armR: o(0, 1) } },
     ],
     side: [
-      { all: o(0, -1), lean: 0.06, off: { legL: o(2, -1), legR: o(-2, 0), armR: o(-2, 0) } },
-      { lean: 0.06, off: { head: o(0, 1), torso: o(0, 1), armR: o(0, 1) } },
-      { all: o(0, -1), lean: 0.06, off: { legL: o(-2, 0), legR: o(2, -1), armR: o(2, 0) } },
-      { lean: 0.06, off: { head: o(0, 1), torso: o(0, 1), armR: o(0, 1) } },
+      { lean: 0.08, rot: { legR: -40, legL: 34, armR: 40, weapon: -30 }, all: o(0, 1), dust: 1 },
+      { lean: 0.08, rot: { legR: -18, legL: 50, armR: 20, weapon: -15 }, all: o(0, -1) },
+      { lean: 0.08, rot: { legR: 12, legL: -8, armR: -10 }, all: o(0, -2), off: { legL: o(0, -2) } },
+      { lean: 0.08, rot: { legR: 34, legL: -40, armR: -40, weapon: 30 }, all: o(0, 1), dust: 1 },
+      { lean: 0.08, rot: { legR: 50, legL: -18, armR: -20, weapon: 15 }, all: o(0, -1) },
+      { lean: 0.08, rot: { legR: -8, legL: 12, armR: 10 }, all: o(0, -2), off: { legR: o(0, -2) } },
     ],
   },
   {
     id: 'jump',
     label: 'Springen',
     kind: 'character',
-    fps: 10,
+    fps: 12,
     loop: false,
-    hint: 'Ducken, Absprung, Flug, Landung – der Schatten bleibt am Boden',
+    hint: 'Ausholen (gestaucht), Absprung (gestreckt), Flug, Landung – der Schatten bleibt am Boden',
     poses: [
-      { off: { head: o(0, 2), torso: o(0, 2), armL: o(0, 2), armR: o(0, 2), legL: o(0, 1), legR: o(0, 1) } },
-      { all: o(0, -3), off: { armL: o(0, -1), armR: o(0, -1) } },
-      { all: o(0, -6), off: { armL: o(0, -2), armR: o(0, -2), legL: o(0, -1), legR: o(0, -1) } },
-      { all: o(0, -7), off: { armL: o(0, -2), armR: o(0, -2), legL: o(0, -1), legR: o(0, -1) } },
-      { all: o(0, -4), off: { armL: o(0, -1), armR: o(0, -1) } },
-      { off: { head: o(0, 1), torso: o(0, 1), armL: o(0, 1), armR: o(0, 1) } },
+      { squash: 0.84, rot: { armL: -15, armR: 15 } },
+      { all: o(0, -3), squash: 1.12, rot: { armL: 60, armR: -60, weapon: 45 } },
+      { all: o(0, -7), rot: { armL: 110, armR: -110, weapon: 90 }, off: { legL: o(0, -1), legR: o(0, -1) } },
+      { all: o(0, -8), rot: { armL: 120, armR: -120, weapon: 100 }, off: { legL: o(0, -1), legR: o(0, -1) } },
+      { all: o(0, -4), squash: 1.06, rot: { armL: 60, armR: -60, weapon: 45 } },
+      { squash: 0.82, rot: { armL: 30, armR: -30, weapon: 20 } },
+      { squash: 0.94 },
+    ],
+    side: [
+      { squash: 0.84, lean: 0.05, rot: { armR: 30, legR: -10, legL: 10 } },
+      { all: o(0, -3), squash: 1.12, rot: { armR: -120, weapon: 100, legL: 25 } },
+      { all: o(0, -7), rot: { armR: -150, weapon: 130, legR: -45, legL: 30 }, off: { legR: o(0, -1) } },
+      { all: o(0, -8), rot: { armR: -140, weapon: 120, legR: -45, legL: 30 }, off: { legR: o(0, -1) } },
+      { all: o(0, -4), squash: 1.06, rot: { armR: -80, weapon: 60, legR: -20, legL: 10 } },
+      { squash: 0.82, rot: { armR: -30, weapon: 20, legR: -12, legL: 12 } },
+      { squash: 0.94 },
     ],
   },
   {
@@ -128,33 +157,80 @@ export const ANIMATIONS: AnimDef[] = [
       { lean: 0.2, off: { head: o(0, 2), torso: o(0, 1), armL: o(0, 1), armR: o(0, 1) }, dust: 3 },
       { lean: 0.16, off: { head: o(0, 1), torso: o(0, 1) }, dust: 2 },
     ],
+    side: [
+      { lean: -0.1, rot: { legR: -40, legL: -20, armR: 50, weapon: -40 }, all: o(0, 2), dust: 1 },
+      { lean: -0.12, rot: { legR: -45, legL: -25, armR: 60, weapon: -50 }, all: o(0, 2), dust: 2 },
+      { lean: -0.12, rot: { legR: -45, legL: -25, armR: 60, weapon: -50 }, all: o(0, 2), dust: 3 },
+      { lean: -0.1, rot: { legR: -40, legL: -20, armR: 50, weapon: -40 }, all: o(0, 2), dust: 2 },
+    ],
   },
   {
     id: 'attack',
     label: 'Angriff',
     kind: 'character',
-    fps: 12,
+    fps: 14,
     loop: false,
-    hint: 'Waffe ausholen und zuschlagen',
-    poses: [{ off: { armR: o(0, -2) } }, { off: { armR: o(1, -3), torso: o(0, 0) } }, { off: { armR: o(3, 1), torso: o(1, 0), head: o(1, 0) } }, { off: { armR: o(2, 1) } }, {}],
+    hint: 'Ausholen über den Kopf, Schlag mit Wischspur, Nachschwung – 6 Bilder',
+    poses: [
+      { rot: { armR: -30, weapon: 70 }, all: o(0, 1), off: { head: o(0, 1) } },
+      { rot: { armR: -140, weapon: 110 } },
+      { rot: { armR: 20, weapon: 180 }, trail: 150, off: { torso: o(0, 1), head: o(0, 1) } },
+      { rot: { armR: 30, weapon: 185 }, trail: 50, off: { torso: o(0, 1), head: o(0, 1) } },
+      { rot: { armR: 10, weapon: 90 } },
+      {},
+    ],
+    side: [
+      { rot: { armR: 40, weapon: -80 }, lean: -0.05 },
+      { rot: { armR: 150, weapon: -210 }, lean: -0.06 },
+      { rot: { armR: -80, weapon: 180 }, trail: 150, lean: 0.06, off: { torso: o(1, 0), head: o(1, 0) } },
+      { rot: { armR: -50, weapon: 190 }, trail: 50, lean: 0.05, off: { torso: o(1, 0), head: o(1, 0) } },
+      { rot: { armR: -20, weapon: 80 } },
+      {},
+    ],
   },
   {
     id: 'hurt',
     label: 'Treffer',
     kind: 'character',
-    fps: 10,
+    fps: 12,
     loop: false,
-    hint: 'Kurz rot aufblitzen und zurückzucken',
-    poses: [{ all: o(-1, 0), flash: 'white' }, { all: o(-1, 0), flash: 'red' }, { all: o(0, 0) }],
+    hint: 'Weiß/rot aufblitzen, Kopf zuckt zurück, kurz zurückgestoßen',
+    poses: [
+      { flash: 'white', all: o(0, -1), squash: 0.92, rot: { head: 10 } },
+      { flash: 'red', all: o(0, -1), rot: { head: 14, armL: 20, armR: -20, weapon: 15 } },
+      { rot: { head: 6, armL: 10, armR: -10 } },
+      {},
+    ],
+    side: [
+      { flash: 'white', all: o(-2, 0), spin: -8, rot: { head: -12, armR: 30, weapon: -20 } },
+      { flash: 'red', all: o(-2, 0), spin: -10, rot: { head: -14, armR: 40, weapon: -30 } },
+      { all: o(-1, 0), spin: -4, rot: { head: -6, armR: 15 } },
+      {},
+    ],
   },
   {
     id: 'death',
     label: 'Umfallen',
     kind: 'character',
-    fps: 8,
+    fps: 10,
     loop: false,
-    hint: 'Kippt zur Seite und bleibt liegen',
-    poses: [{ lean: 0.12 }, { lean: 0.3, off: { head: o(1, 1) } }, { lie: true }, { lie: true, alpha: 0.75 }, { lie: true, alpha: 0.5 }],
+    hint: 'Knickt ein, kippt um und bleibt liegen (letztes Bild bleibt stehen)',
+    poses: [
+      { flash: 'white', rot: { head: 12 }, squash: 0.94 },
+      { spin: 12, rot: { head: 18, armL: 30, armR: -20 }, squash: 0.92 },
+      { spin: 35, rot: { armL: 50, armR: -40, weapon: 30 } },
+      { spin: 65, rot: { armL: 70, armR: -50, weapon: 40 } },
+      { spin: 90, all: o(0, -1), rot: { armL: 60, armR: -60, weapon: 60 } },
+      { spin: 90, rot: { armL: 40, armR: -40, weapon: 60 } },
+    ],
+    side: [
+      { flash: 'white', rot: { head: -12 }, squash: 0.94 },
+      { spin: -12, rot: { head: -18, armR: 40 }, squash: 0.92 },
+      { spin: -35, rot: { armR: 70, weapon: -40, legR: -20 } },
+      { spin: -65, rot: { armR: 90, weapon: -50, legR: -30 } },
+      { spin: -90, all: o(0, -1), rot: { armR: 60, weapon: -40, legR: -20 } },
+      { spin: -90, rot: { armR: 40, weapon: -30, legR: -10 } },
+    ],
   },
   {
     id: 'cast',
@@ -164,10 +240,16 @@ export const ANIMATIONS: AnimDef[] = [
     loop: false,
     hint: 'Arme hoch, kurzes Aufleuchten',
     poses: [
-      { off: { armL: o(0, -1), armR: o(0, -1) } },
-      { off: { armL: o(0, -3), armR: o(0, -3) }, bright: 0.1 },
-      { off: { armL: o(0, -3), armR: o(0, -3), head: o(0, -1) }, bright: 0.22 },
-      { off: { armL: o(0, -1), armR: o(0, -1) } },
+      { rot: { armL: 40, armR: -40, weapon: 30 } },
+      { rot: { armL: 120, armR: -120, weapon: 100 }, bright: 0.1 },
+      { rot: { armL: 160, armR: -160, weapon: 150 }, off: { head: o(0, -1) }, bright: 0.25 },
+      { rot: { armL: 60, armR: -60, weapon: 50 } },
+    ],
+    side: [
+      { rot: { armR: -50, weapon: 40 } },
+      { rot: { armR: -120, weapon: 100 }, bright: 0.1 },
+      { rot: { armR: -150, weapon: 130 }, lean: -0.04, bright: 0.25 },
+      { rot: { armR: -70, weapon: 50 } },
     ],
   },
   {
@@ -178,6 +260,11 @@ export const ANIMATIONS: AnimDef[] = [
     loop: false,
     hint: 'Schild / zweite Hand nach vorn, leicht in die Knie',
     poses: [{ off: { armL: o(1, -1) } }, { off: { armL: o(2, -2), torso: o(0, 1), head: o(0, 1), armR: o(0, 1) } }, { off: { armL: o(2, -2), torso: o(0, 1), head: o(0, 1), armR: o(0, 1) } }],
+    side: [
+      { rot: { armR: -40, weapon: -30 }, lean: -0.04 },
+      { rot: { armR: -70, weapon: -60 }, lean: -0.06, all: o(0, 1) },
+      { rot: { armR: -70, weapon: -60 }, lean: -0.06, all: o(0, 1) },
+    ],
   },
   {
     id: 'crouch',
@@ -195,7 +282,8 @@ export const ANIMATIONS: AnimDef[] = [
     fps: 6,
     loop: true,
     hint: 'Hand hoch und hin und her (NPC, Begrüßung)',
-    poses: [{ off: { armR: o(0, -3) } }, { off: { armR: o(1, -4) } }, { off: { armR: o(0, -3) } }, { off: { armR: o(1, -4) } }],
+    poses: [{ rot: { armR: -150, weapon: 140 } }, { rot: { armR: -120, weapon: 110 } }, { rot: { armR: -155, weapon: 145 } }, { rot: { armR: -120, weapon: 110 } }],
+    side: [{ rot: { armR: -150, weapon: 140 } }, { rot: { armR: -125, weapon: 115 } }, { rot: { armR: -155, weapon: 145 } }, { rot: { armR: -125, weapon: 115 } }],
   },
   {
     id: 'climb',
@@ -205,10 +293,10 @@ export const ANIMATIONS: AnimDef[] = [
     loop: true,
     hint: 'Arme und Beine im Wechsel – am besten mit Ansicht „Hinten“ (Leiter, Ranken)',
     poses: [
-      { off: { armL: o(0, -3), legR: o(0, -1) } },
-      { all: o(0, -1) },
-      { off: { armR: o(0, -3), legL: o(0, -1) } },
-      { all: o(0, -1) },
+      { rot: { armL: 160, armR: -120, weapon: 110 }, off: { legR: o(0, -2) } },
+      { all: o(0, -1), rot: { armL: 140, armR: -140, weapon: 130 } },
+      { rot: { armL: 120, armR: -160, weapon: 150 }, off: { legL: o(0, -2) } },
+      { all: o(0, -1), rot: { armL: 140, armR: -140, weapon: 130 } },
     ],
   },
   {
@@ -218,7 +306,14 @@ export const ANIMATIONS: AnimDef[] = [
     fps: 8,
     loop: true,
     hint: 'Arme nach oben, Beine hängen (nach einem Sprung)',
-    poses: [{ off: { armL: o(0, -2), armR: o(0, -2) } }, { off: { armL: o(0, -3), armR: o(0, -3), legL: o(0, -1) } }],
+    poses: [
+      { squash: 1.05, rot: { armL: 140, armR: -140, weapon: 120 } },
+      { squash: 1.05, rot: { armL: 155, armR: -155, weapon: 135 }, off: { legL: o(0, -1) } },
+    ],
+    side: [
+      { squash: 1.05, rot: { armR: -150, weapon: 130, legR: -15, legL: 10 } },
+      { squash: 1.05, rot: { armR: -165, weapon: 145, legR: -5, legL: 20 } },
+    ],
   },
   // ---------------------------------------------------------------- creatures
   {
@@ -246,7 +341,7 @@ export const ANIMATIONS: AnimDef[] = [
     fps: 10,
     loop: true,
     hint: 'Beine / Klauen im Wechsel (Spinne, Käfer, Wolf)',
-    poses: [{ off: { armL: o(0, -1), armR: o(0, 1) } }, { all: o(0, 1) }, { off: { armL: o(0, 1), armR: o(0, -1) } }, { all: o(0, 1) }],
+    poses: [{ rot: { armL: 14, armR: 8 }, off: { armL: o(0, -1) } }, { all: o(0, 1) }, { rot: { armL: -8, armR: -14 }, off: { armR: o(0, -1) } }, { all: o(0, 1) }],
   },
   {
     id: 'k_fly',
@@ -255,7 +350,12 @@ export const ANIMATIONS: AnimDef[] = [
     fps: 10,
     loop: true,
     hint: 'Flügelschlag und leichtes Auf und Ab',
-    poses: [{ all: o(0, -1), off: { armL: o(0, -3), armR: o(0, -3) } }, { all: o(0, -1) }, { all: o(0, 1), off: { armL: o(0, 2), armR: o(0, 2) } }, {}],
+    poses: [
+      { all: o(0, -2), rot: { armL: 35, armR: -35 }, off: { armL: o(0, -1), armR: o(0, -1) } },
+      { all: o(0, -1), rot: { armL: 12, armR: -12 } },
+      { all: o(0, 1), rot: { armL: -28, armR: 28 }, off: { armL: o(0, 1), armR: o(0, 1) } },
+      { rot: { armL: -8, armR: 8 } },
+    ],
   },
   {
     id: 'k_attack',
@@ -264,7 +364,13 @@ export const ANIMATIONS: AnimDef[] = [
     fps: 12,
     loop: false,
     hint: 'Ausholen und zuschnappen / zuschlagen',
-    poses: [{ squash: 0.86 }, { all: o(0, -2), squash: 1.12, off: { armL: o(-1, -2), armR: o(1, -2) } }, { all: o(0, 1), squash: 0.96, off: { head: o(0, 1) } }, {}],
+    poses: [
+      { squash: 0.84, rot: { armL: -20, armR: 20 } },
+      { all: o(0, -3), squash: 1.14, rot: { armL: 40, armR: -40 }, off: { armL: o(-1, -2), armR: o(1, -2) } },
+      { all: o(0, 2), squash: 0.92, rot: { armL: -25, armR: 25 }, off: { head: o(0, 1) }, flash: 'white' },
+      { all: o(0, 1), squash: 0.96 },
+      {},
+    ],
   },
   {
     id: 'k_hurt',
@@ -301,7 +407,7 @@ export const ANIMATIONS: AnimDef[] = [
     fps: 12,
     loop: true,
     hint: 'Zittert hin und her (Treffer, Falle)',
-    poses: [{}, { all: o(1, 0) }, {}, { all: o(-1, 0) }],
+    poses: [{}, { spin: 6 }, { spin: 0, all: o(1, 0) }, { spin: -6 }, {}, { all: o(-1, 0) }],
   },
   {
     id: 'pulse',
@@ -342,12 +448,29 @@ export { framePad, frameSize };
 export const DIR_NAME: Record<View, string> = { front: 'down', side: 'side', back: 'up' };
 export const frameKey = (view: View, animId: string, i: number) => `${view}:${animId}:${i}`;
 
-/** poses of an animation for a view (side walk moves the legs forward / back instead of up / down) */
-export function posesFor(anim: AnimDef, view: View): Pose[] {
-  return (view === 'side' && anim.side) || (view === 'back' && anim.back) || anim.poses;
+/** a front pose seen from behind: everything mirrored (the weapon hand is on the left there) */
+function mirrorPose(p: Pose): Pose {
+  const neg = <T extends Partial<Record<Region, number>>>(r: T | undefined) => (r ? (Object.fromEntries(Object.entries(r).map(([k, v]) => [k, -(v as number)])) as T) : undefined);
+  const off = p.off && (Object.fromEntries(Object.entries(p.off).map(([k, v]) => [k, { x: -v!.x, y: v!.y }])) as Pose['off']);
+  return { ...p, off, rot: neg(p.rot), spin: p.spin && -p.spin, all: p.all && { x: -p.all.x, y: p.all.y }, lean: p.lean && -p.lean, trail: p.trail && -p.trail };
 }
 
+/** poses of an animation for a view (side walk swings the legs, the back view mirrors the front) */
+export function posesFor(anim: AnimDef, view: View): Pose[] {
+  if (view === 'side' && anim.side) return anim.side;
+  if (view === 'back') return anim.back ?? anim.poses.map(mirrorPose);
+  return anim.poses;
+}
+
+const SWAP: Partial<Record<Region, Region>> = { armL: 'armR', armR: 'armL', legL: 'legR', legR: 'legL' };
+
 function regionOf(layer: SpriteLayer, x: number, y: number, kind: SpriteKind, b: Body, bounds: Bounds, c: Creature): Region {
+  const r = regionRaw(layer, x, y, kind, b, bounds, c);
+  // seen from behind, the left side of the picture is the figure's right side
+  return b.view === 'back' || c.view === 'back' ? (SWAP[r] ?? r) : r;
+}
+
+function regionRaw(layer: SpriteLayer, x: number, y: number, kind: SpriteKind, b: Body, bounds: Bounds, c: Creature): Region {
   const slot = layer.slot;
   if (slot === 'shadow') return 'ground';
   if (kind === 'object') {
@@ -361,8 +484,9 @@ function regionOf(layer: SpriteLayer, x: number, y: number, kind: SpriteKind, b:
     if (slot === 'eyes' || slot === 'mouth' || slot === 'horns') return 'head';
     return 'torso';
   }
-  if (slot === 'weapon') return 'armR';
-  if (slot === 'offhand') return 'armL';
+  // weapon: its own region (turns around the grip), always in the figure's right hand
+  if (slot === 'weapon') return 'weapon';
+  if (slot === 'offhand') return b.view === 'back' ? 'armR' : 'armL';
   if (slot === 'hair' || slot === 'hat' || slot === 'face' || slot === 'headx') return 'head';
   if (slot === 'back') return 'torso';
   if (y < b.t[1]) return 'head';
@@ -374,6 +498,45 @@ function regionOf(layer: SpriteLayer, x: number, y: number, kind: SpriteKind, b:
   return 'torso';
 }
 
+type Pt = [number, number];
+
+/** pivot of each region in design coordinates (after the back-view swap) */
+function pivots(kind: SpriteKind, b: Body, bounds: Bounds, c: Creature): Partial<Record<Region, Pt>> {
+  if (kind === 'object') {
+    const hy = bounds.y0 + (bounds.y1 - bounds.y0) * 0.38;
+    return { head: [bounds.x0, hy], torso: [(bounds.x0 + bounds.x1 + 1) / 2, bounds.y1 + 1] };
+  }
+  if (kind === 'creature') {
+    const back = c.view === 'back';
+    const l: Pt = [c.cx - c.rx * 0.6, c.cy];
+    const r: Pt = [c.cx + c.rx * 0.6, c.cy];
+    return { armL: back ? r : l, armR: back ? l : r, head: [c.cx, c.cy], torso: [c.cx, c.ground + 1] };
+  }
+  const back = b.view === 'back';
+  const arm = (a: [number, number]): Pt => [(a[0] + a[1] + 1) / 2, b.ay[0] + 1];
+  const leg = (l: [number, number]): Pt => [(l[0] + l[1] + 1) / 2, b.ly[0]];
+  // grip of the weapon (see hand() in parts/character.ts)
+  const gx = back ? b.aL[0] - 2 : b.aR[1] + 1;
+  return {
+    armL: arm(back ? b.aR : b.aL),
+    armR: arm(back ? b.aL : b.aR),
+    legL: leg(back ? b.lR : b.lL),
+    legR: leg(back ? b.lL : b.lR),
+    head: [b.hx, b.t[1]],
+    torso: [b.hx, b.ly[0]],
+    weapon: [gx + 1, b.ay[1] + 0.5],
+  };
+}
+
+function rotAbout(x: number, y: number, c: Pt, deg: number): Pt {
+  const a = (deg * Math.PI) / 180;
+  const cs = Math.cos(a);
+  const sn = Math.sin(a);
+  const dx = x - c[0];
+  const dy = y - c[1];
+  return [c[0] + dx * cs - dy * sn, c[1] + dx * sn + dy * cs];
+}
+
 /** feet row inside a frame */
 export function feetInFrame(doc: SpriteDoc, view: View = 'front'): number {
   const n = doc.size;
@@ -382,42 +545,122 @@ export function feetInFrame(doc: SpriteDoc, view: View = 'front'): number {
   return (doc.kind === 'character' ? body.ly[1] : doc.kind === 'creature' ? creature.ground : bounds.y1) + d + framePad(n);
 }
 
+// sub-pixel samples for rotated pixels (no holes in turned arms / weapons)
+const SUB = [1 / 6, 1 / 2, 5 / 6];
+
 /** One frame as RGBA (frameSize × frameSize, sprite centred). */
 export function renderFrame(doc: SpriteDoc, pose: Pose, view: View = 'front'): Uint8ClampedArray {
   const n = doc.size;
   const p = framePad(n);
   const F = frameSize(n);
   const d = Math.floor((n - S) / 2); // design grid → canvas
+  const k = d + p; // design grid → frame
   const { body, bounds, creature } = fitContext(doc, view);
   const feet = feetInFrame(doc, view);
+  const piv = pivots(doc.kind, body, bounds, creature);
+  const pv = (r: Region): Pt => {
+    const q = piv[r] ?? [S / 2, S / 2];
+    return [q[0] + k, q[1] + k];
+  };
+  const rot = pose.rot ?? {};
+  const turned = !!pose.spin || Object.values(rot).some((v) => v);
+  const spinC: Pt = [F / 2, feet + 1];
+
+  /** frame position of a point of a region (continuous coordinates) */
+  const place = (r: Region, x: number, y: number): Pt => {
+    let q: Pt = [x, y];
+    let ox = 0;
+    let oy = 0;
+    let base = r;
+    if (r === 'weapon') {
+      if (rot.weapon) q = rotAbout(q[0], q[1], pv('weapon'), rot.weapon);
+      ox += pose.off?.weapon?.x ?? 0;
+      oy += pose.off?.weapon?.y ?? 0;
+      base = 'armR';
+    }
+    if (rot[base]) q = rotAbout(q[0], q[1], pv(base), rot[base]!);
+    ox += pose.off?.[base]?.x ?? 0;
+    oy += pose.off?.[base]?.y ?? 0;
+    q = [q[0] + ox, q[1] + oy];
+    if (r !== 'ground') {
+      q = [q[0] + (pose.all?.x ?? 0), q[1] + (pose.all?.y ?? 0)];
+      if (pose.lean) q[0] += Math.round((feet - y) * pose.lean);
+      if (pose.spin) q = rotAbout(q[0], q[1], spinC, pose.spin);
+    }
+    return q;
+  };
+
+  const vis = viewLayers(doc, view).filter((l) => l.visible && !(pose.hideEffects && (l.slot === 'effect' || l.slot === 'aura')));
+  const regionAt = (l: SpriteLayer, x: number, y: number) => regionOf(l, x - d, y - d, doc.kind, body, bounds, creature);
+
+  // a figure turned far over rests on the ground instead of sinking into it
+  let lift = 0;
+  if (pose.spin && Math.abs(pose.spin) >= 45) {
+    let maxY = -1;
+    for (const l of vis)
+      for (let y = 0; y < n; y++)
+        for (let x = 0; x < n; x++) {
+          if (!l.data[(y * n + x) * 4 + 3]) continue;
+          const r = regionAt(l, x, y);
+          if (r !== 'ground') maxY = Math.max(maxY, place(r, x + p + 0.5, y + p + 0.5)[1]);
+        }
+    if (maxY > feet + 1) lift = Math.floor(feet + 1 - maxY);
+  }
+
+  // swinging the side arm leaves a gap in the torso – fill it with the torso next to it
+  const fillArm = view === 'side' && doc.kind === 'character' && !!rot.armR;
+  // weapon tip (for the motion trail)
+  let tip: Pt | null = null;
+  let tipD = -1;
+  const armC = pose.trail ? place('armR', pv('armR')[0], pv('armR')[1]) : null;
+
   const layers: SpriteLayer[] = [];
-  for (const l of viewLayers(doc, view)) {
-    if (!l.visible) continue;
-    if (pose.hideEffects && (l.slot === 'effect' || l.slot === 'aura')) continue;
+  for (const l of vis) {
     const out = new Uint8ClampedArray(F * F * 4);
+    const put = (tx: number, ty: number, s: number, r?: Region) => {
+      tx = Math.floor(tx);
+      ty = Math.floor(ty + (r === 'ground' ? 0 : lift));
+      if (tx < 0 || ty < 0 || tx >= F || ty >= F) return;
+      out.set(l.data.subarray(s, s + 4), (ty * F + tx) * 4);
+    };
+    if (fillArm)
+      for (let y = 0; y < n; y++) {
+        const dy = y - d;
+        if (dy < body.t[1] || dy > body.t[3]) continue;
+        const sx = body.aR[0] - 2 + d;
+        const src = (y * n + sx) * 4;
+        if (sx < 0 || !l.data[src + 3] || regionAt(l, sx, y) !== 'torso') continue;
+        for (let x = body.aR[0] - 1 + d; x <= body.aR[1] + 1 + d; x++) {
+          if (x - d > body.t[2] || !l.data[(y * n + x) * 4 + 3] || regionAt(l, x, y) !== 'armR') continue;
+          const q = place('torso', x + p + 0.5, y + p + 0.5);
+          put(q[0], q[1], src);
+        }
+      }
     for (let y = 0; y < n; y++)
       for (let x = 0; x < n; x++) {
         const s = (y * n + x) * 4;
         if (!l.data[s + 3]) continue;
-        const r = regionOf(l, x - d, y - d, doc.kind, body, bounds, creature);
-        const ro = pose.off?.[r];
-        let tx = x + p + (ro?.x ?? 0);
-        let ty = y + p + (ro?.y ?? 0);
-        if (r !== 'ground') {
-          tx += pose.all?.x ?? 0;
-          ty += pose.all?.y ?? 0;
-          if (pose.lean) tx += Math.round((feet - y - p) * pose.lean);
+        const r = regionAt(l, x, y);
+        if (!turned) {
+          const q = place(r, x + p, y + p);
+          put(Math.round(q[0]), Math.round(q[1]), s, r);
+          continue;
         }
-        if (tx < 0 || ty < 0 || tx >= F || ty >= F) continue;
-        const t = (ty * F + tx) * 4;
-        out[t] = l.data[s];
-        out[t + 1] = l.data[s + 1];
-        out[t + 2] = l.data[s + 2];
-        out[t + 3] = l.data[s + 3];
+        for (const u of SUB)
+          for (const v of SUB) {
+            const q = place(r, x + p + u, y + p + v);
+            put(q[0], q[1], s, r);
+          }
+        if (armC && (r === 'weapon' || r === 'armR')) {
+          const q = place(r, x + p + 0.5, y + p + 0.5);
+          const dd = Math.hypot(q[0] - armC[0], q[1] - armC[1]) + (r === 'weapon' ? 100 : 0);
+          if (dd > tipD) (tipD = dd), (tip = q);
+        }
       }
     layers.push({ ...l, data: out });
   }
   let img = compose({ ...doc, size: F, layers });
+  if (pose.trail && tip && armC) drawTrail(img, F, armC, tip, pose.trail, lift);
   if (pose.squash && pose.squash !== 1) img = squash(img, F, feet, pose.squash);
   if (pose.flash || pose.bright) {
     for (let i = 0; i < img.length; i += 4) {
@@ -449,6 +692,31 @@ export function renderFrame(doc: SpriteDoc, pose: Pose, view: View = 'front'): U
   if (pose.lie) img = lieDown(img, F, feet);
   if (pose.alpha !== undefined) for (let i = 3; i < img.length; i += 4) img[i] = Math.round(img[i] * pose.alpha);
   return img;
+}
+
+/** light arc behind the weapon tip – shows the swing in a single frame */
+function drawTrail(img: Uint8ClampedArray, F: number, c: Pt, tip: Pt, deg: number, lift: number) {
+  const R = Math.hypot(tip[0] - c[0], tip[1] - c[1]);
+  if (R < 4) return;
+  const a0 = Math.atan2(tip[1] - c[1], tip[0] - c[0]);
+  const span = (Math.abs(deg) * Math.PI) / 180;
+  const dir = deg > 0 ? -1 : 1; // the trail lies where the tip came from
+  const steps = Math.ceil(span * R * 2);
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const a = a0 + dir * span * t;
+    // thick near the tip, thin at the end
+    const w = Math.max(1, Math.round(3 * (1 - t)));
+    for (let j = 0; j < w; j++) {
+      const r = R - 0.5 - j;
+      const x = Math.floor(c[0] + Math.cos(a) * r);
+      const y = Math.floor(c[1] + lift + Math.sin(a) * r);
+      if (x < 0 || y < 0 || x >= F || y >= F) continue;
+      const q = (y * F + x) * 4;
+      if (img[q + 3] > 100) continue;
+      img.set([255, 250, 235, Math.round(230 * (1 - t * 0.8))], q);
+    }
+  }
 }
 
 /** squash (< 1) / stretch (> 1) towards the feet line, width changes the other way */

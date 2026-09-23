@@ -346,6 +346,19 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 2.4 – spieltaugliche Animationen**
+
+- **Echte Drehungen statt nur Verschieben:** Arme drehen sich um die Schulter, Beine um die Hüfte, der Kopf um den Hals, die Waffe um den Griff (und dazu mit dem Arm), die ganze Figur um die Füße. Gedrehte Pixel werden mehrfach abgetastet (keine Löcher); von der Seite wird die Lücke im Oberkörper hinter dem schwingenden Arm mit der Oberkörperfarbe gefüllt.
+- **Angriff** (6 Bilder): Ausholen über den Kopf, Schlag mit heller **Wischspur**, Nachschwung, zurück – vorne und von der Seite eigens gestaltet.
+- **Laufen von der Seite mit 8 Bildern** (Kontakt – tief – Mitte – hoch, echte Schrittstellung, Arm schwingt gegengleich), **Rennen von der Seite mit 6 Bildern** (Vorlage, Flugphase, Staub).
+- **Springen** mit Stauchen beim Absprung/Landen und Strecken im Flug, Arme gehen hoch. **Umfallen** kippt wirklich um (vorne zur Seite, von der Seite nach hinten), der Schatten bleibt am Boden. **Treffer** mit Kopf-Zucken und Rückstoß. Zaubern, Winken, Klettern, Fallen, Blocken mit Armdrehung; Kreaturen: Flügelschlag, Krabbeln und Angriff mit gedrehten Gliedmaßen; Objekt-Wackeln kippelt.
+- **Hinten** = gespiegelte Vorderansicht (die Waffe ist dort links, der Schlag läuft andersherum).
+- **Godot-Skripte zum Losspielen:**
+  - *Top-Down-Spieler:* Pfeiltasten laufen, Shift rennt, Leertaste/Enter oder J greift an (trifft Gegner der Gruppe `enemy` vor der Figur), `hurt(schaden)` → „hurt“, bei 0 Leben „death“; Signale `hp_changed`, `died`; einmalige Animationen spielen einmal, danach geht die Steuerung weiter.
+  - *Platformer-Spieler* (automatisch, wenn nur die Seitenansicht exportiert wird): Schwerkraft, ← → laufen, ↑/Leertaste springt (Sprung-/Fallbilder passend zum Steigen und Fallen), J/X greift an.
+  - *Gegner:* verfolgt, greift in Reichweite an (mit Pause), nimmt Schaden, spielt „hurt“, verschwindet nach „death“. Leben, Tempo, Schaden, Reichweite im Inspector.
+- Standards: *Top-Down-Held* jetzt mit Rennen, *Platformer-Held* mit Laufen und Angriff.
+
 **Version 2.3 – einfachere Bedienung am Handy**
 
 - Reiter zusammengefasst: **Projekt · Karte · Figuren · Animieren · Einstellungen** (passt auf jedes Handy). Unter *Figuren* oben wählen: Charakter, Kreatur oder Objekt.

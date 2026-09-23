@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { compose, toPng, useSprites } from './store';
 import { animsFor, frameKey, frameSize, framesOf, type AnimDef } from './animation';
 import { ANIM_PRESETS } from './animPresets';
-import { exportFramesZip, exportSheetPng, exportSpriteGodot, type ExportChoice } from './exportSprite';
+import { exportFramesZip, exportSheetPng, exportSpriteGodot, type ExportChoice, isPlatformer } from './exportSprite';
 import { FrameEditor } from './FrameEditor';
 import { VIEWS, type CustomAnim, type SpriteKind, type View } from './types';
 import { HelpTip } from '../components/HelpTip';
@@ -545,7 +545,7 @@ function AnimWorkspace({ desktop, kind, onBack }: { desktop: boolean; kind: Spri
             </Button>
           </div>
           <p className="hint">
-            Godot-Paket: Ordner ins Projekt ziehen, <code>.tscn</code> in die Szene ziehen – {kind === 'creature' ? 'der Gegner verfolgt die Spielfigur' : kind === 'character' ? 'Figur läuft mit Pfeiltasten (mit Richtungen)' : 'Objekt spielt seine Animation'}. Dazu PNG + JSON für andere Engines.
+            Godot-Paket: Ordner ins Projekt ziehen, <code>.tscn</code> in die Szene ziehen – {kind === 'creature' ? 'der Gegner verfolgt die Spielfigur, greift an, nimmt Schaden und stirbt' : kind === 'character' ? (isPlatformer(doc, choice) ? 'nur Seite gewählt → Platformer-Steuerung: ← → laufen, ↑/Leertaste springt, J greift an, mit Schwerkraft' : 'Pfeiltasten laufen, Shift rennt, Leertaste/J greift an (mit Richtungen)') : 'Objekt spielt seine Animation'}. Dazu PNG + JSON für andere Engines.
           </p>
 
           {kind !== 'object' && (

@@ -14,8 +14,8 @@ export interface AnimPreset {
 const ALL3: View[] = ['front', 'side', 'back'];
 
 export const ANIM_PRESETS: AnimPreset[] = [
-  { id: 'td_hero', kind: 'character', label: 'Top-Down-Held', text: 'Stehen, Laufen, Angriff, Treffer, Umfallen – in 3 Richtungen', anims: ['idle', 'walk', 'attack', 'hurt', 'death'], views: ALL3 },
-  { id: 'platformer', kind: 'character', label: 'Platformer-Held', text: 'Seitenansicht: Stehen, Rennen, Springen, Fallen, Rutschen, Ducken', anims: ['idle', 'run', 'jump', 'fall', 'slide', 'crouch', 'hurt', 'death'], views: ['side'] },
+  { id: 'td_hero', kind: 'character', label: 'Top-Down-Held', text: 'Stehen, Laufen, Rennen, Angriff, Treffer, Umfallen – in 3 Richtungen', anims: ['idle', 'walk', 'run', 'attack', 'hurt', 'death'], views: ALL3 },
+  { id: 'platformer', kind: 'character', label: 'Platformer-Held', text: 'Seitenansicht mit Schwerkraft-Steuerung: Laufen, Rennen, Springen, Fallen, Angriff, Rutschen, Ducken', anims: ['idle', 'walk', 'run', 'jump', 'fall', 'attack', 'slide', 'crouch', 'hurt', 'death'], views: ['side'] },
   { id: 'fighter', kind: 'character', label: 'Kämpfer', text: 'Mit Rennen, Angriff und Blocken', anims: ['idle', 'walk', 'run', 'attack', 'block', 'hurt', 'death'], views: ALL3 },
   { id: 'mage', kind: 'character', label: 'Magier', text: 'Laufen und Zaubern', anims: ['idle', 'walk', 'cast', 'hurt', 'death'], views: ALL3 },
   { id: 'npc', kind: 'character', label: 'NPC / Dorfbewohner', text: 'Stehen, Laufen, Winken', anims: ['idle', 'walk', 'wave'], views: ALL3 },
