@@ -117,8 +117,9 @@ func build_tile_set(data: Dictionary, base_dir: String) -> TileSet:
 				td.set_custom_data("category", str(tile["category"]))
 			if tile.get("role") != null:
 				td.set_custom_data("role", str(tile["role"]))
-			# tall tiles (e.g. upper wall fronts) sort by a point further down
-			td.y_sort_origin = int(tile.get("ySortOrigin", 0))
+			# MapForge sorts a tile by the bottom edge of its cell (Godot: cell centre → + half a tile);
+			# tall tiles (e.g. upper wall fronts) sort by a point further down (ySortOrigin)
+			td.y_sort_origin = int(tile.get("ySortOrigin", 0)) + int(tile_size / 2.0)
 	return ts
 
 

@@ -2088,7 +2088,7 @@ input[type='range']:active::-webkit-slider-thumb {
 .wizard-steps {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(8, 1fr);
   gap: 4px;
   margin: 0;
   padding: 4px 18px 14px;
@@ -2694,4 +2694,13 @@ input[type='range']:active::-webkit-slider-thumb {
 .graph-legend {
   flex-wrap: wrap;
   right: 12px;
+}
+/* playtest: the character needs the whole screen, navigation comes back on exit */
+.mobile.is-playtest .m-nav {
+  display: none;
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .mobile.is-playtest {
+    grid-template-columns: 0 minmax(0, 1fr) auto;
+  }
 }

@@ -56,35 +56,100 @@ export function PerspectivePreview({ perspective }: { perspective: Perspective }
     );
   }
   if (perspective === 'low_top_down') {
+    // 3/4 view: back wall shows its front face, side walls are raised (cap + visible inner face),
+    // the south wall shows cap and outer face, everything casts a shadow onto the floor.
     return (
       <svg viewBox="0 0 120 84" className="persp-svg" aria-hidden="true" shapeRendering="crispEdges">
         <rect width="120" height="84" fill={C.bg} />
-        <rect x="16" y="6" width="88" height="70" fill={C.cap} />
-        <Floor x={22} y={24} w={76} h={46} />
-        <rect x="22" y="11" width="76" height="1" fill={C.capEdge} />
-        <Bricks x={22} y={12} w={76} h={12} />
-        <rect x="22" y="24" width="76" height="4" fill={C.shadow} />
-        <rect x="21" y="12" width="1" height="58" fill={C.capEdge} />
-        <rect x="98" y="12" width="1" height="58" fill={C.capEdge} />
-        <rect x="22" y="70" width="76" height="1" fill={C.capEdge} />
-        <rect x="54" y="70" width="12" height="6" fill={C.door} />
+        <Floor x={22} y={24} w={76} h={42} />
+        {/* back wall: cap (upper edge) + front face */}
+        <rect x="12" y="3" width="96" height="8" fill={C.cap} />
+        <rect x="12" y="10" width="96" height="1" fill={C.capEdge} />
+        <Bricks x={22} y={11} w={76} h={13} />
+        <rect x="22" y="23" width="76" height="1" fill={C.faceLine} />
+        {/* left wall: raised cap + lit inner face (the wall visibly stands up) */}
+        <rect x="12" y="3" width="7" height="70" fill={C.cap} />
+        <rect x="18" y="11" width="1" height="62" fill={C.capEdge} />
+        <rect x="19" y="11" width="6" height="55" fill={C.faceHi} />
+        <rect x="24" y="11" width="1" height="55" fill={C.faceLine} />
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((k) => (
+          <rect key={k} x={19} y={12 + k * 4} width={5} height={0.8} fill={C.face} />
+        ))}
+        {/* right wall: raised cap + shaded inner face */}
+        <rect x="101" y="3" width="7" height="70" fill={C.cap} />
+        <rect x="101" y="11" width="1" height="62" fill={C.capEdge} />
+        <rect x="97" y="11" width="4" height="55" fill={C.side} />
+        <rect x="97" y="11" width="1" height="55" fill={C.faceLine} />
+        {/* corner transitions (back wall meets the side faces) */}
+        <polygon points="19,11 25,11 25,24 19,18" fill={C.face} />
+        <polygon points="97,11 101,11 101,18 97,24" fill={C.faceLine} />
+        {/* shadows: under the back wall and along the lit left wall */}
+        <rect x="25" y="24" width="72" height="3" fill={C.shadow} />
+        <rect x="25" y="27" width="72" height="2" fill="rgba(6,5,10,0.22)" />
+        <rect x="25" y="27" width="3" height="39" fill="rgba(6,5,10,0.3)" />
+        <rect x="93" y="24" width="4" height="42" fill="rgba(6,5,10,0.4)" />
+        {/* south wall: cap + outer face, door gap */}
+        <rect x="12" y="66" width="96" height="7" fill={C.cap} />
+        <rect x="12" y="66" width="96" height="1" fill={C.capEdge} />
+        <Bricks x={12} y={73} w={96} h={8} />
+        <rect x="52" y="66" width="16" height="15" fill={C.floorB} />
+        <rect x="52" y="73" width="16" height="8" fill={C.door} />
+        <rect x="59.5" y="73" width="1" height="8" fill={C.faceLine} />
+        <rect x="51" y="66" width="1" height="15" fill={C.capEdge} />
+        <rect x="68" y="66" width="1" height="15" fill={C.capEdge} />
+        {/* pillar for depth: cap, front, contact shadow */}
+        <rect x="68" y="50" width="12" height="3" fill={C.shadow} />
+        <rect x="68" y="34" width="10" height="4" fill={C.cap} />
+        <rect x="68" y="34" width="10" height="1" fill={C.capEdge} />
+        <rect x="68" y="38" width="10" height="12" fill={C.face} />
+        <rect x="68" y="38" width="10" height="1" fill={C.faceHi} />
+        <rect x="68" y="44" width="10" height="0.8" fill={C.faceLine} />
+        <rect x="77" y="38" width="1" height="12" fill={C.faceLine} />
       </svg>
     );
   }
+  // 45°: rotated room seen diagonally – both back walls show tall faces, front walls only their caps
+  const iso = (x: number, y: number) => `${x},${y}`;
+  const floorLines = [];
+  for (let k = 1; k < 6; k++) {
+    const t = k / 6;
+    floorLines.push(<line key={`a${k}`} x1={16 + 44 * t} y1={50 - 22 * t} x2={60 + 44 * t} y2={72 - 22 * t} stroke={C.grout} strokeWidth={0.7} />);
+    floorLines.push(<line key={`b${k}`} x1={16 + 44 * t} y1={50 + 22 * t} x2={60 + 44 * t} y2={28 + 22 * t} stroke={C.grout} strokeWidth={0.7} />);
+  }
+  const courses = [];
+  for (let k = 1; k < 5; k++) {
+    const d = k * 4.4;
+    courses.push(<line key={`l${k}`} x1={16} y1={50 - d} x2={60} y2={28 - d} stroke={C.faceLine} strokeWidth={0.7} />);
+    courses.push(<line key={`r${k}`} x1={60} y1={28 - d} x2={104} y2={50 - d} stroke={C.faceLine} strokeWidth={0.7} />);
+  }
   return (
-    <svg viewBox="0 0 120 84" className="persp-svg" aria-hidden="true" shapeRendering="crispEdges">
+    <svg viewBox="0 0 120 84" className="persp-svg" aria-hidden="true">
       <rect width="120" height="84" fill={C.bg} />
-      <rect x="12" y="2" width="96" height="76" fill={C.cap} />
-      <Floor x={26} y={32} w={68} h={38} />
-      {/* visible side faces */}
-      <polygon points="18,8 26,14 26,70 18,76" fill={C.side} />
-      <polygon points="102,8 94,14 94,70 102,76" fill={C.side} />
-      <rect x="18" y="7" width="84" height="1" fill={C.capEdge} />
-      <Bricks x={26} y={14} w={68} h={18} />
-      <rect x="26" y="32" width="68" height="6" fill={C.shadow} />
-      <rect x="26" y="32" width="4" height="38" fill={C.shadow} />
-      <rect x="18" y="76" width="84" height="1" fill={C.capEdge} />
-      <rect x="54" y="70" width="12" height="7" fill={C.door} />
+      {/* floor diamond */}
+      <polygon points={[iso(16, 50), iso(60, 28), iso(104, 50), iso(60, 72)].join(' ')} fill={C.floorA} />
+      {floorLines}
+      {/* back walls: left lit, right shaded */}
+      <polygon points={[iso(16, 50), iso(60, 28), iso(60, 6), iso(16, 28)].join(' ')} fill={C.face} />
+      <polygon points={[iso(60, 28), iso(104, 50), iso(104, 28), iso(60, 6)].join(' ')} fill={C.side} />
+      {courses}
+      <line x1={60} y1={6} x2={60} y2={28} stroke={C.faceLine} strokeWidth={0.8} />
+      {/* caps (upper edges) */}
+      <polygon points={[iso(12, 26), iso(60, 2), iso(108, 26), iso(104, 28), iso(60, 6), iso(16, 28)].join(' ')} fill={C.cap} />
+      <polyline points={[iso(16, 28), iso(60, 6), iso(104, 28)].join(' ')} fill="none" stroke={C.capEdge} strokeWidth={0.8} />
+      {/* floor shadow along both back walls */}
+      <polygon points={[iso(16, 50), iso(60, 28), iso(104, 50), iso(98, 53), iso(60, 34), iso(22, 53)].join(' ')} fill={C.shadow} />
+      {/* front walls: low caps + outer faces */}
+      <polygon points={[iso(12, 50), iso(16, 50), iso(60, 72), iso(104, 50), iso(108, 50), iso(60, 74)].join(' ')} fill={C.cap} />
+      <polygon points={[iso(12, 50), iso(60, 74), iso(60, 80), iso(12, 56)].join(' ')} fill={C.face} />
+      <polygon points={[iso(60, 74), iso(108, 50), iso(108, 56), iso(60, 80)].join(' ')} fill={C.side} />
+      <polyline points={[iso(16, 50), iso(60, 72), iso(104, 50)].join(' ')} fill="none" stroke={C.capEdge} strokeWidth={0.8} />
+      {/* door in the front-right wall */}
+      <polygon points={[iso(74, 67), iso(84, 62), iso(84, 69), iso(74, 74)].join(' ')} fill={C.door} />
+      {/* pillar: iso box with shadow */}
+      <polygon points={[iso(66, 48), iso(74, 44), iso(80, 47), iso(72, 51)].join(' ')} fill={C.shadow} />
+      <polygon points={[iso(58, 44), iso(64, 47), iso(64, 33), iso(58, 30)].join(' ')} fill={C.face} />
+      <polygon points={[iso(64, 47), iso(70, 44), iso(70, 30), iso(64, 33)].join(' ')} fill={C.side} />
+      <polygon points={[iso(58, 30), iso(64, 27), iso(70, 30), iso(64, 33)].join(' ')} fill={C.capEdge} />
     </svg>
   );
 }
