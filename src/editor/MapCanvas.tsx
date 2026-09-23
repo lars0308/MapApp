@@ -1,0 +1,390 @@
+import { useEffect, useRef } from 'react';
+import { MapRenderer } from '../renderer/MapRenderer';
+import { useProject } from '../store/projectStore';
+import { useEditor } from '../store/editorStore';
+import { mapEvents, viewEvents } from '../store/events';
+import { brushCells, floodCells, lineCells, rectCells, rectFromPoints } from './tools';
+
+type Mode = 'none' | 'paint' | 'pan' | 'pinch' | 'rect' | 'select' | 'tap';
+
+interface Pt {
+  x: number;
+  y: number;
+}
+
+/** Picks the top-most visible tile at a cell (active layer first). */
+export function pickTile(x: number, y: number): boolean {
+  const { project, setActiveLayer } = useProject.getState();
+  const i = y * project.map.width + x;
+  const active = project.layers.find((l) => l.id === project.activeLayerId);
+  let gid = active?.data[i] ?? 0;
+  let layerId = active?.id;
+  if (!gid) {
+    for (let k = project.layers.length - 1; k >= 0; k--) {
+      const l = project.layers[k];
+      if (l.visible && l.data[i]) {
+        gid = l.data[i];
+        layerId = l.id;
+        break;
+      }
+    }
+  }
+  if (!gid || !layerId) return false;
+  setActiveLayer(layerId);
+  useEditor.setState({ selectedGid: gid, tool: 'brush' });
+  return true;
+}
+
+export function MapCanvas() {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rendererRef = useRef<MapRenderer | null>(null);
+
+  // renderer lifecycle & document sync
+  useEffect(() => {
+    const canvas = canvasRef.current!;
+    const wrap = wrapRef.current!;
+    const r = new MapRenderer(canvas);
+    rendererRef.current = r;
+    let zoomTimer = 0;
+    r.onCameraChange = (cam) => {
+      if (zoomTimer) return;
+      zoomTimer = window.setTimeout(() => {
+        zoomTimer = 0;
+        useEditor.getState().setZoom(cam.zoom);
+      }, 60);
+    };
+
+    const p = useProject.getState().project;
+    r.setDocument(p.map.width, p.map.height, p.layers, p.tilesets);
+
+    let fitted = false;
+    const ro = new ResizeObserver(() => {
+      const rect = wrap.getBoundingClientRect();
+      r.resize(rect.width, rect.height);
+      if (!fitted && rect.width > 0 && rect.height > 0) {
+        fitted = true;
+        r.fit();
+      }
+    });
+    ro.observe(wrap);
+
+    let prev = useProject.getState().project;
+    const unsubProject = useProject.subscribe((s) => {
+      const p = s.project;
+      if (p === prev) return;
+      const tilesetsChanged = p.tilesets !== prev.tilesets;
+      const sizeChanged = p.map.width !== prev.map.width || p.map.height !== prev.map.height;
+      const projectSwitched = p.id !== prev.id;
+      if (p.layers !== prev.layers || tilesetsChanged || sizeChanged) {
+        r.setDocument(p.map.width, p.map.height, p.layers, tilesetsChanged ? p.tilesets : null);
+      }
+      if (sizeChanged || projectSwitched) r.fit();
+      prev = p;
+    });
+    const unsubMap = mapEvents.on((e) => {
+      if (e.type === 'all') r.invalidateAll();
+      else r.invalidateCells(e.cells);
+    });
+    const unsubView = viewEvents.on((e) => {
+      if (e.type === 'fit') r.fit();
+      else if (e.type === 'zoom') r.zoomAt(r.viewW / 2, r.viewH / 2, e.factor);
+      else if (e.type === 'focus') {
+        r.focus(e.x, e.y, e.w, e.h);
+        if (e.w && e.h) {
+          r.overlay.highlight = { x: e.x, y: e.y, w: e.w, h: e.h };
+          window.setTimeout(() => {
+            r.overlay.highlight = null;
+            r.requestRender();
+          }, 2200);
+        }
+      }
+    });
+
+    const syncOverlay = () => {
+      const e = useEditor.getState();
+      r.overlay.showGrid = e.showGrid;
+      r.overlay.showCoords = e.showCoords;
+      r.overlay.selection = e.selection;
+      r.overlay.brushSize = e.brushSize;
+      r.overlay.activeTool = e.tool;
+      r.requestRender();
+    };
+    syncOverlay();
+    const unsubEditor = useEditor.subscribe(syncOverlay);
+
+    return () => {
+      ro.disconnect();
+      unsubProject();
+      unsubMap();
+      unsubView();
+      unsubEditor();
+      r.destroy();
+      clearTimeout(zoomTimer);
+    };
+  }, []);
+
+  // pointer / touch / wheel input
+  useEffect(() => {
+    const canvas = canvasRef.current!;
+    const pointers = new Map<number, Pt>();
+    let mode: Mode = 'none';
+    let modeStart = 0;
+    let lastCell: Pt | null = null;
+    let anchor: Pt | null = null;
+    let downPos: Pt | null = null;
+    let pinch: { dist: number; center: Pt } | null = null;
+    let spaceDown = false;
+
+    const R = () => rendererRef.current!;
+    const local = (e: PointerEvent | WheelEvent): Pt => {
+      const rect = canvas.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    };
+    const editor = () => useEditor.getState();
+    const store = () => useProject.getState();
+    const dims = () => store().project.map;
+
+    const setHover = (c: Pt | null) => {
+      R().overlay.hover = c;
+      R().requestRender();
+      editor().setHover(c && R().inBounds(c.x, c.y) ? c : null);
+    };
+
+    const startStroke = (): boolean => {
+      const p = store().project;
+      const layer = p.layers.find((l) => l.id === p.activeLayerId);
+      if (!layer) return false;
+      if (layer.locked) {
+        editor().toast(`Layer „${layer.name}“ ist gesperrt`, 'error');
+        return false;
+      }
+      if (!layer.visible) editor().toast(`Layer „${layer.name}“ ist ausgeblendet`);
+      return store().beginStroke(layer.id);
+    };
+
+    const paintAt = (c: Pt) => {
+      const { tool, brushSize, selectedGid } = editor();
+      const { width: W, height: H } = dims();
+      const gid = tool === 'eraser' ? 0 : selectedGid;
+      const from = lastCell ?? c;
+      const cells: number[] = [];
+      for (const [x, y] of lineCells(from.x, from.y, c.x, c.y)) cells.push(...brushCells(x, y, brushSize, W, H));
+      store().strokeSet(cells, gid);
+      lastCell = c;
+    };
+
+    const endInteraction = () => {
+      if (mode === 'paint') store().endStroke(editor().tool === 'eraser' ? 'Radieren' : 'Malen');
+      mode = 'none';
+      lastCell = null;
+      anchor = null;
+      R().overlay.preview = null;
+      R().requestRender();
+    };
+
+    const cancelInteraction = () => {
+      if (mode === 'paint') {
+        // a second finger shortly after the first → user wants to navigate, not paint
+        if (performance.now() - modeStart < 350) store().cancelStroke();
+        else store().endStroke('Malen');
+      }
+      mode = 'none';
+      lastCell = null;
+      anchor = null;
+      R().overlay.preview = null;
+      R().requestRender();
+    };
+
+    const onDown = (e: PointerEvent) => {
+      canvas.setPointerCapture(e.pointerId);
+      const pt = local(e);
+      pointers.set(e.pointerId, pt);
+
+      if (pointers.size === 2) {
+        cancelInteraction();
+        const [a, b] = [...pointers.values()];
+        pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), center: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+        mode = 'pinch';
+        setHover(null);
+        return;
+      }
+      if (pointers.size > 2) return;
+
+      const { tool, selectedGid } = editor();
+      const cell = R().screenToCell(pt.x, pt.y);
+      downPos = pt;
+      modeStart = performance.now();
+
+      if (e.button === 1 || e.button === 2 || spaceDown || tool === 'hand') {
+        mode = 'pan';
+        canvas.style.cursor = 'grabbing';
+        return;
+      }
+      if (e.pointerType !== 'mouse') setHover(cell);
+
+      switch (tool) {
+        case 'brush':
+        case 'eraser':
+          if (tool === 'brush' && !selectedGid) {
+            editor().toast('Zuerst ein Tile auswählen');
+            mode = 'none';
+            return;
+          }
+          if (!startStroke()) {
+            mode = 'none';
+            return;
+          }
+          mode = 'paint';
+          lastCell = null;
+          paintAt(cell);
+          break;
+        case 'rect':
+        case 'select':
+          mode = tool;
+          anchor = cell;
+          R().overlay.preview = tool === 'rect' ? rectFromPoints(cell, cell, dims().width, dims().height) : null;
+          if (tool === 'select') editor().setSelection(rectFromPoints(cell, cell, dims().width, dims().height));
+          R().requestRender();
+          break;
+        default:
+          mode = 'tap';
+      }
+    };
+
+    const onMove = (e: PointerEvent) => {
+      const pt = local(e);
+      if (!pointers.has(e.pointerId)) {
+        if (e.pointerType === 'mouse') setHover(R().screenToCell(pt.x, pt.y));
+        return;
+      }
+      const prevPt = pointers.get(e.pointerId)!;
+      pointers.set(e.pointerId, pt);
+
+      if (mode === 'pinch' && pointers.size >= 2 && pinch) {
+        const [a, b] = [...pointers.values()];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        const center = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        R().panBy(center.x - pinch.center.x, center.y - pinch.center.y);
+        if (pinch.dist > 10) R().zoomAt(center.x, center.y, dist / pinch.dist);
+        pinch = { dist, center };
+        return;
+      }
+      if (mode === 'pan') {
+        R().panBy(pt.x - prevPt.x, pt.y - prevPt.y);
+        return;
+      }
+      const cell = R().screenToCell(pt.x, pt.y);
+      setHover(cell);
+      const { width: W, height: H } = dims();
+      if (mode === 'paint') {
+        if (!lastCell || lastCell.x !== cell.x || lastCell.y !== cell.y) paintAt(cell);
+      } else if (mode === 'rect' && anchor) {
+        R().overlay.preview = rectFromPoints(anchor, cell, W, H);
+        R().requestRender();
+      } else if (mode === 'select' && anchor) {
+        editor().setSelection(rectFromPoints(anchor, cell, W, H));
+      }
+    };
+
+    const onUp = (e: PointerEvent) => {
+      if (!pointers.has(e.pointerId)) return;
+      const pt = local(e);
+      pointers.delete(e.pointerId);
+      if (mode === 'pinch') {
+        if (pointers.size === 0) mode = 'none';
+        return;
+      }
+      canvas.style.cursor = '';
+      const cell = R().screenToCell(pt.x, pt.y);
+      const { width: W, height: H } = dims();
+      const { tool, selectedGid } = editor();
+
+      if (mode === 'rect' && anchor) {
+        const r = rectFromPoints(anchor, cell, W, H);
+        if (!selectedGid) editor().toast('Zuerst ein Tile auswählen');
+        else if (r.w > 0 && r.h > 0 && startStroke()) {
+          store().strokeSet(rectCells(r, W), selectedGid);
+          store().endStroke('Rechteck');
+        }
+      } else if (mode === 'select' && anchor) {
+        const r = rectFromPoints(anchor, cell, W, H);
+        editor().setSelection(r.w > 0 && r.h > 0 ? r : null);
+      } else if (mode === 'tap' && downPos && Math.hypot(pt.x - downPos.x, pt.y - downPos.y) < 12 && R().inBounds(cell.x, cell.y)) {
+        if (tool === 'fill') {
+          if (!selectedGid) editor().toast('Zuerst ein Tile auswählen');
+          else if (startStroke()) {
+            const p = store().project;
+            const layer = p.layers.find((l) => l.id === p.activeLayerId)!;
+            store().strokeSet(floodCells(layer.data, W, H, cell.x, cell.y, editor().selection), selectedGid);
+            store().endStroke('Füllen');
+          }
+        } else if (tool === 'pipette') {
+          if (pickTile(cell.x, cell.y)) editor().toast('Tile übernommen');
+          else editor().toast('Kein Tile an dieser Stelle');
+        }
+      }
+      endInteraction();
+      if (e.pointerType !== 'mouse') setHover(null);
+    };
+
+    const onCancel = (e: PointerEvent) => {
+      pointers.delete(e.pointerId);
+      if (mode !== 'pinch') cancelInteraction();
+      if (pointers.size === 0) mode = 'none';
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const pt = local(e);
+      if (e.shiftKey && !e.ctrlKey) {
+        R().panBy(-e.deltaY, 0);
+        return;
+      }
+      const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      const factor = Math.exp(-delta * (e.ctrlKey ? 0.01 : 0.0022));
+      R().zoomAt(pt.x, pt.y, factor);
+    };
+
+    const onLeave = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' && !pointers.size) setHover(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        spaceDown = e.type === 'keydown';
+        canvas.style.cursor = spaceDown ? 'grab' : '';
+        if (spaceDown) e.preventDefault();
+      }
+    };
+    const noMenu = (e: Event) => e.preventDefault();
+
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointercancel', onCancel);
+    canvas.addEventListener('pointerleave', onLeave);
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    canvas.addEventListener('contextmenu', noMenu);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKey);
+    return () => {
+      canvas.removeEventListener('pointerdown', onDown);
+      canvas.removeEventListener('pointermove', onMove);
+      canvas.removeEventListener('pointerup', onUp);
+      canvas.removeEventListener('pointercancel', onCancel);
+      canvas.removeEventListener('pointerleave', onLeave);
+      canvas.removeEventListener('wheel', onWheel);
+      canvas.removeEventListener('contextmenu', noMenu);
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKey);
+    };
+  }, []);
+
+  const tool = useEditor((s) => s.tool);
+  return (
+    <div ref={wrapRef} className="map-canvas" data-tool={tool}>
+      <canvas ref={canvasRef} aria-label="Map" />
+    </div>
+  );
+}
+
