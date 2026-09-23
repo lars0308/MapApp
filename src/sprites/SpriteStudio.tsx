@@ -1,3 +1,264 @@
-export function SpriteStudio({ kind }: { kind: 'character' | 'object'; desktop: boolean }) {
-  return <div className="page">{kind}</div>;
+import { useEffect, useMemo, useState } from 'react';
+import { SIZES, SLOTS, compose, toPng, useSprites, type SpriteTool } from './store';
+import { SpriteCanvas } from './SpriteCanvas';
+import { PartsPanel } from './PartsPanel';
+import { ColorsPanel, GalleryPanel, LayersList } from './SidePanels';
+import { DRAW_SWATCHES } from './palette';
+import type { SpriteKind } from './types';
+import { Icon } from '../components/icons';
+import { Button, IconButton } from '../components/ui';
+import { useEditor } from '../store/editorStore';
+import { dataUrlToBytes, downloadBlob, safeFileName } from '../utils/download';
+
+const TOOLS: { id: SpriteTool; label: string; key: string; icon: (p: { size?: number }) => React.ReactElement }[] = [
+  { id: 'pen', label: 'Stift', key: 'B', icon: Icon.Pencil },
+  { id: 'eraser', label: 'Radierer', key: 'E', icon: Icon.Eraser },
+  { id: 'fill', label: 'Füllen', key: 'G', icon: Icon.Fill },
+  { id: 'pipette', label: 'Pipette', key: 'I', icon: Icon.Pipette },
+  { id: 'line', label: 'Linie', key: 'L', icon: Icon.Line },
+  { id: 'rect', label: 'Rechteck', key: 'R', icon: Icon.Rect },
+  { id: 'move', label: 'Ebene verschieben', key: 'M', icon: Icon.Move },
+];
+
+type Tab = 'parts' | 'layers' | 'colors' | 'gallery';
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'parts', label: 'Teile' },
+  { id: 'layers', label: 'Ebenen' },
+  { id: 'colors', label: 'Farben' },
+  { id: 'gallery', label: 'Galerie' },
+];
+
+/** "Charakter bauen" / "Objekt bauen": plug-and-play parts + free pixel drawing. */
+export function SpriteStudio({ kind, desktop }: { kind: SpriteKind; desktop: boolean }) {
+  const loaded = useSprites((s) => s.loaded[kind]);
+  const [tab, setTab] = useState<Tab>('parts');
+  const [savePart, setSavePart] = useState<{ layerId: string | null } | null>(null);
+
+  useEffect(() => {
+    void useSprites.getState().load(kind);
+  }, [kind]);
+
+  // shortcuts of this page (the map editor ignores keys on other pages)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      const st = useSprites.getState();
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+      if (mod && key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) st.redo(kind);
+        else st.undo(kind);
+      } else if (mod && key === 'y') {
+        e.preventDefault();
+        st.redo(kind);
+      } else if (!mod && !e.altKey) {
+        const tool = TOOLS.find((x) => x.key.toLowerCase() === key);
+        if (tool) st.setTool(tool.id);
+        else if (key === 'x') st.setMirror(!st.mirror);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [kind]);
+
+  const panel = (
+    <>
+      <div className="sprite-tabs" role="tablist" aria-label="Bereiche">
+        {TABS.map((t) => (
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'is-active' : ''} onClick={() => setTab(t.id)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="sprite-tab-body">
+        {tab === 'parts' && <PartsPanel kind={kind} />}
+        {tab === 'layers' && <LayersList kind={kind} onSavePart={(layerId) => setSavePart({ layerId })} />}
+        {tab === 'colors' && <ColorsPanel kind={kind} />}
+        {tab === 'gallery' && <GalleryPanel kind={kind} />}
+      </div>
+    </>
+  );
+
+  return (
+    <div className={`sprite-studio kind-${kind}${desktop ? ' is-desktop' : ' is-mobile'}`}>
+      <StudioBar kind={kind} onSavePart={() => setSavePart({ layerId: null })} />
+      <div className="sprite-work">
+        {/* phones: canvas + tools stay on screen while the parts list scrolls below */}
+        <div className="sprite-main">
+          <ToolRail />
+          <div className="sprite-stage">
+            {loaded ? <SpriteCanvas kind={kind} /> : <div className="sprite-canvas" />}
+            <Preview kind={kind} />
+          </div>
+        </div>
+        <aside className="sprite-side">{panel}</aside>
+      </div>
+      {savePart && <SavePartDialog kind={kind} layerId={savePart.layerId} onClose={() => setSavePart(null)} />}
+    </div>
+  );
+}
+
+function StudioBar({ kind, onSavePart }: { kind: SpriteKind; onSavePart: () => void }) {
+  const doc = useSprites((s) => s[kind].doc);
+  const canUndo = useSprites((s) => s[kind].undo.length > 0);
+  const canRedo = useSprites((s) => s[kind].redo.length > 0);
+  const { undo, redo, randomize, renameDoc, setSize, reset } = useSprites.getState();
+  const [newOpen, setNewOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const toast = useEditor((s) => s.toast);
+
+  const exportPng = (scale: number) => {
+    const url = toPng(compose(doc), doc.size, scale);
+    downloadBlob(new Blob([dataUrlToBytes(url) as BlobPart], { type: 'image/png' }), `${safeFileName(doc.name)}${scale > 1 ? `@${scale}x` : ''}.png`);
+    setExportOpen(false);
+    toast('PNG exportiert', 'success');
+  };
+
+  return (
+    <div className="studio-bar">
+      <input className="input studio-name" value={doc.name} aria-label="Name" onChange={(e) => renameDoc(kind, e.target.value.slice(0, 40))} />
+      <select className="input studio-size" value={doc.size} aria-label="Größe in Pixeln" onChange={(e) => setSize(kind, Number(e.target.value))} title="Größe in Pixeln (Baukasten-Teile sind für 32 px gezeichnet)">
+        {SIZES.map((s) => (
+          <option key={s} value={s}>
+            {s} × {s}
+          </option>
+        ))}
+      </select>
+      <div className="studio-actions">
+        <IconButton label="Rückgängig" disabled={!canUndo} onClick={() => undo(kind)}>
+          <Icon.Undo size={19} />
+        </IconButton>
+        <IconButton label="Wiederholen" disabled={!canRedo} onClick={() => redo(kind)}>
+          <Icon.Redo size={19} />
+        </IconButton>
+        <button type="button" className="btn btn-secondary studio-random" onClick={() => randomize(kind)} title="Zufällige Teile und Farben – gesperrte Gruppen bleiben">
+          <Icon.Dice size={17} />
+          <span>Zufall</span>
+        </button>
+        <div className="studio-menu-wrap">
+          <button type="button" className="btn btn-ghost" aria-expanded={newOpen} onClick={() => (setNewOpen(!newOpen), setExportOpen(false))}>
+            <Icon.Plus size={16} />
+            <span>Neu</span>
+          </button>
+          {newOpen && (
+            <div className="studio-menu" role="menu">
+              <button type="button" role="menuitem" onClick={() => (reset(kind, false), setNewOpen(false))}>
+                Mit Baukasten-Teilen
+              </button>
+              <button type="button" role="menuitem" onClick={() => (reset(kind, true), setNewOpen(false))}>
+                Leere Zeichenfläche
+              </button>
+            </div>
+          )}
+        </div>
+        <button type="button" className="btn btn-ghost" onClick={onSavePart} title="Ganze Figur als Teil speichern – taucht rechts in der Auswahl auf">
+          <Icon.Save size={16} />
+          <span>Als Teil</span>
+        </button>
+        <div className="studio-menu-wrap">
+          <button type="button" className="btn btn-primary" aria-expanded={exportOpen} onClick={() => (setExportOpen(!exportOpen), setNewOpen(false))}>
+            <Icon.Download size={16} />
+            <span>PNG</span>
+          </button>
+          {exportOpen && (
+            <div className="studio-menu is-right" role="menu">
+              {[1, 2, 4, 8].map((s) => (
+                <button key={s} type="button" role="menuitem" onClick={() => exportPng(s)}>
+                  {s === 1 ? `Original (${doc.size} px)` : `${s}× vergrößert (${doc.size * s} px)`}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ToolRail() {
+  const tool = useSprites((s) => s.tool);
+  const color = useSprites((s) => s.color);
+  const mirror = useSprites((s) => s.mirror);
+  const { setTool, setColor, setMirror } = useSprites.getState();
+  return (
+    <div className="sprite-tools">
+      <div className="sprite-tool-buttons" role="toolbar" aria-label="Zeichenwerkzeuge">
+        {TOOLS.map((t) => (
+          <IconButton key={t.id} label={`${t.label} (${t.key})`} active={tool === t.id} onClick={() => setTool(t.id)}>
+            <t.icon size={19} />
+          </IconButton>
+        ))}
+        <IconButton label="Spiegeln beim Zeichnen (X)" active={mirror} onClick={() => setMirror(!mirror)}>
+          <Icon.Mirror size={19} />
+        </IconButton>
+      </div>
+      <div className="sprite-swatches" aria-label="Farben">
+        <label className="swatch-current" title="Eigene Farbe wählen" style={{ background: color }}>
+          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} aria-label="Zeichenfarbe" />
+        </label>
+        {DRAW_SWATCHES.map((c) => (
+          <button key={c} type="button" className={`swatch${c === color ? ' is-active' : ''}`} style={{ background: c }} aria-label={`Farbe ${c}`} onClick={() => setColor(c)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Real-size preview (1×, 2×) on a floor-like background. */
+function Preview({ kind }: { kind: SpriteKind }) {
+  const doc = useSprites((s) => s[kind].doc);
+  const rev = useSprites((s) => s.rev);
+  const src = useMemo(() => toPng(compose(doc), doc.size), [doc, rev]);
+  return (
+    <div className="sprite-preview" aria-label="Vorschau">
+      <img src={src} alt="" style={{ width: doc.size, height: doc.size }} />
+      <img src={src} alt="" style={{ width: doc.size * 2, height: doc.size * 2 }} />
+    </div>
+  );
+}
+
+function SavePartDialog({ kind, layerId, onClose }: { kind: SpriteKind; layerId: string | null; onClose: () => void }) {
+  const doc = useSprites((s) => s[kind].doc);
+  const layer = doc.layers.find((l) => l.id === layerId);
+  const slots = SLOTS[kind];
+  const [slot, setSlot] = useState(layer?.slot && layer.slot !== 'shadow' ? layer.slot : 'extra');
+  const [name, setName] = useState(layer ? layer.name : doc.name);
+  const toast = useEditor((s) => s.toast);
+  const save = () => {
+    useSprites.getState().saveAsPart(kind, slot, name, layerId);
+    toast(`„${name.trim() || 'Eigenes Teil'}“ unter ${slots.find((s) => s.id === slot)?.label} gespeichert`, 'success');
+    onClose();
+  };
+  return (
+    <div className="quick-pick-backdrop" role="presentation" onClick={onClose}>
+      <div className="save-part-dialog" role="dialog" aria-label="Als Teil speichern" onClick={(e) => e.stopPropagation()}>
+        <h3>{layer ? `Ebene „${layer.name}“` : 'Ganze Figur'} als Teil speichern</h3>
+        <p className="hint">Das Teil erscheint rechts unter „Teile“ in der gewählten Gruppe und lässt sich in jede Figur ziehen.</p>
+        <div className="field">
+          <label htmlFor="part-name">Name</label>
+          <input id="part-name" className="input" value={name} onChange={(e) => setName(e.target.value.slice(0, 30))} autoFocus />
+        </div>
+        <div className="field">
+          <label htmlFor="part-slot">Gruppe</label>
+          <select id="part-slot" className="input" value={slot} onChange={(e) => setSlot(e.target.value)}>
+            {slots.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="button-row">
+          <Button variant="ghost" onClick={onClose}>
+            Abbrechen
+          </Button>
+          <Button variant="primary" icon={<Icon.Save size={16} />} onClick={save}>
+            Speichern
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }

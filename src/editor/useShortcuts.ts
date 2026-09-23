@@ -4,11 +4,14 @@ import { useProject } from '../store/projectStore';
 import { viewEvents } from '../store/events';
 import { TOOLS } from './tools';
 import { saveNow } from '../persistence/autosave';
+import { useApp } from '../store/appStore';
 
 /** Desktop keyboard shortcuts. Mobile uses the visible buttons. */
 export function useShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // other pages (character / object builder …) have their own shortcuts
+      if (useApp.getState().page !== 'map') return;
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
       const mod = e.ctrlKey || e.metaKey;

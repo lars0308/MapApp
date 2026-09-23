@@ -3800,3 +3800,641 @@ body.is-resizing-y * {
     width: 110px;
   }
 }
+
+/* ============================================================
+   Charakter / Objekt bauen
+   ============================================================ */
+.page-main:has(.sprite-studio.is-desktop) {
+  overflow: hidden;
+}
+.sprite-studio {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.sprite-studio.is-desktop {
+  height: 100%;
+}
+.studio-bar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+}
+.studio-name {
+  width: 200px;
+  height: 36px;
+}
+.studio-size {
+  width: auto;
+  height: 36px;
+  padding-right: 8px;
+}
+.studio-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.studio-actions .btn {
+  height: 36px;
+  padding: 0 12px;
+  gap: 6px;
+}
+.studio-menu-wrap {
+  position: relative;
+}
+.studio-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--surface-2);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.studio-menu.is-right {
+  left: auto;
+  right: 0;
+}
+.studio-menu button {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.studio-menu button:hover {
+  background: var(--surface-4);
+}
+.sprite-work {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) 340px;
+}
+.sprite-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 8px;
+  border-right: 1px solid var(--line);
+  background: var(--bg-2);
+  overflow-y: auto;
+}
+.sprite-tool-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  justify-items: center;
+}
+.sprite-swatches {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+.swatch,
+.swatch-current {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+}
+.swatch.is-active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.swatch-current {
+  position: relative;
+  grid-column: 1 / -1;
+  aspect-ratio: auto;
+  height: 34px;
+  border: 2px solid var(--text);
+}
+.swatch-current input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+.sprite-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+.sprite-canvas {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.sprite-canvas canvas {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  cursor: crosshair;
+}
+.sprite-canvas.tool-move canvas {
+  cursor: move;
+}
+.is-part-dragging .sprite-canvas {
+  outline: 2px dashed var(--accent-line);
+  outline-offset: -8px;
+}
+.sprite-preview {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #2b2a31;
+  border: 1px solid var(--line-2);
+  pointer-events: none;
+}
+.sprite-preview img {
+  image-rendering: pixelated;
+}
+.sprite-side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.sprite-tabs {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  padding: 8px 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.sprite-tabs button {
+  flex: 1;
+  height: 36px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sprite-tabs button.is-active {
+  color: var(--accent-hi);
+  border-bottom-color: var(--accent);
+}
+.sprite-tab-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+}
+.slot-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.slot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.slot-chip.is-filled {
+  color: var(--text);
+}
+.slot-chip.is-filled::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+.slot-chip.is-active {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-hi);
+}
+.slot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0 2px;
+  min-height: 32px;
+}
+.slot-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.btn-sm {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+.parts-hint {
+  margin: 4px 0 10px;
+}
+.parts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+}
+.part-card-wrap {
+  position: relative;
+}
+.part-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.part-card:hover {
+  border-color: var(--accent-line);
+  color: var(--text);
+}
+.part-card.is-used {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-hi);
+}
+.part-card.is-own {
+  border-style: dashed;
+}
+.part-card img {
+  width: 64px;
+  height: 64px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.part-del {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 26px;
+  height: 26px;
+  min-width: 0;
+}
+.part-del.is-confirm {
+  width: auto;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+}
+.parts-empty {
+  grid-column: 1 / -1;
+}
+.part-ghost {
+  position: fixed;
+  z-index: 200;
+  pointer-events: none;
+  transform: translate(-50%, -60%);
+  padding: 4px;
+  border-radius: 10px;
+  border: 2px solid var(--line-2);
+  background: rgba(19, 19, 24, 0.85);
+}
+.part-ghost.is-over {
+  border-color: var(--accent);
+}
+.part-ghost img {
+  display: block;
+  width: 80px;
+  height: 80px;
+  image-rendering: pixelated;
+}
+.sprite-layers-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.sprite-layers-head .hint {
+  flex: 1;
+  margin: 0;
+}
+.sprite-layers ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sprite-layers li {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+.sprite-layers li.is-active {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.sprite-layers li.is-hidden .sprite-layer-name {
+  opacity: 0.5;
+}
+.sprite-layer-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sprite-layer-name span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sprite-layer-name strong {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sprite-layer-name small {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.layer-thumb {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  image-rendering: pixelated;
+  border-radius: 6px;
+  background: #24232b;
+}
+.sprite-layer-actions {
+  display: flex;
+}
+.sprite-layer-actions .icon-btn,
+.sprite-layers li > .icon-btn {
+  width: 30px;
+  height: 30px;
+}
+.sprite-colors {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ramp-row h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  font-weight: 600;
+}
+.ramp-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ramp {
+  position: relative;
+  display: flex;
+  width: 42px;
+  height: 26px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  cursor: pointer;
+  background: none;
+}
+.ramp span {
+  flex: 1;
+}
+.ramp.is-active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.ramp-custom {
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+}
+.ramp-custom input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.sprite-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gallery-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+.gallery-grid li {
+  position: relative;
+}
+.gallery-grid li.is-current .gallery-open {
+  border-color: var(--accent);
+}
+.gallery-open {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.gallery-open img {
+  width: 64px;
+  height: 64px;
+  image-rendering: pixelated;
+}
+.gallery-open span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.save-part-dialog {
+  width: min(420px, 100%);
+  padding: 18px;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.save-part-dialog h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+/* phones / narrow: canvas on top, tools as rows, panel below */
+.sprite-studio.is-mobile .studio-bar {
+  padding: 8px;
+}
+.sprite-studio.is-mobile .studio-name {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+.sprite-studio.is-mobile .studio-actions {
+  width: 100%;
+  margin: 0;
+  justify-content: space-between;
+}
+.sprite-studio.is-mobile .studio-actions .btn span {
+  display: none;
+}
+.sprite-studio.is-mobile .studio-actions .studio-random span {
+  display: inline;
+}
+.sprite-studio.is-mobile .sprite-work {
+  display: flex;
+  flex-direction: column;
+}
+.sprite-main {
+  display: contents;
+}
+.sprite-studio.is-mobile .sprite-main {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+.sprite-studio.is-mobile .sprite-stage {
+  order: 1;
+  height: min(calc(100vw - 16px), 42vh);
+  flex: none;
+}
+.sprite-studio.is-mobile .sprite-tools {
+  order: 2;
+  background: var(--bg-2);
+  gap: 8px;
+  padding: 8px;
+  border-right: 0;
+  border-top: 1px solid var(--line);
+  overflow: visible;
+}
+.sprite-studio.is-mobile .sprite-tool-buttons {
+  display: flex;
+  overflow-x: auto;
+  gap: 2px;
+  scrollbar-width: none;
+}
+.sprite-studio.is-mobile .sprite-swatches {
+  display: flex;
+  overflow-x: auto;
+  gap: 6px;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.sprite-studio.is-mobile .swatch {
+  flex: none;
+  width: 30px;
+  height: 30px;
+}
+.sprite-studio.is-mobile .swatch-current {
+  flex: none;
+  width: 44px;
+  height: 30px;
+}
+.sprite-studio.is-mobile .sprite-side {
+  order: 3;
+  border-left: 0;
+  border-top: 1px solid var(--line);
+}
+.sprite-studio.is-mobile .sprite-tab-body {
+  overflow: visible;
+}
+.sprite-studio.is-mobile .sprite-preview {
+  left: 8px;
+  bottom: 8px;
+  padding: 5px 7px;
+}
+.sprite-studio.is-mobile .parts-grid {
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+}
+@media (max-width: 1240px) {
+  .sprite-studio.is-desktop .sprite-work {
+    grid-template-columns: 96px minmax(0, 1fr) 300px;
+  }
+  .sprite-studio.is-desktop .studio-actions .btn span {
+    display: none;
+  }
+}
+.sprite-studio.is-mobile .sprite-preview img:last-child {
+  display: none;
+}
