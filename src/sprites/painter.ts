@@ -100,6 +100,27 @@ export class Painter {
     this.fixed = fx;
     return this;
   }
+  /** turn everything around (cx, cy) by deg (clockwise, pixel-corner coordinates) – before finish() */
+  rotate(cx: number, cy: number, deg: number) {
+    const a = (-deg * Math.PI) / 180;
+    const cs = Math.cos(a);
+    const sn = Math.sin(a);
+    const g = new Uint8Array(S * S);
+    const fx = new Uint8Array(S * S);
+    for (let y = 0; y < S; y++)
+      for (let x = 0; x < S; x++) {
+        const dx = x + 0.5 - cx;
+        const dy = y + 0.5 - cy;
+        const sx = Math.floor(cx + dx * cs - dy * sn);
+        const sy = Math.floor(cy + dx * sn + dy * cs);
+        if (!this.in(sx, sy)) continue;
+        g[y * S + x] = this.g[sy * S + sx];
+        fx[y * S + x] = this.fixed[sy * S + sx];
+      }
+    this.g = g;
+    this.fixed = fx;
+    return this;
+  }
   /** remove pixels where the test is true */
   clearWhere(test: (x: number, y: number) => boolean) {
     for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (test(x, y)) this.g[y * S + x] = 0;

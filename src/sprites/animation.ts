@@ -2,6 +2,7 @@ import type { Body, Bounds, Creature, CustomAnim, SpriteDoc, SpriteKind, SpriteL
 import { compose, fitContext, viewLayers } from './store';
 import { shiftColor } from './palette';
 import { S } from './painter';
+import { weaponHand, weaponRest } from './parts/character';
 
 // Animations are built from the layers of a character / object: every pixel belongs to a
 // body region (head, torso, left/right arm incl. held items, left/right leg) and each frame
@@ -38,6 +39,8 @@ export interface Pose {
   dust?: number;
   /** squash (< 1) / stretch (> 1) towards the feet */
   squash?: number;
+  /** the hand keeps the weapon steady: this share (0..1) of the arm turn is undone at the grip */
+  hold?: number;
   /** motion trail behind the weapon tip: degrees of the swing (+ clockwise, − counter-clockwise) */
   trail?: number;
 }
@@ -86,14 +89,14 @@ export const ANIMATIONS: AnimDef[] = [
     ],
     side: [
       // contact – down – passing – up, then the other leg
-      { rot: { legR: -26, legL: 24, armR: 22, weapon: -18 }, all: o(0, 1) },
-      { rot: { legR: -14, legL: 16, armR: 12, weapon: -10 }, all: o(0, 1), off: { head: o(0, 1) } },
-      { rot: { legR: 2, legL: -4, armR: 0 }, off: { legL: o(0, -1) } },
-      { rot: { legR: 14, legL: -14, armR: -12, weapon: 10 }, all: o(0, -1) },
-      { rot: { legR: 24, legL: -26, armR: -22, weapon: 18 }, all: o(0, 1) },
-      { rot: { legR: 16, legL: -14, armR: -12, weapon: 10 }, all: o(0, 1), off: { head: o(0, 1) } },
-      { rot: { legR: -4, legL: 2, armR: 0 }, off: { legR: o(0, -1) } },
-      { rot: { legR: -14, legL: 14, armR: 12, weapon: -10 }, all: o(0, -1) },
+      { hold: 0.65, rot: { legR: -26, legL: 24, armR: 22 }, all: o(0, 1) },
+      { hold: 0.65, rot: { legR: -14, legL: 16, armR: 12 }, all: o(0, 1), off: { head: o(0, 1) } },
+      { hold: 0.65, rot: { legR: 2, legL: -4, armR: 0 }, off: { legL: o(0, -1) } },
+      { hold: 0.65, rot: { legR: 14, legL: -14, armR: -12 }, all: o(0, -1) },
+      { hold: 0.65, rot: { legR: 24, legL: -26, armR: -22 }, all: o(0, 1) },
+      { hold: 0.65, rot: { legR: 16, legL: -14, armR: -12 }, all: o(0, 1), off: { head: o(0, 1) } },
+      { hold: 0.65, rot: { legR: -4, legL: 2, armR: 0 }, off: { legR: o(0, -1) } },
+      { hold: 0.65, rot: { legR: -14, legL: 14, armR: 12 }, all: o(0, -1) },
     ],
   },
   {
@@ -110,12 +113,12 @@ export const ANIMATIONS: AnimDef[] = [
       { off: { head: o(0, 1), torso: o(0, 1), armL: o(0, 1), armR: o(0, 1) } },
     ],
     side: [
-      { lean: 0.08, rot: { legR: -40, legL: 34, armR: 40, weapon: -30 }, all: o(0, 1), dust: 1 },
-      { lean: 0.08, rot: { legR: -18, legL: 50, armR: 20, weapon: -15 }, all: o(0, -1) },
-      { lean: 0.08, rot: { legR: 12, legL: -8, armR: -10 }, all: o(0, -2), off: { legL: o(0, -2) } },
-      { lean: 0.08, rot: { legR: 34, legL: -40, armR: -40, weapon: 30 }, all: o(0, 1), dust: 1 },
-      { lean: 0.08, rot: { legR: 50, legL: -18, armR: -20, weapon: 15 }, all: o(0, -1) },
-      { lean: 0.08, rot: { legR: -8, legL: 12, armR: 10 }, all: o(0, -2), off: { legR: o(0, -2) } },
+      { lean: 0.08, hold: 0.65, rot: { legR: -40, legL: 34, armR: 40 }, all: o(0, 1), dust: 1 },
+      { lean: 0.08, hold: 0.65, rot: { legR: -18, legL: 50, armR: 20 }, all: o(0, -1) },
+      { lean: 0.08, hold: 0.65, rot: { legR: 12, legL: -8, armR: -10 }, all: o(0, -2), off: { legL: o(0, -2) } },
+      { lean: 0.08, hold: 0.65, rot: { legR: 34, legL: -40, armR: -40 }, all: o(0, 1), dust: 1 },
+      { lean: 0.08, hold: 0.65, rot: { legR: 50, legL: -18, armR: -20 }, all: o(0, -1) },
+      { lean: 0.08, hold: 0.65, rot: { legR: -8, legL: 12, armR: 10 }, all: o(0, -2), off: { legR: o(0, -2) } },
     ],
   },
   {
@@ -185,6 +188,16 @@ export const ANIMATIONS: AnimDef[] = [
       { rot: { armR: -80, weapon: 180 }, trail: 150, lean: 0.06, off: { torso: o(1, 0), head: o(1, 0) } },
       { rot: { armR: -50, weapon: 190 }, trail: 50, lean: 0.05, off: { torso: o(1, 0), head: o(1, 0) } },
       { rot: { armR: -20, weapon: 80 } },
+      {},
+    ],
+    // facing away (north): the blade sweeps from the side up over the head – it strikes
+    // forward, i.e. upwards in the picture (weapon arm is on the left here)
+    back: [
+      { rot: { armR: 60, weapon: -160 }, all: o(0, 1) },
+      { rot: { armR: 100, weapon: -190 } },
+      { rot: { armR: 170, weapon: -150 }, trail: 110, off: { torso: o(0, -1), head: o(0, -1) } },
+      { rot: { armR: 200, weapon: -140 }, trail: 50, off: { torso: o(0, -1), head: o(0, -1) } },
+      { rot: { armR: 40, weapon: -40 } },
       {},
     ],
   },
@@ -515,8 +528,8 @@ function pivots(kind: SpriteKind, b: Body, bounds: Bounds, c: Creature): Partial
   const back = b.view === 'back';
   const arm = (a: [number, number]): Pt => [(a[0] + a[1] + 1) / 2, b.ay[0] + 1];
   const leg = (l: [number, number]): Pt => [(l[0] + l[1] + 1) / 2, b.ly[0]];
-  // grip of the weapon (see hand() in parts/character.ts)
-  const gx = back ? b.aL[0] - 2 : b.aR[1] + 1;
+  // the fist that holds the weapon (see weaponHand() in parts/character.ts)
+  const h = weaponHand(b);
   return {
     armL: arm(back ? b.aR : b.aL),
     armR: arm(back ? b.aL : b.aR),
@@ -524,7 +537,7 @@ function pivots(kind: SpriteKind, b: Body, bounds: Bounds, c: Creature): Partial
     legR: leg(back ? b.lL : b.lR),
     head: [b.hx, b.t[1]],
     torso: [b.hx, b.ly[0]],
-    weapon: [gx + 1, b.ay[1] + 0.5],
+    weapon: [h.cx, h.hy],
   };
 }
 
@@ -563,7 +576,8 @@ export function renderFrame(doc: SpriteDoc, pose: Pose, view: View = 'front'): U
     return [q[0] + k, q[1] + k];
   };
   const rot = pose.rot ?? {};
-  const turned = !!pose.spin || Object.values(rot).some((v) => v);
+  const rest = doc.kind === 'character' ? weaponRest(doc.layers.find((l) => l.slot === 'weapon')?.partId, view) : 0;
+  const turned = !!pose.spin || Object.entries(rot).some(([r, v]) => (r === 'weapon' ? v !== rest : !!v));
   const spinC: Pt = [F / 2, feet + 1];
 
   /** frame position of a point of a region (continuous coordinates) */
@@ -573,7 +587,9 @@ export function renderFrame(doc: SpriteDoc, pose: Pose, view: View = 'front'): U
     let oy = 0;
     let base = r;
     if (r === 'weapon') {
-      if (rot.weapon) q = rotAbout(q[0], q[1], pv('weapon'), rot.weapon);
+      // pose angles count from an upright weapon; drawn weapons already lean by `rest`
+      if (rot.weapon !== undefined && rot.weapon !== rest) q = rotAbout(q[0], q[1], pv('weapon'), rot.weapon - rest);
+      else if (rot.weapon === undefined && pose.hold && rot.armR) q = rotAbout(q[0], q[1], pv('weapon'), -pose.hold * rot.armR);
       ox += pose.off?.weapon?.x ?? 0;
       oy += pose.off?.weapon?.y ?? 0;
       base = 'armR';

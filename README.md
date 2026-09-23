@@ -346,6 +346,12 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 2.4.1 – Waffe in der Hand, Angriff nach Norden, immer 4 Richtungen**
+
+- Waffen sitzen jetzt **in der Faust**: der Griff läuft durch die Hand, die Hand liegt darüber, die Klinge steht schräg nach außen (Schwert 30°, von der Seite 40° nach vorn; Stab/Speer steiler, Bogen senkrecht). Beim Laufen schwingt die Waffe mit, die Hand hält sie aber ruhig.
+- **Angriff nach Norden** (Ansicht hinten) schlägt jetzt nach oben über den Kopf statt nach unten.
+- Export immer mit **4 Richtungen** (↓ ↑ →, ← gespiegelt) – oder 2 Richtungen für Platformer. Die Godot-Skripte bewegen die Figur in 8 Richtungen und wählen die passende Blickrichtung.
+
 **Version 2.4 – spieltaugliche Animationen**
 
 - **Echte Drehungen statt nur Verschieben:** Arme drehen sich um die Schulter, Beine um die Hüfte, der Kopf um den Hals, die Waffe um den Griff (und dazu mit dem Arm), die ganze Figur um die Füße. Gedrehte Pixel werden mehrfach abgetastet (keine Löcher); von der Seite wird die Lücke im Oberkörper hinter dem schwingenden Arm mit der Oberkörperfarbe gefüllt.

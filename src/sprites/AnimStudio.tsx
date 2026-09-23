@@ -205,7 +205,9 @@ function AnimWorkspace({ desktop, kind, onBack }: { desktop: boolean; kind: Spri
   const frames = useMemo(() => (builtin ? framesOf(doc, builtin, view) : (cAnim?.frames ?? [])), [doc, rev, builtin, cAnim, view]);
   const isOn = (a: AnimDef) => settings.enabled[`${kind}.${a.id}`] ?? true;
   const chosen = list.filter(isOn);
-  const exportViews: View[] = hasViews ? (settings.views[kind] ?? ['front']) : ['front'];
+  // figures always get all directions (↓ ↑ → and ← mirrored); only a side-scroller needs just the side
+  const sideOnly = settings.views[kind]?.length === 1 && settings.views[kind]![0] === 'side';
+  const exportViews: View[] = hasViews ? (sideOnly ? ['side'] : VIEWS.map((v) => v.id)) : ['front'];
   const fpsMap = Object.fromEntries(list.map((a) => [a.id, fpsOf(a)]));
   const choice: ExportChoice = { anims: chosen, fps: fpsMap, views: exportViews, custom };
 
@@ -511,23 +513,19 @@ function AnimWorkspace({ desktop, kind, onBack }: { desktop: boolean; kind: Spri
           </div>
 
           <h4 className="subhead">
-            Export ({chosen.length + custom.length} Animationen{hasViews ? ` × ${exportViews.length} Richtung${exportViews.length > 1 ? 'en' : ''}` : ''})
+            Export ({chosen.length + custom.length} Animationen{hasViews ? (sideOnly ? ' · Seite, links gespiegelt' : ' · vorne, hinten, Seite – links gespiegelt') : ''})
           </h4>
           {hasViews && (
-            <div className="anim-dirs" role="group" aria-label="Richtungen im Export">
-              {VIEWS.map((v) => (
-                <label key={v.id} className="slot-lock">
-                  <input
-                    type="checkbox"
-                    checked={exportViews.includes(v.id)}
-                    onChange={(e) => {
-                      const next = e.target.checked ? [...exportViews, v.id] : exportViews.filter((x) => x !== v.id);
-                      if (next.length) save({ ...settings, views: { ...settings.views, [kind]: VIEWS.map((x) => x.id).filter((x) => next.includes(x)) } });
-                    }}
-                  />
-                  {v.label}
-                </label>
-              ))}
+            <div className="anim-dirs">
+              <Segmented
+                label="Richtungen im Export"
+                value={sideOnly ? 'side' : 'all'}
+                onChange={(v) => save({ ...settings, views: { ...settings.views, [kind]: v === 'side' ? ['side'] : VIEWS.map((x) => x.id) } })}
+                options={[
+                  { value: 'all', label: '4 Richtungen ↓ ↑ ← →' },
+                  { value: 'side', label: '2 Richtungen ← → (Platformer)' },
+                ]}
+              />
             </div>
           )}
           <div className="anim-export-buttons">

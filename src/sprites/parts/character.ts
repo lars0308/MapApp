@@ -81,6 +81,15 @@ const part = (slot: string, id: string, label: string, paint: Paint, opts: { out
         else p.shiftX(-3);
       }
     }
+    if (slot === 'weapon') {
+      // held in the fist: lean out of the hand, then leave the fist free so the hand
+      // (body / gloves) lies over the grip
+      const h = weaponHand(b);
+      const rest = weaponRest(`c.weapon.${id}`, b.view);
+      if (rest) p.rotate(h.cx, h.hy, rest);
+      p.finish(opts);
+      return p.clearWhere((x, y) => x >= h.x0 && x <= h.x1 && y >= h.hy - 1 && y <= h.hy);
+    }
     return p.finish(opts);
   },
 });
@@ -455,8 +464,29 @@ const HATS: DemoPart[] = [
 
 // ---------------------------------------------------------------- held items
 
+/**
+ * Fist of the weapon arm (left in the picture when seen from behind): the 2 × 2 hand at the end of
+ * the arm. cx / hy = its centre in pixel-corner coordinates – the grip of a weapon runs through it.
+ */
+export function weaponHand(b: Body) {
+  const a = b.view === 'back' ? b.aL : b.aR;
+  return { cx: a[0] + 1, hy: b.ay[1], x0: a[0], x1: a[1] };
+}
+
+/** how far a weapon leans out of the hand when standing (degrees, clockwise; 0 = straight up) */
+const WEAPON_REST: Record<string, number> = { sword: 30, axe: 30, hammer: 30, spear: 18, staff: 12, torch: 15, bow: 0 };
+
+/** rest angle of a weapon part in a view (mirrored from behind, a bit more forward from the side) */
+export function weaponRest(partId: string | null | undefined, view: View = 'front'): number {
+  const r = WEAPON_REST[partId?.startsWith('c.weapon.') ? partId.slice(9) : ''] ?? 0;
+  return view === 'back' ? -r : view === 'side' && r ? r + 10 : r;
+}
+
 /** weapon hand / other hand – swapped when seen from behind */
-const hand = (b: Body) => (b.view === 'back' ? { gx: b.aL[0] - 2, hy: b.ay[1], ox: b.aR[1] + 2 } : { gx: b.aR[1] + 1, hy: b.ay[1], ox: b.aL[0] - 1 });
+const hand = (b: Body) => {
+  const gx = weaponHand(b).cx - 1;
+  return b.view === 'back' ? { gx, hy: b.ay[1], ox: b.aR[1] + 2 } : { gx, hy: b.ay[1], ox: b.aL[0] - 1 };
+};
 
 const WEAPONS: DemoPart[] = [
   part('weapon', 'sword', 'Schwert', (b, p) => {
