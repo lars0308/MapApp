@@ -18,26 +18,27 @@ export interface PlacedRoom {
 
 export const MAP_MARGIN = 2;
 
-function chooseShape(s: GeneratorSettings, rng: Rng): RoomShape {
+/**
+ * Shapes for all rooms: the enabled shapes in equal shares (big halls count half), shuffled –
+ * 12 rooms with rectangle + L + T give 4 of each. Independent of other sliders.
+ */
+function planShapes(s: GeneratorSettings, count: number, rng: Rng): RoomShape[] {
   const enabled = (Object.keys(s.shapes) as RoomShape[]).filter((k) => s.shapes[k]);
-  if (!enabled.length) return 'rect';
-  const irr = s.irregularity / 100;
-  const others = enabled.filter((k) => k !== 'rect');
-  if (!others.length) return 'rect';
-  if (enabled.includes('rect')) {
-    // 0 % irregularity → mostly rectangles, 100 % → mostly the other shapes
-    const pOther = 0.2 + 0.75 * irr;
-    if (!rng.chance(pOther)) return 'rect';
-  }
-  // halls are rarer than the rest
-  const weights = others.map((k) => (k === 'hall' ? 0.5 : 1));
+  if (!enabled.length) return Array(count).fill('rect');
+  const weights = enabled.map((k) => (k === 'hall' ? 0.5 : 1));
   const total = weights.reduce((a, b) => a + b, 0);
-  let r = rng.next() * total;
-  for (let i = 0; i < others.length; i++) {
-    r -= weights[i];
-    if (r < 0) return others[i];
-  }
-  return others[others.length - 1];
+  const out: RoomShape[] = [];
+  // largest remainder distribution
+  const exact = weights.map((w) => (w / total) * count);
+  const base = exact.map(Math.floor);
+  let left = count - base.reduce((a, b) => a + b, 0);
+  const order = exact.map((e, i) => [e - base[i], i] as const).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+  for (const [, i] of order) if (left-- > 0) base[i]++;
+  enabled.forEach((k, i) => {
+    for (let n = 0; n < base[i]; n++) out.push(k);
+  });
+  rng.shuffle(out);
+  return out;
 }
 
 interface Rect {
@@ -95,8 +96,9 @@ export function placeRooms(s: GeneratorSettings, W: number, H: number, rng: Rng,
     }
   };
 
+  const plannedShapes = planShapes(s, count, rng);
   for (let i = 0; i < count; i++) {
-    const shape = chooseShape(s, rng);
+    const shape = plannedShapes[i];
     let w = rng.int(minW, maxW);
     let h = rng.int(minH, maxH);
     if (shape === 'hall') {
@@ -105,8 +107,9 @@ export function placeRooms(s: GeneratorSettings, W: number, H: number, rng: Rng,
     }
     let placed: Rect | null = null;
     for (let shrink = 0; shrink < 4 && !placed; shrink++) {
-      const rw = Math.min(usableW - 2, Math.max(3, Math.round(w * (1 - shrink * 0.15))));
-      const rh = Math.min(usableH - 2, Math.max(3, Math.round(h * (1 - shrink * 0.15))));
+      // never below the minimum size the user asked for
+      const rw = Math.min(usableW - 2, Math.max(minW, Math.round(w * (1 - shrink * 0.15))));
+      const rh = Math.min(usableH - 2, Math.max(minH, Math.round(h * (1 - shrink * 0.15))));
       const candidates = s.distribution === 'spread' ? 40 : s.distribution === 'even' ? 6 : 1;
       let best: Rect | null = null;
       let bestScore = -Infinity;

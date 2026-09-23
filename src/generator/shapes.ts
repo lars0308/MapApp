@@ -18,8 +18,9 @@ function rectMask(w: number, h: number): Mask {
   return fill(w, h, () => true);
 }
 
-function lMask(w: number, h: number, rng: Rng, irr: number): Mask {
-  const f = () => 0.5 + (rng.next() - 0.5) * 0.3 * (0.4 + irr);
+function lMask(w: number, h: number, rng: Rng): Mask {
+  // cut-out corner between 35 % and 60 % of each side → both arms clearly visible
+  const f = () => rng.range(0.35, 0.6);
   const cw = Math.max(2, Math.round(w * f()));
   const ch = Math.max(2, Math.round(h * f()));
   const corner = rng.int(0, 3);
@@ -152,7 +153,7 @@ export function createMask(shape: RoomShape, w: number, h: number, rng: Rng, irr
   const small = w < 5 || h < 5;
   switch (small ? 'rect' : shape) {
     case 'l':
-      m = lMask(w, h, rng, irregularity);
+      m = lMask(w, h, rng);
       break;
     case 't':
       m = tMask(w, h, rng);
@@ -167,8 +168,7 @@ export function createMask(shape: RoomShape, w: number, h: number, rng: Rng, irr
     default:
       m = rectMask(w, h);
   }
-  // global irregularity roughens every shape a little (halls stay clean)
-  if (shape !== 'irregular' && shape !== 'hall') erodeEdges(m, rng, irregularity * 0.6);
+  // rectangle, L, T, cross and hall stay exact – only the "irregular" shape is roughened
   cleanup(m);
   return m;
 }

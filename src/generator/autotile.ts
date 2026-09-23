@@ -153,6 +153,18 @@ export function resolveWalls(g: Grid, perspective: Perspective, shadows: boolean
   return { roles, front, shadows: shadowTags, floorMask };
 }
 
+/**
+ * Tag preference for a wall front tile: where the front ends next to walkable floor the wall
+ * block's side face must show ('end_l' / 'end_r'); otherwise plain fronts (end pieces avoided).
+ */
+export function frontTilePrefs(cells: Uint8Array, W: number, i: number): { prefer?: string[]; avoid?: string[] } {
+  const x = i % W;
+  const walk = (j: number) => cells[j] !== CELL_VOID && cells[j] !== CELL_WALL;
+  if (x > 0 && walk(i - 1)) return { prefer: ['end_l'] };
+  if (x < W - 1 && walk(i + 1)) return { prefer: ['end_r'] };
+  return { avoid: ['end_l', 'end_r'] };
+}
+
 /** 8-neighbour walkable mask of a wall cell (exported for later terrain systems). */
 export function wallNeighbourMask(g: Grid, x: number, y: number): number {
   const { W, H, cells } = g;

@@ -344,6 +344,15 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 1.6 – exakte Formen, saubere Ecken, lernende Tile-Erkennung**
+
+- Raumformen exakt: Rechteck, L, T, Kreuz und Halle werden nicht mehr „angefressen“ (vorher rauten die Kanten jeder Form mit dem Regelmäßigkeits-Regler auf). Der Regler heißt jetzt „Unregelmäßigkeit“, wirkt nur auf die Form „Unregelmäßig“ und erscheint nur, wenn sie gewählt ist. Gewählte Formen werden gleichmäßig verteilt (12 Räume, 3 Formen → je 4). Räume werden nie unter die Mindestgröße verkleinert.
+- 3/4-Ansicht: Ecken sind echte Übergänge – die Seitenkante der linken/rechten Wand geht nahtlos in die Oberkante der Wandfront bzw. in die untere Abschlusskante über (kein überstehender „Pfosten“ mehr). Wo eine Wandfront neben Boden endet (Innenecke eines L, Gangmündung), setzt der Generator automatisch ein Endstück mit sichtbarer Seitenfläche (Tags `end_l` / `end_r`, auch beim manuellen Malen mit Auto-Wände). Die untere Wand zeigt weiterhin nur ihre Oberkante.
+- Lernen: jede Zuordnung (Tile-Menü, Inspektor, „Vorschläge bestätigen“, „In Bibliothek“) wird als Beispiel gespeichert (visueller Fingerabdruck: 8×8-Helligkeit, Transparenz, Farbe, 1-px-Kanten), automatisch auch gespiegelt (eine korrigierte linke Wand/Ecke lernt die rechte mit). Neue Tiles übernehmen den Typ des ähnlichsten gelernten Beispiels vor der Regel-Erkennung; im Tile-Menü werden gleich aussehende Tiles desselben Tilesets sofort mit vorgeschlagen. Einstellungen → Tile-Erkennung zeigt die Anzahl und kann das Gelernte löschen. Gespeichert lokal im Browser.
+- Tilegröße wird aus dem Bildinhalt erkannt (Kachelgrenzen = Farbsprünge, Kachelmitte nicht) – 32-px-Tiles werden nicht mehr in 16-px-Viertel zerlegt.
+- Regel-Erkennung: 3/4-Wandfronten, die ins Dunkle abfallen (Grube/Schatten), werden als Wandfront erkannt.
+- Neu: `tilesets/learning.ts`.
+
 **Version 1.5 – automatische Tile-Zuordnung**
 
 - Beim Hochladen (Setup-Assistent und Tiles → Tilesets) wird jedes Tile automatisch erkannt: Boden (mit Material-Tag stone/grass/sand/wood), Wände (helle Kante zeigt zum Boden → Wand ↑/↓/←/→, Durchgangswand, Innenecke, Endstück, Kreuzung), Außenecken (heller Eckpunkt), Wandfront, Bodenrand, Wasser, Lava, Abgrund, Brücke, Deko/Hindernis (Form auf Transparenz). Trefferquote auf den Demo-Tilesets 65–83 % (nach Gruppe).

@@ -128,37 +128,48 @@ function bricks(d: D, x0: number, y0: number, w: number, h: number, offset = 0) 
   }
 }
 
-/** 3/4 wall: lighter cap; sides facing the room show a raised inner face strip. */
+/**
+ * 3/4 wall cap. Left/right walls show their raised inner face as a brick strip; the cap edge
+ * above a wall front is a thin highlight; walls below the room only show their top lip.
+ * Corners join these edges seamlessly: the side strip ends exactly where the front's top edge
+ * (outer top corners) or the bottom lip (outer bottom corners) begins – no posts sticking out.
+ */
 function drawThreeQuarterWall(d: D, rim: Rim) {
   capTexture(d, '#2a2530', '#221e27');
-  const strip = 4;
-  // vertical faces (left / right walls are visibly raised)
-  if (rim.e) {
-    bricks(d, T - strip, 0, strip, T);
-    d.rect(T - strip - 1, 0, 1, T, RIM_HI);
-  }
-  if (rim.w) {
-    bricks(d, 0, 0, strip, T);
-    d.rect(strip, 0, 1, T, RIM_HI);
-  }
-  // top edge of a wall that has its front below: thin highlight
-  if (rim.s) d.rect(0, T - 1, T, 1, RIM_HI);
-  // back edge (room above): lip
-  if (rim.n) {
-    d.rect(0, 0, T, 2, RIM_MID);
-    d.rect(0, 0, T, 1, RIM_HI);
-  }
-  const corner = (x: number, y: number) => {
-    bricks(d, x, y, strip, strip);
-    d.rect(x === 0 ? strip : x - 1, y, 1, strip, RIM_HI);
+  const S = 4; // width of the visible side face
+  const face = (x: number) => {
+    bricks(d, x, 0, S, T);
+    d.rect(x === 0 ? S : x - 1, 0, 1, T, RIM_HI); // cap edge along the face
   };
-  if (rim.ne) corner(T - strip, 0);
-  if (rim.nw) corner(0, 0);
-  if (rim.se) corner(T - strip, T - strip);
-  if (rim.sw) corner(0, T - strip);
+  if (rim.e) face(T - S);
+  if (rim.w) face(0);
+  // part of the tile width not covered by side faces
+  const x0 = rim.w ? S + 1 : 0;
+  const x1 = rim.e ? T - S - 1 : T;
+  // cap edge above a wall front (room below)
+  if (rim.s) d.rect(x0, T - 1, x1 - x0, 1, RIM_HI);
+  // wall below the room: only its top lip is visible
+  if (rim.n) {
+    d.rect(x0, 0, x1 - x0, 2, RIM_MID);
+    d.rect(x0, 0, x1 - x0, 1, RIM_HI);
+  }
+  // outer corners: the edge turns around the corner
+  // room diagonally below → the front's top edge meets the side face edge (L of highlight)
+  if (rim.se) d.rect(T - S - 1, T - 1, S + 1, 1, RIM_HI);
+  if (rim.sw) d.rect(0, T - 1, S + 1, 1, RIM_HI);
+  // room diagonally above → the bottom lip meets the side face
+  if (rim.ne) {
+    d.rect(T - S - 1, 0, S + 1, 2, RIM_MID);
+    d.rect(T - S - 1, 0, S + 1, 1, RIM_HI);
+  }
+  if (rim.nw) {
+    d.rect(0, 0, S + 1, 2, RIM_MID);
+    d.rect(0, 0, S + 1, 1, RIM_HI);
+  }
 }
 
-function wallFront(d: D, opts: { base: boolean; upper?: boolean; broken?: boolean }) {
+/** Wall front; `end` shows the wall's side face where the front ends next to floor. */
+function wallFront(d: D, opts: { base: boolean; upper?: boolean; broken?: boolean; end?: 'l' | 'r' }) {
   bricks(d, 0, 0, T, T, opts.upper ? 1 : 0);
   d.speckle([FACE.hi, FACE.dark], 0.06);
   if (opts.upper) d.rect(0, 0, T, 1, RIM_HI);
@@ -171,6 +182,13 @@ function wallFront(d: D, opts: { base: boolean; upper?: boolean; broken?: boolea
     d.rect(10, 6, 2, 2, '#2a2530');
     d.px(3, 9, FACE.line);
     d.px(4, 10, FACE.line);
+  }
+  if (opts.end) {
+    // side face of the wall block, same look as the side faces of left/right walls
+    const x = opts.end === 'l' ? 0 : T - 4;
+    bricks(d, x, 0, 4, T, 1);
+    d.rect(opts.end === 'l' ? 4 : T - 5, 0, 1, T, FACE.line);
+    d.rect(opts.end === 'l' ? 0 : T - 1, 0, 1, T, RIM_HI);
   }
 }
 
@@ -360,6 +378,11 @@ function wallDefs(style: 'top' | 'front'): Def[] {
       { role: 'wall_front', category: 'wallFront', tags: ['stone', 'base'], weight: 85, collision: true, draw: (d) => wallFront(d, { base: true }) },
       { role: 'wall_front', category: 'wallFront', tags: ['stone', 'base', 'broken'], weight: 15, collision: true, draw: (d) => wallFront(d, { base: true, broken: true }) },
       { role: 'wall_front_upper', category: 'wallFront', tags: ['stone', 'upper'], weight: 100, collision: true, sortOffset: 1, draw: (d) => wallFront(d, { base: false, upper: true }) },
+      // front ends: the wall block's side face where a front stops next to floor
+      { role: 'wall_front', category: 'wallFront', tags: ['stone', 'base', 'end_l'], weight: 100, collision: true, draw: (d) => wallFront(d, { base: true, end: 'l' }) },
+      { role: 'wall_front', category: 'wallFront', tags: ['stone', 'base', 'end_r'], weight: 100, collision: true, draw: (d) => wallFront(d, { base: true, end: 'r' }) },
+      { role: 'wall_front_upper', category: 'wallFront', tags: ['stone', 'upper', 'end_l'], weight: 100, collision: true, sortOffset: 1, draw: (d) => wallFront(d, { base: false, upper: true, end: 'l' }) },
+      { role: 'wall_front_upper', category: 'wallFront', tags: ['stone', 'upper', 'end_r'], weight: 100, collision: true, sortOffset: 1, draw: (d) => wallFront(d, { base: false, upper: true, end: 'r' }) },
       { role: 'door', category: 'door', tags: ['wood', 'front'], weight: 100, collision: false, draw: doorFront },
       { role: 'door', category: 'door', tags: ['wood', 'h'], weight: 100, collision: false, draw: (d) => doorTopDown(d, 'h') },
       { role: 'door', category: 'door', tags: ['wood', 'v'], weight: 100, collision: false, draw: (d) => doorTopDown(d, 'v') },

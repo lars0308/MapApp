@@ -1,7 +1,7 @@
 import { CELL_CORRIDOR, CELL_HAZARD, CELL_ROOM, CELL_VOID, CELL_WALL, type TileRole } from '../types';
 import { useProject } from '../store/projectStore';
 import { TilePools } from '../tilesets/tilePools';
-import { resolveWalls, roleAt } from '../generator/autotile';
+import { frontTilePrefs, resolveWalls, roleAt } from '../generator/autotile';
 import { Rng, hashSeed } from '../generator/rng';
 import { metaTable } from './collision';
 
@@ -114,7 +114,8 @@ export function applyAutoWalls(changed: number[], paintedLayerId: string) {
         if (doorAt(i + 1) && cells[i - 1] === CELL_WALL) role = 'door_frame_left';
         else if (doorAt(i - 1) && cells[i + 1] === CELL_WALL) role = 'door_frame_right';
         const isFront = walls.front[i] > 0;
-        let gid = role ? pools.pickRole(rng, role, role.startsWith('door_frame') ? [isFront ? 'front' : 'top'] : undefined) : 0;
+        const fp = isFront && !role?.startsWith('door_frame') ? frontTilePrefs(cells, W, i) : {};
+        let gid = role ? pools.pickRole(rng, role, role.startsWith('door_frame') ? [isFront ? 'front' : 'top'] : fp.prefer, fp.avoid) : 0;
         if (role?.startsWith('door_frame') && !pools.hasRole(role)) gid = pools.pickRole(rng, roleAt(walls.roles[i])!);
         if (isFront) front = gid;
         else back = gid;

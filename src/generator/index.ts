@@ -35,7 +35,7 @@ import { buildGraph } from './graph';
 import { carveBranches, carveCorridors, computeNearRoom, type Grid } from './corridors';
 import { assignSpecialRooms } from './specials';
 import { TilePools } from '../tilesets/tilePools';
-import { NO_ROLE, resolveWalls, roleAt, wallNeighbourMask } from './autotile';
+import { NO_ROLE, frontTilePrefs, resolveWalls, roleAt, wallNeighbourMask } from './autotile';
 import { PERSPECTIVE_INFO, requiredRooms } from './perspective';
 import { createTerrainState, placeTerrain, placeTransitions } from './terrain';
 import { placeObjects, type ObjectContext } from './objectsGen';
@@ -390,7 +390,8 @@ export function generate(input: GenerateInput): GenerateOutput {
     const isFront = walls.front[i] > 0;
     const layer = isFront ? frontL : wallL;
     if (!layer) continue;
-    let gid = pools.pickRole(rTiles, role, override ? [isFront ? 'front' : 'top'] : undefined);
+    const fp = isFront && !override ? frontTilePrefs(grid.cells, W, i) : {};
+    let gid = pools.pickRole(rTiles, role, override ? [isFront ? 'front' : 'top'] : fp.prefer, fp.avoid);
     // frames without matching tiles fall back to the plain wall role
     if (override && !pools.hasRole(override) && walls.roles[i] !== NO_ROLE) gid = pools.pickRole(rTiles, roleAt(walls.roles[i])!);
     layer[i] = gid;

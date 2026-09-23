@@ -10,6 +10,7 @@ import { TileThumb } from '../../tilesets/TileThumb';
 import { AssignSummary, TileLabel, confirmedMetas, suggestMetas } from '../../tilesets/TileLabel';
 import { autoAssign } from '../../tilesets/autoAssign';
 import { QuickPick } from '../../tilesets/QuickPick';
+import { learnFrom, similarTiles } from '../../tilesets/learning';
 import { TileInspector } from '../../tilesets/TilesPanel';
 import { useEditor } from '../../store/editorStore';
 import { readFileAsDataUrl } from '../../utils/download';
@@ -244,6 +245,7 @@ function UploadEditor({
     setBusy(true);
     try {
       await saveLibraryTileset(toLibraryTileset(upload));
+      void learnFrom(upload);
       toast(`„${upload.name}“ in der Bibliothek gespeichert`, 'success');
       await onSaved(upload.id);
     } catch {
@@ -269,12 +271,28 @@ function UploadEditor({
   const indices = Array.from({ length: upload.columns * upload.rows }, (_, i) => i).filter((i) => !empty.has(i));
   const custom = !COMMON_TILE_SIZES.includes(upload.tileSize);
   const list = upload.perspectives.length ? upload.perspectives : [...PERSPECTIVES];
-  const onMeta = (gids: number[], patch: Partial<TileMeta>) => setUpload(applyTileMeta([upload], gids, patch)[0]);
+  const onMeta = (gids: number[], patch: Partial<TileMeta>) => {
+    const next = applyTileMeta([upload], gids, patch)[0];
+    setUpload(next);
+    // the app learns from every manual assignment
+    if ('category' in patch || 'role' in patch) void learnFrom(next, gids.map((g) => g - 1));
+    return next;
+  };
   const pos = pick === null ? -1 : indices.indexOf(pick);
   const choose = (patch: Partial<TileMeta>) => {
     if (pick === null) return;
     const gids = multi && marked.length ? marked : [pick + 1];
-    onMeta(gids, patch);
+    const next = onMeta(gids, patch);
+    // same look elsewhere in this tileset → same type as a suggestion
+    if (!multi && (patch.category || patch.role)) {
+      void similarTiles(next, pick).then((idx) => {
+        if (!idx.length) return;
+        const tiles = { ...next.tiles };
+        for (const i of idx) tiles[i] = { ...(tiles[i] ?? { tags: [], weight: 50 }), category: patch.category, role: patch.role, auto: true };
+        setUpload({ ...next, tiles });
+        toast(`${idx.length} ähnliche${idx.length === 1 ? 's' : ''} Tile${idx.length === 1 ? '' : 's'} ebenfalls vorgeschlagen`);
+      });
+    }
     if (multi) {
       setMarked([]);
       setPick(null);
@@ -368,7 +386,11 @@ function UploadEditor({
             .then((tiles) => setUpload({ ...upload, tiles: { ...upload.tiles, ...tiles } }))
             .finally(() => setBusy(false));
         }}
-        onConfirm={() => setUpload({ ...upload, tiles: { ...upload.tiles, ...confirmedMetas(upload.tiles) } })}
+        onConfirm={() => {
+          const next = { ...upload, tiles: { ...upload.tiles, ...confirmedMetas(upload.tiles) } };
+          setUpload(next);
+          void learnFrom(next);
+        }}
       />
       {marked.length > 0 && <TileInspector gids={marked} tilesets={[upload]} onMeta={onMeta} />}
       {pick !== null && (

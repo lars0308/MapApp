@@ -327,7 +327,10 @@ function WizardDialog() {
                   ))}
                 </div>
               </div>
-              <Slider label="Regelmäßigkeit" value={gen.irregularity} unit="%" hint={['Sauber / rechteckig', 'Unregelmäßig']} onChange={(v) => setGen({ irregularity: v })} />
+              {gen.shapes.irregular && (
+                <Slider label="Unregelmäßigkeit" value={gen.irregularity} unit="%" hint={['Leicht zerklüftet', 'Stark zerklüftet']} onChange={(v) => setGen({ irregularity: v })} />
+              )}
+              <p className="hint">Rechteck, L, T, Kreuz und Halle werden exakt gebaut; gewählte Formen kommen gleich häufig vor. Die Unregelmäßigkeit gilt nur für „Unregelmäßig“.</p>
             </StepSection>
           )}
 

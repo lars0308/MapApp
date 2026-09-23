@@ -6,7 +6,7 @@ export function TileLabel({ meta }: { meta: TileMeta | undefined }) {
   const l = tileLabel(meta);
   if (!l) return <span className="tile-label is-none">?</span>;
   return (
-    <span className={`tile-label g-${l.group}${l.auto ? ' is-auto' : ''}`} title={l.auto ? `${l.text} (Vorschlag)` : l.text}>
+    <span className={`tile-label g-${l.group}${l.auto ? ' is-auto' : ''}`} title={l.auto ? `${l.text} (${meta?.tags.includes('learned') ? 'gelernt' : 'Vorschlag'})` : l.text}>
       {l.text}
     </span>
   );

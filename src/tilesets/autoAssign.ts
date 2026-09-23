@@ -1,5 +1,6 @@
 import type { TileCategory, TileMeta, TileRole, Tileset } from '../types';
 import { loadImage } from '../utils/image';
+import { learnedSuggestions } from './learning';
 
 // Automatic first guess for uploaded tilesets: every tile gets a category / role from its pixels.
 // Results are suggestions (meta.auto = true) – the user reviews and corrects them in the inspector.
@@ -33,6 +34,10 @@ interface Features {
   line: Record<Side, number>;
   /** small corner patches − interior */
   dot: Record<Corner, number>;
+  /** mean luminance of the upper half, lower half and lowest quarter (3/4 fronts falling into darkness) */
+  topHalf: number;
+  bottomHalf: number;
+  bottomQuarter: number;
 }
 
 const lum = (r: number, g: number, b: number) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -63,6 +68,7 @@ function features(data: Uint8ClampedArray, imgW: number, x0: number, y0: number,
   const line = { t: acc(), b: acc(), l: acc(), r: acc() };
   const dot = { tl: acc(), tr: acc(), bl: acc(), br: acc() };
   const inner = acc();
+  const halves = { top: acc(), bottom: acc(), low: acc() };
   const band = { t: 0, b: 0, l: 0, r: 0 };
   let opaque = 0;
   let centerOpaque = 0;
@@ -88,6 +94,8 @@ function features(data: Uint8ClampedArray, imgW: number, x0: number, y0: number,
       if (x >= c0 && x < c1 && y >= c0 && y < c1) centerOpaque++;
       const add = (a: number[]) => ((a[0] += L), a[1]++);
       if (x >= e3 && x < s - e3 && y >= e3 && y < s - e3) add(inner);
+      add(y < s / 2 ? halves.top : halves.bottom);
+      if (y >= (s * 3) / 4) add(halves.low);
       // lines exclude the corners so a corner dot does not count as a line
       if (x >= e && x < s - e) {
         if (y < e) add(line.t);
@@ -114,6 +122,9 @@ function features(data: Uint8ClampedArray, imgW: number, x0: number, y0: number,
     inner: inn,
     line: { t: rel(line.t), b: rel(line.b), l: rel(line.l), r: rel(line.r) },
     dot: { tl: rel(dot.tl), tr: rel(dot.tr), bl: rel(dot.bl), br: rel(dot.br) },
+    topHalf: mean(halves.top),
+    bottomHalf: mean(halves.bottom),
+    bottomQuarter: mean(halves.low),
   };
 }
 
@@ -199,6 +210,8 @@ function classify(f: Features): Guess | null {
     // plain dark block: wall fill / cap
     if (f.inner < 0.13) return { category: 'wallTop', role: 'junction_cross', tags: [] };
   }
+  // 3/4 wall front dropping into darkness (pit / shadow below): light upper part, very dark bottom
+  if (f.topHalf - f.bottomHalf >= 0.1 && f.bottomQuarter < 0.12) return { category: 'wallFront', role: 'wall_front', tags: [] };
   // wall front: highlight along the top edge, shadow along the bottom (or a dark mortar band top and bottom)
   if (L.t - L.b >= 0.17 || (L.t <= -0.1 && L.b <= -0.1 && Math.abs(L.l) < 0.06 && Math.abs(L.r) < 0.06))
     return { category: 'wallFront', role: 'wall_front', tags: [] };
@@ -254,6 +267,14 @@ export async function autoAssign(ts: Pick<Tileset, 'dataUrl' | 'tileSize' | 'col
     const sizes = [...groups.values()].sort((a, b) => b.length - a.length);
     const main = sizes[0].length;
     for (const g of sizes.slice(1)) if (g.length * 4 <= main) for (const i of g) out[i] = { ...out[i], weight: 15, tags: [...out[i].tags, 'variant'] };
+  }
+  // what the user taught the app wins over the rules (see learning.ts)
+  const learned = await learnedSuggestions({ ...ts, tiles: { ...ts.tiles, ...out } });
+  for (const [k, m] of Object.entries(learned)) {
+    const i = Number(k);
+    if (!overwrite && ts.tiles[i] && !ts.tiles[i].auto && (ts.tiles[i].category || ts.tiles[i].role)) continue;
+    const keep = (out[i]?.tags ?? []).filter((t) => ['stone', 'grass', 'sand', 'wood', 'dark'].includes(t));
+    out[i] = { ...m, tags: [...new Set([...keep, 'learned'])] };
   }
   return out;
 }

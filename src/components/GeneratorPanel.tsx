@@ -146,13 +146,10 @@ export function GeneratorPanel() {
             ))}
           </div>
         </div>
-        <Slider
-          label="Unregelmäßigkeit"
-          value={g.irregularity}
-          unit=" %"
-          hint={['Sauber', 'Unregelmäßig']}
-          onChange={(v) => update({ irregularity: v })}
-        />
+        {g.shapes.irregular ? (
+          <Slider label="Unregelmäßigkeit" value={g.irregularity} unit=" %" hint={['Leicht zerklüftet', 'Stark zerklüftet']} onChange={(v) => update({ irregularity: v })} />
+        ) : null}
+        <p className="hint">Rechteck, L, T, Kreuz und Halle werden exakt gebaut; gewählte Formen kommen gleich häufig vor. Die Unregelmäßigkeit gilt nur für die Form „Unregelmäßig“.</p>
       </Section>
 
       <Section title="Wege">

@@ -7,6 +7,7 @@ import { createDemoTileset } from '../tilesets/demoTileset';
 import { createDemoAutotileSets } from '../tilesets/demoAutotiles';
 import { applyTileMeta, findEmptyTiles } from '../tilesets/slicing';
 import { libraryToProjectTilesets, withTerrainsFor } from '../tilesets/library';
+import { learnFrom } from '../tilesets/learning';
 import type { LibraryTileset } from '../persistence/db';
 import { LAYER_COLORS, createDefaultLayers, createLayer, resizeData } from '../layers/defaults';
 import { uid } from '../utils/id';
@@ -326,7 +327,15 @@ export const useProject = create<ProjectState>((set, get) => {
     },
     setTileMeta: (gids, patch) => {
       const p = get().project;
-      touch({ ...p, tilesets: applyTileMeta(p.tilesets, gids, patch) });
+      const tilesets = applyTileMeta(p.tilesets, gids, patch);
+      touch({ ...p, tilesets });
+      // the app learns from manual assignments (uploaded tilesets)
+      if ('category' in patch || 'role' in patch)
+        for (const ts of tilesets) {
+          if (ts.source !== 'upload') continue;
+          const idx = gids.filter((g) => g >= ts.firstGid && g < ts.firstGid + ts.columns * ts.rows).map((g) => g - ts.firstGid);
+          if (idx.length) void learnFrom(ts, idx);
+        }
     },
 
     addObject: (o) =>

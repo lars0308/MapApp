@@ -6,6 +6,8 @@ import { Button, Section, Segmented, Toggle } from './ui';
 import { Icon } from './icons';
 import { startPlaytest } from '../playtest/controller';
 import { useLayout } from '../store/layoutStore';
+import { useState } from 'react';
+import { forgetLearned, learnedCount } from '../tilesets/learning';
 
 /** View / editor settings (mobile sheet, desktop: tab of the left panel). */
 export function SettingsPanel({ desktop = false }: { desktop?: boolean }) {
@@ -49,11 +51,40 @@ export function SettingsPanel({ desktop = false }: { desktop?: boolean }) {
           </Button>
         </Section>
       )}
+      <LearningSection />
       <Section title="Test">
         <Button variant="primary" block icon={<Icon.Play size={16} />} onClick={() => startPlaytest()}>
           Playtest starten
         </Button>
       </Section>
     </div>
+  );
+}
+
+/** What the tile detection has learned from the user's assignments. */
+function LearningSection() {
+  const [count, setCount] = useState(() => learnedCount());
+  return (
+    <Section title="Tile-Erkennung">
+      <p className="hint">
+        Die App lernt aus jeder Zuordnung, die du triffst oder bestätigst (auch gespiegelt: eine korrigierte Ecke gilt für alle vier). Neue Tilesets werden dann zuerst mit dem Gelernten
+        verglichen.
+      </p>
+      <div className="learn-row">
+        <span>
+          <strong>{count}</strong> gelernte Beispiele
+        </span>
+        <Button
+          variant="ghost"
+          disabled={!count}
+          onClick={() => {
+            forgetLearned();
+            setCount(0);
+          }}
+        >
+          Gelerntes vergessen
+        </Button>
+      </div>
+    </Section>
   );
 }

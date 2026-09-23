@@ -11,6 +11,7 @@ import { CATEGORIES, CATEGORY_LABEL, SUGGESTED_TAGS } from './categories';
 import { TileThumb } from './TileThumb';
 import { AssignSummary, TileLabel, assignmentStats, confirmedMetas, suggestMetas } from './TileLabel';
 import { autoAssign } from './autoAssign';
+import { learnFrom } from './learning';
 import { resolveGid, createTilesetFromFile, COMMON_TILE_SIZES } from './slicing';
 import { Button, Chip, IconButton, NumberField, PanelTabs, Segmented, Slider, Toggle } from '../components/ui';
 import { Icon } from '../components/icons';
@@ -409,7 +410,11 @@ function TilesetCard({ ts }: { ts: Tileset }) {
             })
             .finally(() => setDetecting(false));
         }}
-        onConfirm={() => mergeTileMetas(ts.id, confirmedMetas(ts.tiles))}
+        onConfirm={() => {
+          const confirmed = confirmedMetas(ts.tiles);
+          mergeTileMetas(ts.id, confirmed);
+          void learnFrom({ ...ts, tiles: { ...ts.tiles, ...confirmed } });
+        }}
       />
       <div className="field">
         <label>Geeignet für</label>
@@ -453,7 +458,7 @@ function TilesetCard({ ts }: { ts: Tileset }) {
           variant="secondary"
           icon={<Icon.Save size={16} />}
           onClick={() =>
-            void saveLibraryTileset(toLibraryTileset(ts))
+            void (learnFrom(ts), saveLibraryTileset(toLibraryTileset(ts)))
               .then(() => toast(`„${ts.name}“ in der Tileset-Bibliothek gespeichert – bei neuen Projekten wählbar`, 'success'))
               .catch(() => toast('Speichern in der Bibliothek fehlgeschlagen', 'error'))
           }
