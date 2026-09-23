@@ -5,9 +5,10 @@ import { PERSPECTIVE_INFO } from '../generator/perspective';
 import { Button, Section, Segmented, Toggle } from './ui';
 import { Icon } from './icons';
 import { startPlaytest } from '../playtest/controller';
+import { useLayout } from '../store/layoutStore';
 
-/** View / editor settings (mobile sheet, desktop popover). */
-export function SettingsPanel() {
+/** View / editor settings (mobile sheet, desktop: tab of the left panel). */
+export function SettingsPanel({ desktop = false }: { desktop?: boolean }) {
   const e = useEditor();
   const map = useProject((s) => s.project.map);
   const setMapOptions = useProject((s) => s.setMapOptions);
@@ -37,6 +38,17 @@ export function SettingsPanel() {
         <Toggle label="Schatten" checked={map.shadows} onChange={(shadows) => setMapOptions({ shadows })} />
         <p className="hint">Wirkt beim nächsten Generieren.</p>
       </Section>
+      {desktop && (
+        <Section title="Arbeitsbereich">
+          <p className="hint">
+            Panels über die Symbole oben rechts ein-/ausblenden, am Rand ziehen für die Breite, zwischen Layer und Tiles ziehen für die Höhe (Doppelklick = Standardgröße), ↗ maximiert
+            einen Bereich (Esc stellt wieder her). Die Anordnung wird in diesem Browser gespeichert.
+          </p>
+          <Button variant="secondary" block onClick={() => useLayout.getState().resetAll()}>
+            Panel-Layout zurücksetzen
+          </Button>
+        </Section>
+      )}
       <Section title="Test">
         <Button variant="primary" block icon={<Icon.Play size={16} />} onClick={() => startPlaytest()}>
           Playtest starten

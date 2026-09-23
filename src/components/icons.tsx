@@ -240,6 +240,38 @@ export const Icon = {
       <path d="M4 9V5a1 1 0 011-1h4M15 4h4a1 1 0 011 1v4M20 15v4a1 1 0 01-1 1h-4M9 20H5a1 1 0 01-1-1v-4" />
     </Svg>
   ),
+  ChevronDown: (p: P) => (
+    <Svg {...p}>
+      <path d="M6 9l6 6 6-6" />
+    </Svg>
+  ),
+  ChevronRight: (p: P) => (
+    <Svg {...p}>
+      <path d="M9 6l6 6-6 6" />
+    </Svg>
+  ),
+  Maximize: (p: P) => (
+    <Svg {...p}>
+      <path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7" />
+    </Svg>
+  ),
+  Restore: (p: P) => (
+    <Svg {...p}>
+      <path d="M20 4l-6 6M14 5v5h5M4 20l6-6M10 19v-5H5" />
+    </Svg>
+  ),
+  PanelLeft: (p: P) => (
+    <Svg {...p}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M9 4.5v15" />
+    </Svg>
+  ),
+  PanelRight: (p: P) => (
+    <Svg {...p}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M15 4.5v15" />
+    </Svg>
+  ),
   Close: (p: P) => (
     <Svg {...p}>
       <path d="M6 6l12 12M18 6L6 18" />

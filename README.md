@@ -178,6 +178,22 @@ Testfigur, Joystick, Test-UI und Debug-Overlays gehören nur zum Editor: Sie wer
 | Speichern | Export → Speichern | Strg+S (zusätzlich Auto-Speichern) |
 | Generieren | GENERIEREN | Umschalt+Enter |
 
+### Desktop-Arbeitsbereich
+
+Auf dem PC sind die Seitenpanels frei anpassbar (wie in einem Level-Editor):
+
+| Aktion | So geht's |
+| --- | --- |
+| Breite ändern | Innenkante des linken bzw. rechten Panels ziehen (auch per Tastatur: Fokus + Pfeiltasten) |
+| Höhe Layer ↔ Tiles | Trennlinie zwischen Layer und Tiles ziehen |
+| Standardgröße | Doppelklick auf den Griff |
+| Einklappen | ⌄ im Panelkopf bzw. Klick auf den Titel – links wird eine Icon-Leiste daraus, rechts bleibt nur die Kopfzeile (beide eingeklappt → Icon-Leiste) |
+| Schließen / Öffnen | ✕ im Panelkopf; wieder einblenden über die drei Panel-Symbole oben rechts (linkes Panel, Layer, Tiles) |
+| Maximieren | ↗ – das Panel nutzt fast die ganze App-Fläche, Inhalt scrollt, die Map liegt abgedunkelt dahinter; erneuter Klick, Klick daneben oder Esc stellt die vorherige Größe wieder her |
+| Zurücksetzen | Einstellungen → Arbeitsbereich → „Panel-Layout zurücksetzen“ |
+
+Linkes Panel: Generator · Terrain · Export · Einstellungen (das Zahnrad an der Map öffnet den Einstellungen-Tab). Rechts: Layer und Tiles (inkl. Tile-Eigenschaften/Inspektor). Die Map nimmt automatisch den freien Platz ein und behält mindestens 320 px Breite. Breiten, Höhen, eingeklappt/geschlossen/maximiert und der aktive Tab werden im Browser gespeichert (`localStorage`) und beim nächsten Öffnen wiederhergestellt. Auf dem Handy bleibt es bei Bottom Sheets.
+
 Handy-Navigation: **Map · Generator · Terrain · Tiles · Layer · Export**, Einstellungen über das Zahnrad rechts oben. Panels öffnen sich als Bottom Sheet mit drei Zuständen:
 
 - **eingeklappt** – nur Kopfzeile, Map fast vollständig sichtbar
@@ -327,6 +343,13 @@ Wichtige Entscheidungen:
 ---
 
 ## Änderungen
+
+**Version 1.4 – flexible Desktop-Panels**
+
+- Seitenpanels per Drag in der Breite, Layer/Tiles in der Höhe änderbar, einklappen (Icon-Leiste), schließen/öffnen über die Topbar, maximieren (Esc/Klick daneben stellt wieder her), Doppelklick = Standardgröße, Layout zurücksetzen.
+- Einstellungen sind ein Tab im linken Panel (statt Popover).
+- Panel-Zustand wird lokal gespeichert. Mobile unverändert (Bottom Sheets).
+- Neu: `store/layoutStore.ts`, `components/desktop/Dock.tsx`; geändert: `components/DesktopLayout.tsx`, `components/SettingsPanel.tsx`, `components/icons.tsx`, `styles/index.css`.
 
 **Version 1.3 – Tileset-Auswahl, Bibliothek, Baukasten-Vorbereitung**
 
