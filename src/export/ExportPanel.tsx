@@ -5,6 +5,7 @@ import { Button, Section, Segmented, SelectField, Toggle } from '../components/u
 import { Icon } from '../components/icons';
 import { exportGodotPackage, exportGodotScript, exportJson, exportPng, exportProjectFile } from './actions';
 import { pngSize, pngTooLarge } from './pngExport';
+import { playerSpriteName } from '../playtest/playerSprite';
 
 export function ExportPanel() {
   const project = useProject((s) => s.project);
@@ -43,6 +44,12 @@ export function ExportPanel() {
         />
         <div className="export-list">
           <ExportItem
+            title="Godot-Paket"
+            meta={`Empfohlen · Ordner ins Godot-Projekt ziehen, Map.tscn starten${playerSpriteName() ? ` · mit Spielfigur „${playerSpriteName()}“` : ''}`}
+            busy={busy === 'godot'}
+            onClick={() => run('godot', () => exportGodotPackage(project, withShadows), 'Godot-Paket exportiert')}
+          />
+          <ExportItem
             title="Projektdatei"
             meta=".mapforge.json · vollständig wieder importierbar"
             busy={busy === 'project'}
@@ -53,12 +60,6 @@ export function ExportPanel() {
             meta="Map-Daten für Godot, Tilesets eingebettet"
             busy={busy === 'json'}
             onClick={() => run('json', () => exportJson(project, withShadows), 'JSON exportiert')}
-          />
-          <ExportItem
-            title="Godot-Paket"
-            meta="ZIP: map.json, Tileset-PNGs, Loader-Script"
-            busy={busy === 'godot'}
-            onClick={() => run('godot', () => exportGodotPackage(project, withShadows), 'Godot-Paket exportiert')}
           />
           <ExportItem
             title="GDScript"

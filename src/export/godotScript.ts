@@ -5,11 +5,9 @@ export const GODOT_LOADER_FILENAME = 'mapforge_loader.gd';
 
 export const GODOT_LOADER_SCRIPT = `## MapForge → Godot 4 loader (Godot 4.3+, TileMapLayer)
 ##
-## Usage:
-##   1. Copy the exported folder to res://mapforge/
-##   2. Add a Node2D to your scene and attach this script
-##   3. Set "map_json_path" (default: res://mapforge/map.json) and run
-##      (or call build_now() from a @tool script / the editor to keep the nodes)
+## Usage (easiest): copy the exported folder anywhere into your project and run Map.tscn.
+## Manual: add a Node2D, attach this script – map.json next to this script is found automatically
+## (or set "map_json_path"). Call build_now() from a @tool script / the editor to keep the nodes.
 ##
 ## Scene that is created:
 ##   MapForgeLoader (this node)
@@ -26,7 +24,11 @@ export const GODOT_LOADER_SCRIPT = `## MapForge → Godot 4 loader (Godot 4.3+, 
 extends Node2D
 class_name MapForgeLoader
 
-@export_file("*.json") var map_json_path: String = "res://mapforge/map.json"
+## empty = map.json next to this script
+@export_file("*.json") var map_json_path: String = ""
+## optional: your player scene (e.g. player/player.tscn from the export) – placed on the player spawn
+@export var player_scene: PackedScene
+@export var player_camera_zoom: float = 2.0
 @export var build_on_ready: bool = true
 ## Collision layer keeps its physics but is not drawn
 @export var hide_collision_layer: bool = true
@@ -42,6 +44,7 @@ var layer_nodes: Dictionary = {}
 var world: Node2D
 var characters: Node2D
 var astar: AStarGrid2D
+var player: Node2D
 var _sources: Dictionary = {}
 var _objects_texture: Texture2D
 
@@ -53,7 +56,11 @@ func _ready() -> void:
 
 
 func build_now() -> void:
-	map_data = load_map_json(map_json_path)
+	var path := map_json_path
+	if path == "" or not FileAccess.file_exists(path):
+		path = (get_script() as Script).resource_path.get_base_dir().path_join("map.json")
+	map_json_path = path
+	map_data = load_map_json(path)
 	if map_data.is_empty():
 		return
 	var info: Dictionary = map_data.get("map", {})
@@ -71,6 +78,8 @@ func build_now() -> void:
 		build_collision_rects(map_data)
 	build_spawn_markers(map_data)
 	astar = build_astar(map_data)
+	if player_scene:
+		_spawn_player()
 	print("MapForge: %d layers, %d objects, %d rooms" % [layer_nodes.size(), map_data.get("objects", []).size(), get_rooms().size()])
 
 
@@ -293,6 +302,30 @@ func add_character(node: Node2D) -> void:
 	characters.add_child(node)
 
 
+## Player on the "player" spawn point (else the first spawn / map centre), camera follows.
+func _spawn_player() -> void:
+	player = player_scene.instantiate() as Node2D
+	if player == null:
+		return
+	var spawns: Array = map_data.get("spawnPoints", [])
+	var pos := Vector2(float(map_data.get("map", {}).get("width", 0)) / 2.0, float(map_data.get("map", {}).get("height", 0)) / 2.0)
+	var found := false
+	for sp in spawns:
+		if str(sp.get("type", "")) == "player":
+			pos = Vector2(float(sp["x"]), float(sp["y"]))
+			found = true
+			break
+	if not found and spawns.size() > 0:
+		pos = Vector2(float(spawns[0]["x"]), float(spawns[0]["y"]))
+	# feet on the bottom middle of the spawn tile
+	player.position = Vector2((pos.x + 0.5) * tile_size, (pos.y + 0.9) * tile_size)
+	add_character(player)
+	var cam := Camera2D.new()
+	cam.zoom = Vector2(player_camera_zoom, player_camera_zoom)
+	cam.position_smoothing_enabled = true
+	player.add_child(cam)
+
+
 static func rle_decode(rle: Array, size: int) -> PackedByteArray:
 	var out := PackedByteArray()
 	out.resize(size)
@@ -344,11 +377,18 @@ Contents
 - tilesets/*.png        tileset images, re-sampled to the map tile size
 - objects.png           object sprites (trees, pillars, rocks, arches …), same scale
 - mapforge_loader.gd    loader script (Godot 4.3+, TileMapLayer)
+- Map.tscn              ready scene (loader attached) – just run it
+- player/               your own character from MapForge (only if set as player)
 
-Steps
-1. Copy this folder into your project as res://mapforge/
-2. Create a scene with a Node2D and attach mapforge_loader.gd
-3. Keep map_json_path = res://mapforge/map.json and run the scene
+Schritte / Steps
+1. Diesen Ordner irgendwo in dein Godot-Projekt ziehen (Drag & Drop in den FileSystem-Dock).
+   Copy this folder anywhere into your project.
+2. Map.tscn öffnen und starten (F6). Open Map.tscn and run it (F6).
+3. Fertig. Ist in MapForge eine eigene Spielfigur gesetzt, liegt sie in player/ und steht am
+   Startpunkt, die Kamera folgt ihr (Pfeiltasten). Done – with your own player if one was set.
+
+Eigene Szene: Node2D + mapforge_loader.gd – map.json neben dem Script wird automatisch gefunden.
+Own scene: Node2D + mapforge_loader.gd – map.json next to the script is found automatically.
 
 Y-sort
 - Layers with "ySort": true (ObjectsBack, WallsFront), all objects and the node

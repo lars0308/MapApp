@@ -93,19 +93,18 @@ func _physics_process(_delta: float) -> void:
 \t\tsprite.play(anim)
 `;
 
-function godotScene(doc: SpriteDoc, base: string, meta: SheetMeta, feet: number): string {
-  const node = doc.name.replace(/[^\p{L}\p{N}_]/gu, '_') || 'Sprite';
-  const character = doc.kind === 'character';
+/** Godot scene for a sprite: feetInFrame = feet row inside one frame (frames are square). */
+function godotScene(name: string, character: boolean, frame: number, feetInFrame: number, spriteSize: number, base: string, meta: SheetMeta): string {
+  const node = name.replace(/[^\p{L}\p{N}_]/gu, '_') || 'Sprite';
   const first = meta.animations.find((a) => a.name === 'idle')?.name ?? meta.animations[0]?.name ?? 'default';
   // feet of the sprite at the node origin (y-sort / collision work from the feet)
-  const F = frameSize(doc.size);
-  const offY = -(feet + framePad(doc.size) + 1 - F / 2);
+  const offY = -(feetInFrame + 1 - frame / 2);
   return `[gd_scene load_steps=${character ? 4 : 3} format=3]
 
 [ext_resource type="SpriteFrames" path="${base}_frames.tres" id="1_frames"]
 ${character ? `[ext_resource type="Script" path="${base}.gd" id="2_script"]\n` : ''}
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_feet"]
-size = Vector2(${Math.round(doc.size * 0.4)}, ${Math.max(4, Math.round(doc.size * 0.18))})
+size = Vector2(${Math.round(spriteSize * 0.4)}, ${Math.max(4, Math.round(spriteSize * 0.18))})
 
 [node name="${node}" type="${character ? 'CharacterBody2D' : 'StaticBody2D'}"]
 y_sort_enabled = true
@@ -118,9 +117,22 @@ animation = &"${first}"
 autoplay = "${first}"
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(0, ${-Math.max(2, Math.round(doc.size * 0.09))})
+position = Vector2(0, ${-Math.max(2, Math.round(spriteSize * 0.09))})
 shape = SubResource("RectangleShape2D_feet")
 `;
+}
+
+/** Files of a Godot sprite folder (sheet, SpriteFrames, scene, script, JSON). */
+export function spriteGodotEntries(o: { folder: string; base: string; name: string; character: boolean; png: Uint8Array; meta: SheetMeta; feetInFrame: number; spriteSize: number }): ZipEntry[] {
+  const { folder, base, meta } = o;
+  const entries: ZipEntry[] = [
+    { path: `${folder}/${base}.png`, data: o.png },
+    { path: `${folder}/${base}.json`, data: JSON.stringify(meta, null, 1) },
+    { path: `${folder}/${base}_frames.tres`, data: godotFrames(`${base}.png`, meta) },
+    { path: `${folder}/${base}.tscn`, data: godotScene(o.name, o.character, meta.frameWidth, o.feetInFrame, o.spriteSize, base, meta) },
+  ];
+  if (o.character) entries.push({ path: `${folder}/${base}.gd`, data: PLAYER_SCRIPT });
+  return entries;
 }
 
 function readme(doc: SpriteDoc, base: string, meta: SheetMeta): string {
@@ -150,16 +162,11 @@ ${list}
 export function exportSpriteGodot(doc: SpriteDoc, anims: AnimDef[], fps: Fps) {
   const base = safeFileName(doc.name) || 'sprite';
   const { canvas, meta } = sheet(doc, anims, fps);
-  const feet = feetRow(doc);
   const entries: ZipEntry[] = [
-    { path: `${base}/${base}.png`, data: pngBytes(canvas) },
-    { path: `${base}/${base}.json`, data: JSON.stringify(meta, null, 1) },
-    { path: `${base}/${base}_frames.tres`, data: godotFrames(`${base}.png`, meta) },
-    { path: `${base}/${base}.tscn`, data: godotScene(doc, base, meta, feet) },
+    ...spriteGodotEntries({ folder: base, base, name: doc.name, character: doc.kind === 'character', png: pngBytes(canvas), meta, feetInFrame: feetRow(doc) + framePad(doc.size), spriteSize: doc.size }),
     { path: `${base}/README.md`, data: readme(doc, base, meta) },
     { path: `${base}/${base}_still.png`, data: dataUrlToBytes(toPng(compose(doc), doc.size)) },
   ];
-  if (doc.kind === 'character') entries.push({ path: `${base}/${base}.gd`, data: PLAYER_SCRIPT });
   downloadBlob(createZip(entries), `${base}-godot.zip`);
 }
 

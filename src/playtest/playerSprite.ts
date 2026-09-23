@@ -7,7 +7,7 @@ import { feetRow } from '../sprites/exportSprite';
 
 const KEY = 'mapforge.player.v1';
 
-interface Stored {
+export interface Stored {
   name: string;
   size: number;
   png: string;
@@ -61,6 +61,11 @@ export function clearPlayerSprite() {
   stored = null;
   img = null;
   listeners.forEach((f) => f());
+}
+
+/** stored sheet (row 0 idle, row 1 walk) for the map export */
+export function playerSpriteData(): Stored | null {
+  return stored;
 }
 
 export function playerSpriteName(): string | null {

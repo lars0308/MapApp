@@ -1,5 +1,7 @@
 import type { Project } from '../types';
-import { downloadBlob, downloadText, safeFileName } from '../utils/download';
+import { dataUrlToBytes, downloadBlob, downloadText, safeFileName } from '../utils/download';
+import { playerSpriteData } from '../playtest/playerSprite';
+import { spriteGodotEntries } from '../sprites/exportSprite';
 import { serializeProject, PROJECT_EXTENSION } from '../persistence/projectFile';
 import { OBJECTS_IMAGE, buildGodotData, scaledObjectsPng, scaledTilesetPng, tilesetImageName } from './godotJson';
 import { renderMapPng, type PngOptions } from './pngExport';
@@ -36,6 +38,42 @@ export async function exportGodotPackage(p: Project, includeShadows = true) {
     const png = await scaledTilesetPng(ts, p.map.tileSize);
     entries.push({ path: `${folder}/tilesets/${tilesetImageName(ts)}`, data: new Uint8Array(await png.arrayBuffer()) });
   }
+  // ready scene + own player figure (if one is set in "Animieren")
+  const player = playerSpriteData();
+  if (player) {
+    const walkFps = 8;
+    entries.push(
+      ...spriteGodotEntries({
+        folder: `${folder}/player`,
+        base: 'player',
+        name: player.name,
+        character: true,
+        png: dataUrlToBytes(player.png),
+        feetInFrame: player.feet,
+        spriteSize: Math.round(player.size / 1.5),
+        meta: {
+          name: player.name,
+          frameWidth: player.size,
+          frameHeight: player.size,
+          columns: Math.max(player.idle, player.walk),
+          animations: [
+            { name: 'idle', row: 0, frames: player.idle, fps: 4, loop: true },
+            { name: 'walk', row: 1, frames: player.walk, fps: walkFps, loop: true },
+          ],
+        },
+      }),
+    );
+  }
+  entries.push({
+    path: `${folder}/Map.tscn`,
+    data: `[gd_scene load_steps=${player ? 3 : 2} format=3]
+
+[ext_resource type="Script" path="${GODOT_LOADER_FILENAME}" id="1_loader"]
+${player ? '[ext_resource type="PackedScene" path="player/player.tscn" id="2_player"]\n' : ''}
+[node name="Map" type="Node2D"]
+script = ExtResource("1_loader")
+${player ? 'player_scene = ExtResource("2_player")\n' : ''}`,
+  });
   downloadBlob(createZip(entries), `${folder}-godot.zip`);
 }
 
