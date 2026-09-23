@@ -349,7 +349,8 @@ Wichtige Entscheidungen:
 - Beim Hochladen (Setup-Assistent und Tiles → Tilesets) wird jedes Tile automatisch erkannt: Boden (mit Material-Tag stone/grass/sand/wood), Wände (helle Kante zeigt zum Boden → Wand ↑/↓/←/→, Durchgangswand, Innenecke, Endstück, Kreuzung), Außenecken (heller Eckpunkt), Wandfront, Bodenrand, Wasser, Lava, Abgrund, Brücke, Deko/Hindernis (Form auf Transparenz). Trefferquote auf den Demo-Tilesets 65–83 % (nach Gruppe).
 - Jedes Tile zeigt seine Zuordnung als Label („Boden“, „Wand ↑“, „Ecke ┌“ …), farbig nach Gruppe (grün Boden, lila Wände/Ecken, blau Wasser/Lava/Abgrund, orange Türen/Brücken/Treppen, gelb Objekte, „?“ = ohne Zuordnung). Gestrichelt = automatischer Vorschlag, ausgefüllt = bestätigt; jede Änderung im Inspektor bestätigt das Tile.
 - Übersicht pro Tileset („20 Boden · 8 Wände/Ecken · 3 ohne Zuordnung“) mit „Automatisch zuordnen“ (erkennt nur Unzugeordnetes und unbestätigte Vorschläge neu, eigene Zuordnungen bleiben) und „Vorschläge bestätigen“. In der Palette per Schalter „Zuordnung“ ein-/ausblendbar; Filter „Ohne Kategorie“ zeigt nicht zugeordnete Tiles.
-- Neu: `tilesets/autoAssign.ts`, `tilesets/TileLabel.tsx`.
+- Tile-Auswahlmenü beim Hochladen (Setup → Tiles → Neues Tileset): Tile antippen → Menü mit allen Typen (Boden, Wände, Ecken außen/innen, Wandfront, Wasser, Lava, Abgrund, Brücke, Tür, Treppe, Deko …), jeweils mit kleiner Raumskizze (dunkel = Boden, hell = Wand, Rahmen = dieses Tile). Nach der Wahl springt das Menü zum nächsten Tile (abschaltbar), ◀ ▶ blättern, „Keine Zuordnung“, „Mehr Optionen“ öffnet den vollen Inspektor. Mit „Mehrfachauswahl“ mehrere Tiles markieren und einen Typ für alle wählen.
+- Neu: `tilesets/autoAssign.ts`, `tilesets/TileLabel.tsx`, `tilesets/QuickPick.tsx`.
 
 **Version 1.4.1 – Stabilität**
 

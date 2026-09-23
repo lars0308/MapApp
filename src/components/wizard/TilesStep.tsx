@@ -9,10 +9,11 @@ import { tilesetSupports } from '../../tilesets/tilePools';
 import { TileThumb } from '../../tilesets/TileThumb';
 import { AssignSummary, TileLabel, confirmedMetas, suggestMetas } from '../../tilesets/TileLabel';
 import { autoAssign } from '../../tilesets/autoAssign';
+import { QuickPick } from '../../tilesets/QuickPick';
 import { TileInspector } from '../../tilesets/TilesPanel';
 import { useEditor } from '../../store/editorStore';
 import { readFileAsDataUrl } from '../../utils/download';
-import { Button, Chip, IconButton, NumberField, Segmented } from '../ui';
+import { Button, Chip, IconButton, NumberField, Segmented, Toggle } from '../ui';
 import { Icon } from '../icons';
 
 export type TileSource = 'library' | 'upload' | 'demo';
@@ -201,6 +202,10 @@ function UploadEditor({
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [marked, setMarked] = useState<number[]>([]);
+  /** tile whose quick menu is open (local index) */
+  const [pick, setPick] = useState<number | null>(null);
+  const [multi, setMulti] = useState(false);
+  const [autoNext, setAutoNext] = useState(true);
   const [detected, setDetected] = useState<number | null>(null);
 
   const onFile = async (f: File | undefined) => {
@@ -263,9 +268,19 @@ function UploadEditor({
   const empty = new Set(upload.emptyTiles);
   const indices = Array.from({ length: upload.columns * upload.rows }, (_, i) => i).filter((i) => !empty.has(i));
   const custom = !COMMON_TILE_SIZES.includes(upload.tileSize);
-  const sum = summarizeTileset(upload);
   const list = upload.perspectives.length ? upload.perspectives : [...PERSPECTIVES];
   const onMeta = (gids: number[], patch: Partial<TileMeta>) => setUpload(applyTileMeta([upload], gids, patch)[0]);
+  const pos = pick === null ? -1 : indices.indexOf(pick);
+  const choose = (patch: Partial<TileMeta>) => {
+    if (pick === null) return;
+    const gids = multi && marked.length ? marked : [pick + 1];
+    onMeta(gids, patch);
+    if (multi) {
+      setMarked([]);
+      setPick(null);
+    } else if (autoNext && pos < indices.length - 1) setPick(indices[pos + 1]);
+    else setPick(null);
+  };
 
   return (
     <div className="upload-editor">
@@ -308,8 +323,16 @@ function UploadEditor({
       </div>
       <div className="field">
         <label>
-          Tiles <span className="muted">· {indices.length} Tiles, {sum.roles.length} Rollen zugewiesen – antippen zum Markieren</span>
+          Tiles <span className="muted">· {indices.length} Tiles – antippen, um den Typ zu wählen</span>
         </label>
+        <div className="upload-grid-bar">
+          <Toggle label="Mehrfachauswahl" checked={multi} onChange={(v) => (setMulti(v), setMarked([]))} />
+          {multi && marked.length > 0 && (
+            <Button variant="primary" onClick={() => setPick(marked[0] - 1)}>
+              Typ für {marked.length} wählen
+            </Button>
+          )}
+        </div>
         <div className="tile-grid upload-grid has-labels" role="listbox" aria-label="Tiles des neuen Tilesets" aria-multiselectable="true">
           {indices.map((i) => {
             const on = marked.includes(i + 1);
@@ -322,7 +345,7 @@ function UploadEditor({
                 aria-selected={on}
                 className={`tile-cell${on ? ' is-selected' : ''}`}
                 title={meta?.role ?? meta?.category ?? `#${i}`}
-                onClick={() => setMarked(on ? marked.filter((g) => g !== i + 1) : [...marked, i + 1])}
+                onClick={() => (multi ? setMarked(on ? marked.filter((g) => g !== i + 1) : [...marked, i + 1]) : setPick(i))}
               >
                 <TileThumb ts={upload} index={i} size={40} />
                 <TileLabel meta={meta} />
@@ -347,7 +370,25 @@ function UploadEditor({
         }}
         onConfirm={() => setUpload({ ...upload, tiles: { ...upload.tiles, ...confirmedMetas(upload.tiles) } })}
       />
-      <TileInspector gids={marked} tilesets={[upload]} onMeta={onMeta} />
+      {marked.length > 0 && <TileInspector gids={marked} tilesets={[upload]} onMeta={onMeta} />}
+      {pick !== null && (
+        <QuickPick
+          ts={upload}
+          index={pick}
+          count={multi ? Math.max(1, marked.length) : 1}
+          position={`${pos + 1} / ${indices.length}`}
+          autoNext={autoNext}
+          onAutoNext={setAutoNext}
+          onPick={choose}
+          onNav={multi ? undefined : (d) => setPick(indices[Math.min(indices.length - 1, Math.max(0, pos + d))])}
+          onMore={() => {
+            // full inspector (collision, weight, tags …) for this tile
+            if (!multi) setMarked([pick + 1]);
+            setPick(null);
+          }}
+          onClose={() => setPick(null)}
+        />
+      )}
       <p className="hint">
         Rolle = Verwendung im Generator (z. B. <code>floor_center</code>, <code>wall_top</code>, <code>wall_front</code>). Material-Tags von Böden (z. B. <code>#grass</code>) werden
         zu Terrain-Sets.
