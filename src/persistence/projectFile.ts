@@ -53,7 +53,7 @@ export function serializeProject(p: Project): string {
   return JSON.stringify(file);
 }
 
-export function deserializeProject(text: string): Project {
+export function deserializeProject(text: string, keepId = false): Project {
   let parsed: ProjectFile;
   try {
     parsed = JSON.parse(text);
@@ -78,11 +78,11 @@ export function deserializeProject(text: string): Project {
   return migrateProject({
     ...fp,
     // imported copies get a fresh id so they never overwrite an existing local project
-    id: uid('prj'),
+    id: keepId && fp.id ? fp.id : uid('prj'),
     generator: { ...defaultGenerator(fp.generator?.seed), ...fp.generator },
     layers,
     result,
     activeLayerId: layers.some((l) => l.id === fp.activeLayerId) ? fp.activeLayerId : layers[0]?.id,
-    updatedAt: Date.now(),
+    updatedAt: keepId ? (fp.updatedAt ?? Date.now()) : Date.now(),
   });
 }

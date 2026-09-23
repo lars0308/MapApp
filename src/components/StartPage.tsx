@@ -10,6 +10,7 @@ import { deserializeProject, PROJECT_EXTENSION } from '../persistence/projectFil
 import { readFileAsText } from '../utils/download';
 import { ExportPanel } from '../export/ExportPanel';
 import { profileLabel } from '../profiles';
+import { BackupSection } from '../persistence/BackupSection';
 
 const when = (t: number) => new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -134,6 +135,8 @@ export function StartPage() {
             </button>
           )}
         </section>
+
+        <BackupSection />
 
         <section className="start-block" aria-labelledby="recent-title">
           <h2 id="recent-title">Zuletzt bearbeitet</h2>

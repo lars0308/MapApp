@@ -5022,3 +5022,38 @@ body.is-resizing-y * {
   flex: none;
   width: 220px;
 }
+
+/* Sicherung */
+.backup-box {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.page-settings .backup-box {
+  margin: 0 0 20px;
+}
+.backup-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.backup-head h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+.backup-head p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.backup-state {
+  margin: 12px 0 10px;
+  font-size: 13px;
+  color: var(--ok);
+}
+.backup-state.is-warn {
+  color: #f0b36b;
+}

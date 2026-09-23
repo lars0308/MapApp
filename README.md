@@ -346,6 +346,10 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 2.2 – Sicherung**
+
+- **Alles sichern / Sicherung laden** (Seite „Projekt“ und „Einstellungen“): eine Datei `mapforge-sicherung-JJJJ-MM-TT.json` mit allen Karten-Projekten, der Tileset-Bibliothek und allem aus den Baukästen (aktuelle Figuren, Galerie, eigene Teile, Paletten, Spielfigur, Animations- und Lern-Einstellungen). Beim Laden werden gleiche Projekte ersetzt, andere bleiben; danach lädt die App neu. Anzeige „Letzte Sicherung vor … Tagen“ (gelb nach 7 Tagen / nie).
+
 **Version 2.1 – Ansichten, Bild für Bild, Kreaturen, Import/Export**
 
 - **Ansichten vorne / Seite / hinten**: im Baukasten umschaltbar. Seite und Rücken werden aus den Teilen erzeugt (Profil mit Nase und einem Auge, schmaler Körper; von hinten Haare statt Gesicht, Umhang/Flügel liegen oben). Was man in Seite/Hinten malt, gilt nur für diese Ansicht („Ansicht zurücksetzen“). Animationen gibt es in allen drei Richtungen – von der Seite schwingen die Beine vor und zurück.
