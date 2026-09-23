@@ -346,6 +346,12 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 1.9 – mehr Teile, Paletten, Profi-Werkzeuge**
+
+- Charakter-Baukasten deutlich erweitert: neue Gruppe **Rücken** (Umhang, Engels-/Fledermausflügel, Rucksack, Köcher, Schwanz), Körper *Rundlich* und *Groß*, Frisuren (Seitenscheitel, Pony, Afro, Zwei Zöpfe, Undercut, Lange Wellen), Gesichter (Wütend, Überrascht, Zwinkern, Katzenaugen), Kopf-Extras – jetzt kombinierbar – (Katzenohren, Brille, Schnurrbart, Sommersprossen, Narbe, Tuchmaske, Kriegsbemalung), Oberteile (Lederrüstung, Kettenhemd, Mantel, Kleid, Kapuzenpulli, Kampfanzug), Beinschienen, Leggings, Hüte (Barett, Federhut, Kopftuch, Heiligenschein, Hörnerhelm, Hexenhut), Waffen (Dolch, Streitkolben, Katana, Dreizack, Sense, Sternstab) und zweite Hand (zweites Schwert, Zauberkugel, Blume, Schlüssel).
+- **Eigene Farbpaletten** (Tab „Palette“): Vorlagen MapForge, PICO-8, Sweetie 16, DawnBringer 16, Endesga 32, Game Boy; eigene Paletten anlegen, benennen, Farben hinzufügen/entfernen, *Aus Figur übernehmen*, Import/Export im Lospec-Format (.hex/.gpl), *Figur auf Palette* (alle Pixel auf die nächste Palettenfarbe). Die aktive Palette steht links bei den Werkzeugen, „+“ übernimmt die aktuelle Farbe.
+- **Profi-Werkzeuge**: Pinselgröße 1–4 (`[` `]`), Dithering (D), Farbe ersetzen auf der ganzen Ebene (F), Aufhellen (U) / Abdunkeln (J), Hand (H, Leertaste oder mittlere Maustaste), Zoom per Mausrad, zwei Fingern oder Knöpfen (`0` = einpassen), Raster ein/aus mit 8-px-Hilfslinien. Ebenen-Menü: Duplizieren, Mit Ebene darunter zusammenführen, Umriss hinzufügen, Als Teil speichern, Löschen.
+
 **Version 1.8 – Spiel-Profil im Setup**
 
 - Neuer erster Schritt im Assistenten **„Spiel“**: Ansicht (Top-Down, Isometrisch; Side-Scroller und Hexagonal als „bald“ markiert), **Genre** (Action-Roguelite, Dungeon-Crawler, RPG/Abenteuer, Taktik, Puzzle, Anderes) und **Aufwand** (Klein & schnell, Mittel, Groß & detailliert). Daraus werden Map-Größe, Raumanzahl und -größen, Gänge, Spezialräume, Deko, Gelände und Boden-Varianten voreingestellt – alle Regler bleiben in den folgenden Schritten änderbar. Die Perspektiven-Auswahl zeigt nur, was zur Ansicht passt.

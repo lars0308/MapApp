@@ -3,14 +3,14 @@ import type { Body, Bounds, DemoPart, FitContext, SlotDef, SpriteDoc, SpriteKind
 import { BODIES, CHARACTER_PARTS, CHARACTER_SLOTS } from './parts/character';
 import { OBJECT_PARTS, OBJECT_SLOTS } from './parts/object';
 import { render, S } from './painter';
-import { CHANNELS, RAMP_PRESETS, defaultRamps, hexToRgb, type Channel, type Ramp, type Ramps } from './palette';
+import { CHANNELS, PALETTE_PRESETS, RAMP_PRESETS, defaultRamps, hexToRgb, type Channel, type DrawPalette, type Ramp, type Ramps } from './palette';
 import { uid } from '../utils/id';
 
 export const SLOTS: Record<SpriteKind, SlotDef[]> = { character: CHARACTER_SLOTS, object: OBJECT_SLOTS };
 export const DEMO_PARTS: Record<SpriteKind, DemoPart[]> = { character: CHARACTER_PARTS, object: OBJECT_PARTS };
 export const SIZES = [16, 32, 48, 64];
 
-export type SpriteTool = 'pen' | 'eraser' | 'fill' | 'pipette' | 'line' | 'rect' | 'move';
+export type SpriteTool = 'pen' | 'eraser' | 'fill' | 'pipette' | 'line' | 'rect' | 'move' | 'dither' | 'replace' | 'lighten' | 'darken' | 'hand';
 
 const DEFAULT_BOUNDS: Bounds = { x0: 8, y0: 9, x1: 23, y1: 26 };
 const HISTORY = 60;
@@ -18,6 +18,8 @@ const HISTORY = 60;
 const KEY_DOC = (k: SpriteKind) => `mapforge.sprite.current.${k}`;
 const KEY_PARTS = 'mapforge.sprite.parts.v1';
 const KEY_GALLERY = 'mapforge.sprite.gallery.v1';
+const KEY_PALETTES = 'mapforge.sprite.palettes.v1';
+const KEY_ACTIVE_PALETTE = 'mapforge.sprite.palette';
 
 // ---------------------------------------------------------------- pixel helpers
 
@@ -225,6 +227,27 @@ interface SpriteState {
   tool: SpriteTool;
   color: string;
   mirror: boolean;
+  /** brush size in pixels (pen, eraser, dither, lighten, darken) */
+  brush: number;
+  /** canvas zoom on top of "fit" (1 = fit) and pan in screen px */
+  zoom: number;
+  pan: { x: number; y: number };
+  grid: boolean;
+  /** own palettes (presets come from PALETTE_PRESETS) */
+  palettes: DrawPalette[];
+  activePalette: string;
+  setBrush: (n: number) => void;
+  setView: (v: Partial<{ zoom: number; pan: { x: number; y: number }; grid: boolean }>) => void;
+  setActivePalette: (id: string) => void;
+  /** change a palette – a preset is copied first ("Meine …"); returns the edited palette id */
+  editPalette: (id: string, fn: (p: DrawPalette) => DrawPalette) => string;
+  createPalette: (name: string, colors: string[]) => string;
+  deletePalette: (id: string) => void;
+  duplicateLayer: (kind: SpriteKind, id: string) => void;
+  mergeDown: (kind: SpriteKind, id: string) => void;
+  outlineLayer: (kind: SpriteKind, id: string, color: string) => void;
+  /** snap every pixel of every layer to the nearest palette colour */
+  applyPalette: (kind: SpriteKind, colors: string[]) => void;
   userParts: UserPart[];
   gallery: GalleryEntry[];
   /** bumps on every pixel change (canvas redraw) */
@@ -288,6 +311,123 @@ export const useSprites = create<SpriteState>((set, get) => {
     tool: 'pen',
     color: '#e86f6f',
     mirror: false,
+    brush: 1,
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+    grid: true,
+    palettes: read<DrawPalette[]>(KEY_PALETTES, []),
+    activePalette: read<string>(KEY_ACTIVE_PALETTE, 'mapforge'),
+    setBrush: (brush) => set({ brush }),
+    setView: (v) => set(v as Partial<SpriteState>),
+    setActivePalette: (activePalette) => {
+      set({ activePalette });
+      write(KEY_ACTIVE_PALETTE, activePalette);
+    },
+    editPalette: (id, fn) => {
+      let palettes = get().palettes;
+      let target = palettes.find((p) => p.id === id);
+      if (!target) {
+        const preset = PALETTE_PRESETS.find((p) => p.id === id);
+        if (!preset) return id;
+        target = { id: uid(), name: `Meine ${preset.name}`, colors: [...preset.colors] };
+        palettes = [...palettes, target];
+      }
+      const next = fn(target);
+      palettes = palettes.map((p) => (p.id === target!.id ? { ...next, id: target!.id, preset: undefined } : p));
+      set({ palettes, activePalette: target.id });
+      write(KEY_PALETTES, palettes);
+      write(KEY_ACTIVE_PALETTE, target.id);
+      return target.id;
+    },
+    createPalette: (name, colors) => {
+      const p: DrawPalette = { id: uid(), name, colors };
+      const palettes = [...get().palettes, p];
+      set({ palettes, activePalette: p.id });
+      write(KEY_PALETTES, palettes);
+      write(KEY_ACTIVE_PALETTE, p.id);
+      return p.id;
+    },
+    deletePalette: (id) => {
+      const palettes = get().palettes.filter((p) => p.id !== id);
+      set({ palettes, activePalette: get().activePalette === id ? 'mapforge' : get().activePalette });
+      write(KEY_PALETTES, palettes);
+    },
+    duplicateLayer: (kind, id) => {
+      const k = get()[kind];
+      const i = k.doc.layers.findIndex((l) => l.id === id);
+      if (i < 0) return;
+      const src = k.doc.layers[i];
+      const copy: SpriteLayer = { ...src, id: uid(), name: `${src.name} Kopie`, slot: 'extra', partId: null, edited: true, data: new Uint8ClampedArray(src.data) };
+      const layers = [...k.doc.layers.slice(0, i + 1), copy, ...k.doc.layers.slice(i + 1)];
+      setDoc(kind, { layers }, { ...snapshot(kind), active: copy.id });
+    },
+    mergeDown: (kind, id) => {
+      const k = get()[kind];
+      const i = k.doc.layers.findIndex((l) => l.id === id);
+      if (i <= 0) return;
+      const below = k.doc.layers[i - 1];
+      const merged = compose({ ...k.doc, layers: [{ ...below, visible: true }, { ...k.doc.layers[i], visible: true }] });
+      const layers = k.doc.layers.filter((l) => l.id !== id).map((l) => (l.id === below.id ? { ...l, data: merged, edited: true } : l));
+      setDoc(kind, { layers }, { ...snapshot(kind), active: below.id });
+    },
+    applyPalette: (kind, colors) => {
+      if (!colors.length) return;
+      const k = get()[kind];
+      const pal = colors.map(hexToRgb);
+      const hist = snapshot(kind);
+      const near = new Map<number, [number, number, number]>();
+      const layers = k.doc.layers.map((l) => {
+        const d = new Uint8ClampedArray(l.data);
+        for (let i = 0; i < d.length; i += 4) {
+          if (!d[i + 3]) continue;
+          const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
+          let best = near.get(key);
+          if (!best) {
+            let bd = Infinity;
+            for (const c of pal) {
+              // weighted RGB distance (closer to what the eye sees)
+              const dr = c[0] - d[i];
+              const dg = c[1] - d[i + 1];
+              const db = c[2] - d[i + 2];
+              const dist = 2 * dr * dr + 4 * dg * dg + 3 * db * db;
+              if (dist < bd) {
+                bd = dist;
+                best = c;
+              }
+            }
+            near.set(key, best!);
+          }
+          d[i] = best![0];
+          d[i + 1] = best![1];
+          d[i + 2] = best![2];
+        }
+        return { ...l, data: d, edited: true };
+      });
+      setDoc(kind, { layers }, hist);
+    },
+    outlineLayer: (kind, id, color) => {
+      const k = get()[kind];
+      const n = k.doc.size;
+      const [r, g, b] = hexToRgb(color);
+      const hist = snapshot(kind);
+      setDoc(
+        kind,
+        {
+          layers: k.doc.layers.map((l) => {
+            if (l.id !== id) return l;
+            const d = new Uint8ClampedArray(l.data);
+            const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < n && y < n && l.data[(y * n + x) * 4 + 3] > 0;
+            for (let y = 0; y < n; y++)
+              for (let x = 0; x < n; x++) {
+                if (solid(x, y)) continue;
+                if (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1)) d.set([r, g, b, 255], (y * n + x) * 4);
+              }
+            return { ...l, data: d, edited: true };
+          }),
+        },
+        hist,
+      );
+    },
     userParts: read<UserPart[]>(KEY_PARTS, []),
     gallery: read<GalleryEntry[]>(KEY_GALLERY, []),
     rev: 0,
@@ -306,7 +446,7 @@ export const useSprites = create<SpriteState>((set, get) => {
       set({ loaded: { ...get().loaded, [kind]: true } });
     },
     setTool: (tool) => set({ tool }),
-    setColor: (color) => set({ color, tool: get().tool === 'eraser' || get().tool === 'move' || get().tool === 'pipette' ? 'pen' : get().tool }),
+    setColor: (color) => set({ color, tool: ['eraser', 'move', 'pipette', 'hand', 'lighten', 'darken'].includes(get().tool) ? 'pen' : get().tool }),
     setMirror: (mirror) => set({ mirror }),
     setActive: (kind, id) => patch(kind, { active: id }),
     checkpoint: (kind) => patch(kind, snapshot(kind)),
@@ -430,14 +570,14 @@ export const useSprites = create<SpriteState>((set, get) => {
       const parts = DEMO_PARTS[kind];
       const chance: Record<string, number> =
         kind === 'character'
-          ? { shadow: 1, body: 1, legs: 0.9, feet: 0.85, top: 0.95, hands: 0.4, face: 1, headx: 0.35, hair: 0.85, hat: 0.4, weapon: 0.75, offhand: 0.4 }
+          ? { shadow: 1, back: 0.3, body: 1, legs: 0.9, feet: 0.85, top: 0.95, hands: 0.4, face: 1, hair: 0.85, hat: 0.4, weapon: 0.75, offhand: 0.4 }
           : { shadow: 1, base: 1 };
       // body / base first (others fit to it)
       const order = [...SLOTS[kind]].sort((a, b) => Number(b.id === 'body' || b.id === 'base') - Number(a.id === 'body' || a.id === 'base'));
       for (const slot of order) {
         if (k.locks[slot.id] || slot.id === 'extra') continue;
         if (slot.multi) {
-          const n = slot.id === 'detail' ? Math.floor(Math.random() * 3) : Math.random() < 0.35 ? 1 : 0;
+          const n = slot.id === 'detail' ? Math.floor(Math.random() * 3) : slot.id === 'headx' ? (Math.random() < 0.45 ? 1 : 0) + (Math.random() < 0.15 ? 1 : 0) : Math.random() < 0.35 ? 1 : 0;
           const pool = parts.filter((p) => p.slot === slot.id);
           const chosen = new Set<string>();
           for (let i = 0; i < n; i++) chosen.add(pick(pool).id);

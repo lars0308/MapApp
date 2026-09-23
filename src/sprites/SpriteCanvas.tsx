@@ -1,10 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { compose, useSprites } from './store';
-import { hexToRgb } from './palette';
+import { hexToRgb, shiftColor } from './palette';
 import type { SpriteKind } from './types';
 import { useEditor } from '../store/editorStore';
+import { Icon } from '../components/icons';
+import { IconButton } from '../components/ui';
 
 type Pt = { x: number; y: number };
+type RGBA = [number, number, number, number];
 
 /** cells of a line (Bresenham) */
 function lineCells(a: Pt, b: Pt): Pt[] {
@@ -42,10 +45,12 @@ function rectCells(a: Pt, b: Pt): Pt[] {
   return out;
 }
 
+const BRUSH_TOOLS = ['pen', 'eraser', 'dither', 'lighten', 'darken'];
+
 /**
  * Zoomed pixel canvas: draws the composite of all visible layers and lets the user
- * paint on the active layer (pen, eraser, fill, pipette, line, rectangle, move).
- * It is also the drop target for parts dragged from the panel.
+ * paint on the active layer. Zoom with wheel / pinch / buttons, pan with the hand tool,
+ * space + drag or the middle mouse button. Also the drop target for dragged parts.
  */
 export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -53,9 +58,15 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
   const view = useRef({ zoom: 8, ox: 0, oy: 0 });
   const hover = useRef<Pt | null>(null);
   const preview = useRef<{ cells: Pt[]; move?: Pt } | null>(null);
-  const rev = useSprites((s) => s.rev);
-  const doc = useSprites((s) => s[kind].doc);
-  const active = useSprites((s) => s[kind].active);
+  const space = useRef(false);
+  useSprites((s) => s.rev);
+  useSprites((s) => s[kind].doc);
+  useSprites((s) => s[kind].active);
+  const zoomLevel = useSprites((s) => s.zoom);
+  const grid = useSprites((s) => s.grid);
+  useSprites((s) => s.pan);
+  useSprites((s) => s.brush);
+  useSprites((s) => s.mirror);
 
   const draw = () => {
     const c = canvasRef.current;
@@ -73,9 +84,10 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     const st = useSprites.getState();
     const d = st[kind].doc;
     const n = d.size;
-    const zoom = Math.max(2, Math.floor((Math.min(W, H) - 16) / n));
-    const ox = Math.floor((W - n * zoom) / 2);
-    const oy = Math.floor((H - n * zoom) / 2);
+    const fit = Math.max(2, Math.floor((Math.min(W, H) - 16) / n));
+    const zoom = Math.max(1, Math.round(fit * st.zoom));
+    const ox = Math.floor((W - n * zoom) / 2 + st.pan.x);
+    const oy = Math.floor((H - n * zoom) / 2 + st.pan.y);
     view.current = { zoom, ox, oy };
     const g = c.getContext('2d')!;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -96,8 +108,7 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     off.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(img), n, n), 0, 0);
     g.imageSmoothingEnabled = false;
     g.drawImage(off, ox, oy, n * zoom, n * zoom);
-    // grid
-    if (zoom >= 6) {
+    if (st.grid && zoom >= 6) {
       g.strokeStyle = 'rgba(255,255,255,0.06)';
       g.lineWidth = 1;
       g.beginPath();
@@ -108,8 +119,19 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
         g.lineTo(ox + n * zoom, oy + i * zoom + 0.5);
       }
       g.stroke();
-      // centre line (helps symmetric drawing)
-      g.strokeStyle = st.mirror ? 'rgba(232,137,176,0.55)' : 'rgba(255,255,255,0.1)';
+      // 8-px guides + centre line (symmetric drawing)
+      g.strokeStyle = 'rgba(255,255,255,0.1)';
+      g.beginPath();
+      for (let i = 8; i < n; i += 8) {
+        g.moveTo(ox + i * zoom + 0.5, oy);
+        g.lineTo(ox + i * zoom + 0.5, oy + n * zoom);
+        g.moveTo(ox, oy + i * zoom + 0.5);
+        g.lineTo(ox + n * zoom, oy + i * zoom + 0.5);
+      }
+      g.stroke();
+    }
+    if (st.mirror) {
+      g.strokeStyle = 'rgba(232,137,176,0.6)';
       g.beginPath();
       g.moveTo(ox + (n / 2) * zoom + 0.5, oy);
       g.lineTo(ox + (n / 2) * zoom + 0.5, oy + n * zoom);
@@ -117,17 +139,19 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     }
     g.strokeStyle = '#3a3945';
     g.strokeRect(ox - 0.5, oy - 0.5, n * zoom + 1, n * zoom + 1);
-    // line / rect preview
     if (preview.current?.cells.length) {
-      g.fillStyle = st.tool === 'eraser' ? 'rgba(255,255,255,0.35)' : st.color;
+      g.fillStyle = st.color;
       for (const p of preview.current.cells) if (p.x >= 0 && p.y >= 0 && p.x < n && p.y < n) g.fillRect(ox + p.x * zoom, oy + p.y * zoom, zoom, zoom);
     }
-    // hover cell
+    // hover: brush footprint
     const h = hover.current;
-    if (h && h.x >= 0 && h.y >= 0 && h.x < n && h.y < n && st.tool !== 'move') {
+    if (h && st.tool !== 'move' && st.tool !== 'hand') {
+      const b = BRUSH_TOOLS.includes(st.tool) ? st.brush : 1;
+      const o = Math.floor((b - 1) / 2);
       g.strokeStyle = 'rgba(255,255,255,0.8)';
-      g.strokeRect(ox + h.x * zoom + 0.5, oy + h.y * zoom + 0.5, zoom - 1, zoom - 1);
-      if (st.mirror) g.strokeRect(ox + (n - 1 - h.x) * zoom + 0.5, oy + h.y * zoom + 0.5, zoom - 1, zoom - 1);
+      const box = (x: number) => g.strokeRect(ox + (x - o) * zoom + 0.5, oy + (h.y - o) * zoom + 0.5, b * zoom - 1, b * zoom - 1);
+      box(h.x);
+      if (st.mirror) box(n - 1 - h.x - (b - 1) + 2 * o);
     }
   };
 
@@ -137,12 +161,30 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
   useEffect(() => {
     const ro = new ResizeObserver(() => draw());
     if (wrapRef.current) ro.observe(wrapRef.current);
-    return () => ro.disconnect();
+    const kd = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && (e.target as HTMLElement)?.tagName !== 'INPUT') {
+        space.current = true;
+      }
+    };
+    const ku = (e: KeyboardEvent) => e.code === 'Space' && (space.current = false);
+    window.addEventListener('keydown', kd);
+    window.addEventListener('keyup', ku);
+    // wheel zoom (non-passive so the page does not scroll)
+    const c = canvasRef.current;
+    const wheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const st = useSprites.getState();
+      st.setView({ zoom: Math.max(0.5, Math.min(8, st.zoom * (e.deltaY < 0 ? 1.25 : 0.8))) });
+    };
+    c?.addEventListener('wheel', wheel, { passive: false });
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('keydown', kd);
+      window.removeEventListener('keyup', ku);
+      c?.removeEventListener('wheel', wheel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  void rev;
-  void doc;
-  void active;
 
   const cellAt = (e: { clientX: number; clientY: number }): Pt => {
     const r = canvasRef.current!.getBoundingClientRect();
@@ -164,23 +206,59 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     return useSprites.getState()[kind].doc.layers.find((x) => x.id === id) ?? null;
   };
 
-  const put = (data: Uint8ClampedArray, n: number, p: Pt, rgba: [number, number, number, number]) => {
+  /** paint one brush dab (size, mirror, dither, lighten / darken) */
+  const touched = useRef<Set<number>>(new Set());
+  const dab = (data: Uint8ClampedArray, n: number, p: Pt, tool: string) => {
     const st = useSprites.getState();
-    const pts = st.mirror ? [p, { x: n - 1 - p.x, y: p.y }] : [p];
-    for (const q of pts) {
-      if (q.x < 0 || q.y < 0 || q.x >= n || q.y >= n) continue;
-      data.set(rgba, (q.y * n + q.x) * 4);
-    }
+    const b = BRUSH_TOOLS.includes(tool) ? st.brush : 1;
+    const o = Math.floor((b - 1) / 2);
+    const rgb = hexToRgb(st.color);
+    for (let dy = 0; dy < b; dy++)
+      for (let dx = 0; dx < b; dx++) {
+        const q = { x: p.x - o + dx, y: p.y - o + dy };
+        const pts = st.mirror ? [q, { x: n - 1 - q.x, y: q.y }] : [q];
+        for (const r of pts) {
+          if (r.x < 0 || r.y < 0 || r.x >= n || r.y >= n) continue;
+          const i = (r.y * n + r.x) * 4;
+          if (tool === 'eraser') data.set([0, 0, 0, 0], i);
+          else if (tool === 'dither') {
+            if ((r.x + r.y) % 2 === 0) data.set([...rgb, 255] as RGBA, i);
+          } else if (tool === 'lighten' || tool === 'darken') {
+            // once per stroke and pixel, only where something is drawn
+            if (!data[i + 3] || touched.current.has(i)) continue;
+            touched.current.add(i);
+            data.set(shiftColor(data[i], data[i + 1], data[i + 2], tool === 'lighten' ? 0.18 : -0.18), i);
+          } else data.set([...rgb, 255] as RGBA, i);
+        }
+      }
   };
 
-  const drag = useRef<{ start: Pt; last: Pt; layer: string; tool: string } | null>(null);
+  // pointers (two fingers = pinch zoom / pan)
+  const pointers = useRef(new Map<number, Pt>());
+  const pinch = useRef<{ dist: number; mid: Pt; zoom: number; pan: Pt } | null>(null);
+  const drag = useRef<{ start: Pt; last: Pt; layer: string; tool: string; screen: Pt; pan: Pt } | null>(null);
 
   const onDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const st = useSprites.getState();
+    if (pointers.current.size === 2) {
+      // second finger: stop drawing, start pinch (undo the few pixels the first finger drew)
+      if (drag.current && BRUSH_TOOLS.includes(drag.current.tool)) st.undo(kind);
+      drag.current = null;
+      const [a, b] = [...pointers.current.values()];
+      pinch.current = { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, zoom: st.zoom, pan: st.pan };
+      return;
+    }
+    if (e.button !== 0 && e.button !== 1) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     const n = st[kind].doc.size;
     const p = cellAt(e);
-    if (st.tool === 'pipette') {
+    const tool = e.button === 1 || space.current ? 'hand' : st.tool;
+    if (tool === 'hand') {
+      drag.current = { start: p, last: p, layer: '', tool, screen: { x: e.clientX, y: e.clientY }, pan: st.pan };
+      return;
+    }
+    if (tool === 'pipette') {
       if (p.x < 0 || p.y < 0 || p.x >= n || p.y >= n) return;
       const img = compose(st[kind].doc);
       const i = (p.y * n + p.x) * 4;
@@ -189,25 +267,40 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     }
     const layer = target();
     if (!layer) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
     st.checkpoint(kind);
-    const rgba: [number, number, number, number] = st.tool === 'eraser' ? [0, 0, 0, 0] : [...hexToRgb(st.color), 255];
-    if (st.tool === 'fill') {
-      if (p.x >= 0 && p.y >= 0 && p.x < n && p.y < n) {
+    const inside = p.x >= 0 && p.y >= 0 && p.x < n && p.y < n;
+    if (tool === 'fill') {
+      if (inside) {
+        const rgba: RGBA = [...hexToRgb(st.color), 255];
         flood(layer.data, n, p, rgba);
         if (st.mirror) flood(layer.data, n, { x: n - 1 - p.x, y: p.y }, rgba);
         st.touch(kind, layer.id);
       }
       return;
     }
-    drag.current = { start: p, last: p, layer: layer.id, tool: st.tool };
-    if (st.tool === 'pen' || st.tool === 'eraser') {
-      put(layer.data, n, p, rgba);
+    if (tool === 'replace') {
+      if (inside && replaceColor(layer.data, (p.y * n + p.x) * 4, [...hexToRgb(st.color), 255])) st.touch(kind, layer.id);
+      return;
+    }
+    touched.current = new Set();
+    drag.current = { start: p, last: p, layer: layer.id, tool, screen: { x: e.clientX, y: e.clientY }, pan: st.pan };
+    if (BRUSH_TOOLS.includes(tool)) {
+      dab(layer.data, n, p, tool);
       st.touch(kind, layer.id);
     }
   };
 
   const onMove = (e: React.PointerEvent) => {
+    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const st = useSprites.getState();
+    if (pinch.current && pointers.current.size >= 2) {
+      const [a, b] = [...pointers.current.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const pc = pinch.current;
+      st.setView({ zoom: Math.max(0.5, Math.min(8, pc.zoom * (dist / Math.max(10, pc.dist)))), pan: { x: pc.pan.x + mid.x - pc.mid.x, y: pc.pan.y + mid.y - pc.mid.y } });
+      return;
+    }
     const p = cellAt(e);
     const h = hover.current;
     if (!h || h.x !== p.x || h.y !== p.y) {
@@ -215,14 +308,17 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
       if (!drag.current) draw();
     }
     const dr = drag.current;
-    if (!dr || (dr.last.x === p.x && dr.last.y === p.y)) return;
-    const st = useSprites.getState();
+    if (!dr) return;
+    if (dr.tool === 'hand') {
+      st.setView({ pan: { x: dr.pan.x + e.clientX - dr.screen.x, y: dr.pan.y + e.clientY - dr.screen.y } });
+      return;
+    }
+    if (dr.last.x === p.x && dr.last.y === p.y) return;
     const n = st[kind].doc.size;
     const layer = st[kind].doc.layers.find((l) => l.id === dr.layer);
     if (!layer) return;
-    if (dr.tool === 'pen' || dr.tool === 'eraser') {
-      const rgba: [number, number, number, number] = dr.tool === 'eraser' ? [0, 0, 0, 0] : [...hexToRgb(st.color), 255];
-      for (const q of lineCells(dr.last, p)) put(layer.data, n, q, rgba);
+    if (BRUSH_TOOLS.includes(dr.tool)) {
+      for (const q of lineCells(dr.last, p)) dab(layer.data, n, q, dr.tool);
       st.touch(kind, layer.id);
     } else if (dr.tool === 'line' || dr.tool === 'rect') {
       const cells = dr.tool === 'line' ? lineCells(dr.start, p) : rectCells(dr.start, p);
@@ -235,7 +331,12 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     dr.last = p;
   };
 
-  const onUp = () => {
+  const onUp = (e: React.PointerEvent) => {
+    pointers.current.delete(e.pointerId);
+    if (pinch.current) {
+      if (pointers.current.size < 2) pinch.current = null;
+      return;
+    }
     const dr = drag.current;
     drag.current = null;
     if (!dr) return;
@@ -243,8 +344,7 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     const n = st[kind].doc.size;
     const layer = st[kind].doc.layers.find((l) => l.id === dr.layer);
     if (layer && (dr.tool === 'line' || dr.tool === 'rect')) {
-      const rgba: [number, number, number, number] = [...hexToRgb(st.color), 255];
-      for (const q of dr.tool === 'line' ? lineCells(dr.start, dr.last) : rectCells(dr.start, dr.last)) put(layer.data, n, q, rgba);
+      for (const q of dr.tool === 'line' ? lineCells(dr.start, dr.last) : rectCells(dr.start, dr.last)) dab(layer.data, n, q, 'pen-1');
       st.touch(kind, layer.id);
     } else if (layer && dr.tool === 'move') {
       const m = preview.current?.move;
@@ -257,8 +357,9 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     draw();
   };
 
+  const tool = useSprites.getState().tool;
   return (
-    <div className={`sprite-canvas tool-${useSprites.getState().tool}`} ref={wrapRef} data-sprite-drop={kind}>
+    <div className={`sprite-canvas tool-${tool}`} ref={wrapRef} data-sprite-drop={kind}>
       <canvas
         ref={canvasRef}
         onPointerDown={onDown}
@@ -269,8 +370,26 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
           hover.current = null;
           if (!drag.current) draw();
         }}
+        onContextMenu={(e) => e.preventDefault()}
         aria-label="Zeichenfläche"
       />
+      <div className="sprite-view-controls">
+        <IconButton label="Raster" active={grid} onClick={() => useSprites.getState().setView({ grid: !grid })}>
+          <Icon.Grid size={16} />
+        </IconButton>
+        <IconButton label="Verkleinern" onClick={() => useSprites.getState().setView({ zoom: Math.max(0.5, zoomLevel * 0.8) })}>
+          <Icon.Minus size={16} />
+        </IconButton>
+        <button type="button" className="zoom-label" title="Einpassen" onClick={() => useSprites.getState().setView({ zoom: 1, pan: { x: 0, y: 0 } })}>
+          {Math.round(zoomLevel * 100)} %
+        </button>
+        <IconButton label="Vergrößern" onClick={() => useSprites.getState().setView({ zoom: Math.min(8, zoomLevel * 1.25) })}>
+          <Icon.Plus size={16} />
+        </IconButton>
+        <IconButton label="Einpassen" onClick={() => useSprites.getState().setView({ zoom: 1, pan: { x: 0, y: 0 } })}>
+          <Icon.Fit size={16} />
+        </IconButton>
+      </div>
     </div>
   );
 }
@@ -288,7 +407,20 @@ function shifted(data: Uint8ClampedArray, n: number, dx: number, dy: number): Ui
   return out;
 }
 
-function flood(data: Uint8ClampedArray, n: number, p: Pt, rgba: [number, number, number, number]) {
+/** every pixel of the clicked colour on this layer gets the new colour */
+function replaceColor(data: Uint8ClampedArray, at: number, rgba: RGBA): boolean {
+  if (!data[at + 3]) return false;
+  const ref = [data[at], data[at + 1], data[at + 2], data[at + 3]];
+  let changed = false;
+  for (let i = 0; i < data.length; i += 4)
+    if (data[i] === ref[0] && data[i + 1] === ref[1] && data[i + 2] === ref[2] && data[i + 3] === ref[3]) {
+      data.set(rgba, i);
+      changed = true;
+    }
+  return changed;
+}
+
+function flood(data: Uint8ClampedArray, n: number, p: Pt, rgba: RGBA) {
   const i0 = (p.y * n + p.x) * 4;
   const ref = [data[i0], data[i0 + 1], data[i0 + 2], data[i0 + 3]];
   if (ref.every((v, k) => v === rgba[k])) return;

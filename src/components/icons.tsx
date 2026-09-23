@@ -341,6 +341,28 @@ export const Icon = {
       <path d="M4 12l8-8M4 20L20 4M12 20l8-8" />
     </Svg>
   ),
+  Dither: (p: P) => (
+    <Svg {...p}>
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <path d="M8 8h2v2H8zM12 8h2v2h-2zM10 10h2v2h-2zM14 10h2v2h-2zM8 12h2v2H8zM12 12h2v2h-2zM10 14h2v2h-2zM14 14h2v2h-2z" fill="currentColor" stroke="none" />
+    </Svg>
+  ),
+  Swap: (p: P) => (
+    <Svg {...p}>
+      <path d="M5 8h12l-3-3M19 16H7l3 3" />
+    </Svg>
+  ),
+  Sun: (p: P) => (
+    <Svg {...p}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4" />
+    </Svg>
+  ),
+  Moon: (p: P) => (
+    <Svg {...p}>
+      <path d="M19 14.5A7.5 7.5 0 1 1 9.5 5a6 6 0 0 0 9.5 9.5z" />
+    </Svg>
+  ),
   Home: (p: P) => (
     <Svg {...p}>
       <path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" />

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { SLOTS, compose, partById, fitContext, toPng, useSprites } from './store';
-import { CHANNEL_LABEL, CHANNELS, RAMP_PRESETS, hexToRgb, rgbToHex, type Channel, type Ramp } from './palette';
+import { CHANNEL_LABEL, CHANNELS, PALETTE_PRESETS, RAMP_PRESETS, hexToRgb, parsePaletteText, rgbToHex, type Channel, type Ramp } from './palette';
+import { downloadText, readFileAsText, safeFileName } from '../utils/download';
 import { channelsUsed } from './painter';
 import type { SpriteKind, SpriteLayer } from './types';
 import { Icon } from '../components/icons';
@@ -18,7 +19,8 @@ function LayerThumb({ layer, size }: { layer: SpriteLayer; size: number }) {
 export function LayersList({ kind, onSavePart }: { kind: SpriteKind; onSavePart: (layerId: string | null) => void }) {
   const doc = useSprites((s) => s[kind].doc);
   const active = useSprites((s) => s[kind].active);
-  const { setActive, toggleLayer, moveLayer, removeLayer, flipLayer, addLayer } = useSprites.getState();
+  const { setActive, toggleLayer, moveLayer, removeLayer, flipLayer, addLayer, duplicateLayer, mergeDown, outlineLayer } = useSprites.getState();
+  const [menu, setMenu] = useState<string | null>(null);
   const slotLabel = (id: string | null) => SLOTS[kind].find((s) => s.id === id)?.label ?? '';
   const layers = [...doc.layers].reverse();
   return (
@@ -57,13 +59,29 @@ export function LayersList({ kind, onSavePart }: { kind: SpriteKind; onSavePart:
                 <IconButton label="Spiegeln" onClick={() => flipLayer(kind, l.id)}>
                   <Icon.Mirror size={15} />
                 </IconButton>
-                <IconButton label="Als Teil speichern" onClick={() => onSavePart(l.id)}>
-                  <Icon.Save size={15} />
-                </IconButton>
-                <IconButton label="Ebene löschen" onClick={() => removeLayer(kind, l.id)}>
-                  <Icon.Trash size={15} />
+                <IconButton label="Weitere Aktionen" active={menu === l.id} onClick={() => setMenu(menu === l.id ? null : l.id)}>
+                  <Icon.More size={15} />
                 </IconButton>
               </div>
+              {menu === l.id && (
+                <div className="sprite-layer-menu" role="menu">
+                  <button type="button" role="menuitem" onClick={() => (duplicateLayer(kind, l.id), setMenu(null))}>
+                    Duplizieren
+                  </button>
+                  <button type="button" role="menuitem" disabled={i === 0} onClick={() => (mergeDown(kind, l.id), setMenu(null))}>
+                    Mit Ebene darunter zusammenführen
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => (outlineLayer(kind, l.id, '#1b1420'), setMenu(null))}>
+                    Umriss hinzufügen
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => (onSavePart(l.id), setMenu(null))}>
+                    Als Teil speichern
+                  </button>
+                  <button type="button" role="menuitem" className="is-danger" onClick={() => (removeLayer(kind, l.id), setMenu(null))}>
+                    Löschen
+                  </button>
+                </div>
+              )}
             </li>
           );
         })}
@@ -184,3 +202,117 @@ export function GalleryPanel({ kind }: { kind: SpriteKind }) {
 }
 
 export { compose };
+
+// ---------------------------------------------------------------- drawing palettes
+
+export function PalettePanel({ kind }: { kind: SpriteKind }) {
+  const palettes = useSprites((s) => s.palettes);
+  const activeId = useSprites((s) => s.activePalette);
+  const color = useSprites((s) => s.color);
+  const doc = useSprites((s) => s[kind].doc);
+  const { setActivePalette, editPalette, createPalette, deletePalette, setColor, applyPalette } = useSprites.getState();
+  const toast = useEditor((s) => s.toast);
+  const [editing, setEditing] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const all = [...PALETTE_PRESETS, ...palettes];
+  const pal = all.find((p) => p.id === activeId) ?? PALETTE_PRESETS[0];
+
+  const fromSprite = () => {
+    const img = compose(doc);
+    const set = new Set<string>();
+    for (let i = 0; i < img.length && set.size < 64; i += 4) if (img[i + 3] > 128) set.add(rgbToHex(img[i], img[i + 1], img[i + 2]));
+    createPalette(`${doc.name} – Farben`, [...set]);
+    toast(`${set.size} Farben als neue Palette übernommen`, 'success');
+  };
+  const importFile = async (f: File | undefined) => {
+    if (!f) return;
+    const colors = parsePaletteText(await readFileAsText(f));
+    if (!colors.length) toast('Keine Farben gefunden (erwartet: .hex, .txt, .gpl mit #rrggbb)', 'error');
+    else {
+      createPalette(f.name.replace(/\.[^.]+$/, ''), colors);
+      toast(`${colors.length} Farben importiert`, 'success');
+    }
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  return (
+    <div className="palette-panel">
+      <div className="palette-list" role="listbox" aria-label="Paletten">
+        {all.map((p) => (
+          <button key={p.id} type="button" role="option" aria-selected={p.id === pal.id} className={`palette-item${p.id === pal.id ? ' is-active' : ''}`} onClick={() => (setActivePalette(p.id), setEditing(false))}>
+            <span className="palette-strip">
+              {p.colors.slice(0, 16).map((c, i) => (
+                <span key={i} style={{ background: c }} />
+              ))}
+            </span>
+            <span className="palette-name">
+              {p.name}
+              <small>{p.colors.length} Farben{p.preset ? '' : ' · eigene'}</small>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <section className="palette-edit">
+        <div className="palette-edit-head">
+          {pal.preset ? (
+            <strong>{pal.name}</strong>
+          ) : (
+            <input className="input" value={pal.name} aria-label="Name der Palette" onChange={(e) => editPalette(pal.id, (p) => ({ ...p, name: e.target.value.slice(0, 30) }))} />
+          )}
+          <button type="button" className={`btn btn-ghost btn-sm${editing ? ' is-active' : ''}`} onClick={() => setEditing(!editing)}>
+            {editing ? 'Fertig' : 'Bearbeiten'}
+          </button>
+        </div>
+        {pal.preset && editing && <p className="hint">Vorlagen bleiben unverändert – beim ersten Ändern entsteht automatisch „Meine {pal.name}“.</p>}
+        <div className={`palette-colors${editing ? ' is-editing' : ''}`}>
+          {pal.colors.map((c, i) => (
+            <button
+              key={c + i}
+              type="button"
+              className={`swatch${c === color ? ' is-active' : ''}`}
+              style={{ background: c }}
+              title={editing ? `${c} entfernen` : c}
+              aria-label={editing ? `Farbe ${c} entfernen` : `Farbe ${c}`}
+              onClick={() => (editing ? editPalette(pal.id, (p) => ({ ...p, colors: p.colors.filter((_, k) => k !== i) })) : setColor(c))}
+            >
+              {editing && <Icon.Close size={12} />}
+            </button>
+          ))}
+        </div>
+        <div className="button-row">
+          <Button icon={<Icon.Plus size={16} />} disabled={pal.colors.includes(color)} onClick={() => editPalette(pal.id, (p) => ({ ...p, colors: [...p.colors, color] }))}>
+            Aktuelle Farbe
+          </Button>
+          <Button onClick={() => applyPalette(kind, pal.colors)} title="Alle Pixel der Figur auf die nächstliegende Palettenfarbe setzen">
+            Figur auf Palette
+          </Button>
+        </div>
+      </section>
+
+      <div className="button-row palette-actions">
+        <Button onClick={() => createPalette('Neue Palette', [color])}>Neue Palette</Button>
+        <Button onClick={fromSprite}>Aus Figur übernehmen</Button>
+        <Button icon={<Icon.Upload size={16} />} onClick={() => fileRef.current?.click()}>
+          Importieren
+        </Button>
+        <Button icon={<Icon.Download size={16} />} onClick={() => downloadText(pal.colors.map((c) => c.slice(1)).join('\n'), `${safeFileName(pal.name)}.hex`, 'text/plain')}>
+          .hex
+        </Button>
+        {!pal.preset &&
+          (confirmDel ? (
+            <Button variant="danger" onClick={() => (deletePalette(pal.id), setConfirmDel(false))}>
+              Wirklich löschen
+            </Button>
+          ) : (
+            <Button variant="ghost" icon={<Icon.Trash size={16} />} onClick={() => setConfirmDel(true)}>
+              Löschen
+            </Button>
+          ))}
+      </div>
+      <input ref={fileRef} type="file" accept=".hex,.txt,.gpl,.pal" hidden onChange={(e) => importFile(e.target.files?.[0])} />
+      <p className="hint">Import im Lospec-Format (.hex, .gpl). Paletten werden im Browser gespeichert.</p>
+    </div>
+  );
+}

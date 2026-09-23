@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { SIZES, SLOTS, compose, toPng, useSprites, type SpriteTool } from './store';
 import { SpriteCanvas } from './SpriteCanvas';
 import { PartsPanel } from './PartsPanel';
-import { ColorsPanel, GalleryPanel, LayersList } from './SidePanels';
-import { DRAW_SWATCHES } from './palette';
+import { ColorsPanel, GalleryPanel, LayersList, PalettePanel } from './SidePanels';
+import { PALETTE_PRESETS } from './palette';
 import type { SpriteKind } from './types';
 import { Icon } from '../components/icons';
 import { Button, IconButton } from '../components/ui';
@@ -18,13 +18,19 @@ const TOOLS: { id: SpriteTool; label: string; key: string; icon: (p: { size?: nu
   { id: 'line', label: 'Linie', key: 'L', icon: Icon.Line },
   { id: 'rect', label: 'Rechteck', key: 'R', icon: Icon.Rect },
   { id: 'move', label: 'Ebene verschieben', key: 'M', icon: Icon.Move },
+  { id: 'dither', label: 'Dithering (Schachbrett)', key: 'D', icon: Icon.Dither },
+  { id: 'replace', label: 'Farbe ersetzen (ganze Ebene)', key: 'F', icon: Icon.Swap },
+  { id: 'lighten', label: 'Aufhellen', key: 'U', icon: Icon.Sun },
+  { id: 'darken', label: 'Abdunkeln', key: 'J', icon: Icon.Moon },
+  { id: 'hand', label: 'Ansicht verschieben (Leertaste)', key: 'H', icon: Icon.Hand },
 ];
 
-type Tab = 'parts' | 'layers' | 'colors' | 'gallery';
+type Tab = 'parts' | 'layers' | 'colors' | 'palette' | 'gallery';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'parts', label: 'Teile' },
   { id: 'layers', label: 'Ebenen' },
   { id: 'colors', label: 'Farben' },
+  { id: 'palette', label: 'Palette' },
   { id: 'gallery', label: 'Galerie' },
 ];
 
@@ -57,6 +63,8 @@ export function SpriteStudio({ kind, desktop }: { kind: SpriteKind; desktop: boo
         const tool = TOOLS.find((x) => x.key.toLowerCase() === key);
         if (tool) st.setTool(tool.id);
         else if (key === 'x') st.setMirror(!st.mirror);
+        else if (key === '[' || key === ']') st.setBrush(Math.max(1, Math.min(8, st.brush + (key === ']' ? 1 : -1))));
+        else if (key === '0') st.setView({ zoom: 1, pan: { x: 0, y: 0 } });
       }
     };
     window.addEventListener('keydown', onKey);
@@ -76,6 +84,7 @@ export function SpriteStudio({ kind, desktop }: { kind: SpriteKind; desktop: boo
         {tab === 'parts' && <PartsPanel kind={kind} />}
         {tab === 'layers' && <LayersList kind={kind} onSavePart={(layerId) => setSavePart({ layerId })} />}
         {tab === 'colors' && <ColorsPanel kind={kind} />}
+        {tab === 'palette' && <PalettePanel kind={kind} />}
         {tab === 'gallery' && <GalleryPanel kind={kind} />}
       </div>
     </>
@@ -181,7 +190,11 @@ function ToolRail() {
   const tool = useSprites((s) => s.tool);
   const color = useSprites((s) => s.color);
   const mirror = useSprites((s) => s.mirror);
-  const { setTool, setColor, setMirror } = useSprites.getState();
+  const brush = useSprites((s) => s.brush);
+  const palettes = useSprites((s) => s.palettes);
+  const activePalette = useSprites((s) => s.activePalette);
+  const { setTool, setColor, setMirror, setBrush, setActivePalette, editPalette } = useSprites.getState();
+  const pal = [...PALETTE_PRESETS, ...palettes].find((p) => p.id === activePalette) ?? PALETTE_PRESETS[0];
   return (
     <div className="sprite-tools">
       <div className="sprite-tool-buttons" role="toolbar" aria-label="Zeichenwerkzeuge">
@@ -194,13 +207,34 @@ function ToolRail() {
           <Icon.Mirror size={19} />
         </IconButton>
       </div>
+      {['pen', 'eraser', 'dither', 'lighten', 'darken'].includes(tool) && (
+        <div className="sprite-brush" role="radiogroup" aria-label="Pinselgröße">
+          {[1, 2, 3, 4].map((n) => (
+            <button key={n} type="button" role="radio" aria-checked={brush === n} className={brush === n ? 'is-active' : ''} onClick={() => setBrush(n)} title={`${n} × ${n} px ( [ / ] )`}>
+              {n}
+            </button>
+          ))}
+        </div>
+      )}
+      <select className="input sprite-palette-select" value={activePalette} aria-label="Palette" onChange={(e) => setActivePalette(e.target.value)}>
+        {[...PALETTE_PRESETS, ...palettes].map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
       <div className="sprite-swatches" aria-label="Farben">
         <label className="swatch-current" title="Eigene Farbe wählen" style={{ background: color }}>
           <input type="color" value={color} onChange={(e) => setColor(e.target.value)} aria-label="Zeichenfarbe" />
         </label>
-        {DRAW_SWATCHES.map((c) => (
-          <button key={c} type="button" className={`swatch${c === color ? ' is-active' : ''}`} style={{ background: c }} aria-label={`Farbe ${c}`} onClick={() => setColor(c)} />
+        {pal.colors.map((c, i) => (
+          <button key={c + i} type="button" className={`swatch${c === color ? ' is-active' : ''}`} style={{ background: c }} aria-label={`Farbe ${c}`} title={c} onClick={() => setColor(c)} />
         ))}
+        {!pal.colors.includes(color) && (
+          <button type="button" className="swatch swatch-add" title="Aktuelle Farbe zur Palette hinzufügen" aria-label="Farbe zur Palette hinzufügen" onClick={() => editPalette(pal.id, (p) => ({ ...p, colors: [...p.colors, color] }))}>
+            <Icon.Plus size={14} />
+          </button>
+        )}
       </div>
     </div>
   );

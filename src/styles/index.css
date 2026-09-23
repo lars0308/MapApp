@@ -4458,3 +4458,186 @@ body.is-resizing-y * {
 .start-profile {
   margin: -4px 0 12px;
 }
+
+/* sprite studio: pro tools, palettes */
+.sprite-brush {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+}
+.sprite-brush button {
+  height: 28px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.sprite-brush button.is-active {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-hi);
+}
+.sprite-palette-select {
+  height: 32px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+.swatch-add {
+  display: grid;
+  place-items: center;
+  background: var(--surface-2) !important;
+  color: var(--text-2);
+  border-style: dashed;
+}
+.sprite-view-controls {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: rgba(19, 19, 24, 0.9);
+}
+.sprite-view-controls .icon-btn {
+  width: 30px;
+  height: 30px;
+}
+.sprite-canvas.tool-hand canvas {
+  cursor: grab;
+}
+.sprite-layers li {
+  position: relative;
+  flex-wrap: wrap;
+}
+.sprite-layer-menu {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 4px 2px 36px;
+}
+.sprite-layer-menu button {
+  padding: 6px 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.sprite-layer-menu button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sprite-layer-menu button.is-danger {
+  color: var(--danger);
+}
+.palette-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.palette-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.palette-item:hover {
+  background: var(--surface);
+}
+.palette-item.is-active {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.palette-strip {
+  display: flex;
+  width: 96px;
+  height: 16px;
+  flex: none;
+  overflow: hidden;
+  border-radius: 4px;
+}
+.palette-strip span {
+  flex: 1;
+}
+.palette-name {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  font-weight: 600;
+}
+.palette-name small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+.palette-edit {
+  padding: 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.palette-edit-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.palette-edit-head strong,
+.palette-edit-head .input {
+  flex: 1;
+}
+.palette-colors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(26px, 1fr));
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.palette-colors .swatch {
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+.palette-colors.is-editing .swatch svg {
+  filter: drop-shadow(0 0 2px #000);
+}
+.palette-actions .btn {
+  flex: 1 1 auto;
+}
+.sprite-studio.is-mobile .sprite-brush {
+  display: flex;
+}
+.sprite-studio.is-mobile .sprite-brush button {
+  width: 34px;
+}
+.sprite-studio.is-mobile .sprite-palette-select {
+  width: auto;
+}
+.sprite-studio.is-mobile .swatch-add {
+  flex: none;
+  width: 30px;
+  height: 30px;
+}
