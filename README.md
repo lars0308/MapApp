@@ -346,6 +346,13 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 2.3 – einfachere Bedienung am Handy**
+
+- Reiter zusammengefasst: **Projekt · Karte · Figuren · Animieren · Einstellungen** (passt auf jedes Handy). Unter *Figuren* oben wählen: Charakter, Kreatur oder Objekt.
+- **Animieren** fragt zuerst, *welche* Figur animiert werden soll: gespeicherte Figuren aus der Galerie, die zuletzt bearbeitete oder „Neue Figur bauen“. In der Leiste: *Auswahl* (zurück), *Speichern* (Galerie, mit Animationen), *Bearbeiten*.
+- Handy: Beim Scrollen im Baukasten wird der obere Bereich kompakt (kleinere Zeichenfläche, Vorschau/Farbwahl ausgeblendet), die Teile-/Farben-Tabs bleiben oben sichtbar. Alle Werkzeuge und Aktionen haben eine Beschriftung (Stift, Radierer, Füllen …, Neu, Import, Als Teil, PNG).
+- Kurze **„So geht's“-Hinweise** im Baukasten und beim Animieren (einmal „Verstanden“ tippen, dann weg).
+
 **Version 2.2 – Sicherung**
 
 - **Alles sichern / Sicherung laden** (Seite „Projekt“ und „Einstellungen“): eine Datei `mapforge-sicherung-JJJJ-MM-TT.json` mit allen Karten-Projekten, der Tileset-Bibliothek und allem aus den Baukästen (aktuelle Figuren, Galerie, eigene Teile, Paletten, Spielfigur, Animations- und Lern-Einstellungen). Beim Laden werden gleiche Projekte ersetzt, andere bleiben; danach lädt die App neu. Anzeige „Letzte Sicherung vor … Tagen“ (gelb nach 7 Tagen / nie).

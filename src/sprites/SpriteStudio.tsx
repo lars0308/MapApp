@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { HelpTip } from '../components/HelpTip';
+import { useApp } from '../store/appStore';
 import { SIZES, SLOTS, compose, composeView, deserialize, serialize, toPng, useSprites, type SpriteTool } from './store';
 import { SpriteCanvas } from './SpriteCanvas';
 import { PartsPanel } from './PartsPanel';
@@ -41,19 +43,19 @@ async function imageDataFromFile(file: File): Promise<ImageData> {
   return g.getImageData(x0, y0, x1 - x0 + 1, y1 - y0 + 1);
 }
 
-const TOOLS: { id: SpriteTool; label: string; key: string; icon: (p: { size?: number }) => React.ReactElement }[] = [
-  { id: 'pen', label: 'Stift', key: 'B', icon: Icon.Pencil },
-  { id: 'eraser', label: 'Radierer', key: 'E', icon: Icon.Eraser },
-  { id: 'fill', label: 'Füllen', key: 'G', icon: Icon.Fill },
-  { id: 'pipette', label: 'Pipette', key: 'I', icon: Icon.Pipette },
-  { id: 'line', label: 'Linie', key: 'L', icon: Icon.Line },
-  { id: 'rect', label: 'Rechteck', key: 'R', icon: Icon.Rect },
-  { id: 'move', label: 'Ebene verschieben', key: 'M', icon: Icon.Move },
-  { id: 'dither', label: 'Dithering (Schachbrett)', key: 'D', icon: Icon.Dither },
-  { id: 'replace', label: 'Farbe ersetzen (ganze Ebene)', key: 'F', icon: Icon.Swap },
-  { id: 'lighten', label: 'Aufhellen', key: 'U', icon: Icon.Sun },
-  { id: 'darken', label: 'Abdunkeln', key: 'J', icon: Icon.Moon },
-  { id: 'hand', label: 'Ansicht verschieben (Leertaste)', key: 'H', icon: Icon.Hand },
+const TOOLS: { id: SpriteTool; label: string; short: string; key: string; icon: (p: { size?: number }) => React.ReactElement }[] = [
+  { id: 'pen', label: 'Stift', key: 'B', short: 'Stift', icon: Icon.Pencil },
+  { id: 'eraser', label: 'Radierer', key: 'E', short: 'Radierer', icon: Icon.Eraser },
+  { id: 'fill', label: 'Füllen', key: 'G', short: 'Füllen', icon: Icon.Fill },
+  { id: 'pipette', label: 'Pipette', key: 'I', short: 'Pipette', icon: Icon.Pipette },
+  { id: 'line', label: 'Linie', key: 'L', short: 'Linie', icon: Icon.Line },
+  { id: 'rect', label: 'Rechteck', key: 'R', short: 'Rechteck', icon: Icon.Rect },
+  { id: 'move', label: 'Ebene verschieben', key: 'M', short: 'Schieben', icon: Icon.Move },
+  { id: 'dither', label: 'Dithering (Schachbrett)', key: 'D', short: 'Muster', icon: Icon.Dither },
+  { id: 'replace', label: 'Farbe ersetzen (ganze Ebene)', key: 'F', short: 'Ersetzen', icon: Icon.Swap },
+  { id: 'lighten', label: 'Aufhellen', key: 'U', short: 'Heller', icon: Icon.Sun },
+  { id: 'darken', label: 'Abdunkeln', key: 'J', short: 'Dunkler', icon: Icon.Moon },
+  { id: 'hand', label: 'Ansicht verschieben (Leertaste)', key: 'H', short: 'Ansicht', icon: Icon.Hand },
 ];
 
 type Tab = 'parts' | 'layers' | 'colors' | 'palette' | 'gallery';
@@ -70,6 +72,26 @@ export function SpriteStudio({ kind, desktop }: { kind: SpriteKind; desktop: boo
   const loaded = useSprites((s) => s.loaded[kind]);
   const [tab, setTab] = useState<Tab>('parts');
   const [savePart, setSavePart] = useState<{ layerId: string | null } | null>(null);
+  // phones: scrolling down to the parts makes the canvas smaller, the menu moves up
+  const [compact, setCompact] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (desktop) return;
+    const sc = rootRef.current?.closest('.page-main');
+    if (!sc) return;
+    const on = () => setCompact(sc.scrollTop > 40);
+    sc.addEventListener('scroll', on, { passive: true });
+    return () => sc.removeEventListener('scroll', on);
+  }, [desktop]);
+  // sticky tabs sit right below the sticky canvas block
+  useEffect(() => {
+    const root = rootRef.current;
+    const main = root?.querySelector('.sprite-main');
+    if (!root || !main || desktop) return;
+    const ro = new ResizeObserver(() => root.style.setProperty('--main-h', `${(main as HTMLElement).offsetHeight}px`));
+    ro.observe(main);
+    return () => ro.disconnect();
+  }, [desktop]);
 
   useEffect(() => {
     void useSprites.getState().load(kind);
@@ -122,8 +144,16 @@ export function SpriteStudio({ kind, desktop }: { kind: SpriteKind; desktop: boo
   );
 
   return (
-    <div className={`sprite-studio kind-${kind}${desktop ? ' is-desktop' : ' is-mobile'}`}>
+    <div className={`sprite-studio kind-${kind}${desktop ? ' is-desktop' : ' is-mobile'}${compact ? ' is-compact' : ''}`} ref={rootRef}>
       <StudioBar kind={kind} onSavePart={() => setSavePart({ layerId: null })} />
+      <HelpTip
+        id={`builder-${kind}`}
+        steps={[
+          <>Unten{desktop ? ' bzw. rechts' : ''} unter <strong>Teile</strong> eine Gruppe wählen (z. B. Haare) und ein Teil <strong>antippen</strong> – es sitzt sofort richtig.</>,
+          <>Farben ändern im Tab <strong>Farben</strong>, selbst malen mit dem <strong>Stift</strong>. <strong>Zufall</strong> würfelt eine neue {kind === 'object' ? 'Variante' : 'Figur'}.</>,
+          <>Fertig? Tab <strong>Galerie → Aktuellen speichern</strong>, dann oben <strong>Animieren</strong>.</>,
+        ]}
+      />
       <div className="sprite-work">
         {/* phones: canvas + tools stay on screen while the parts list scrolls below */}
         <div className="sprite-main">
@@ -195,6 +225,16 @@ function StudioBar({ kind, onSavePart }: { kind: SpriteKind; onSavePart: () => v
 
   return (
     <div className="studio-bar">
+      <Segmented
+        label="Was bauen?"
+        value={kind}
+        onChange={(k) => useApp.getState().goTo(k)}
+        options={[
+          { value: 'character', label: 'Charakter' },
+          { value: 'creature', label: 'Kreatur' },
+          { value: 'object', label: 'Objekt' },
+        ]}
+      />
       <input className="input studio-name" value={doc.name} aria-label="Name" onChange={(e) => renameDoc(kind, e.target.value.slice(0, 40))} />
       <Segmented
         label="Ansicht"
@@ -298,10 +338,12 @@ function ToolRail() {
         {TOOLS.map((t) => (
           <IconButton key={t.id} label={`${t.label} (${t.key})`} active={tool === t.id} onClick={() => setTool(t.id)}>
             <t.icon size={19} />
+            <span className="tool-label">{t.short}</span>
           </IconButton>
         ))}
         <IconButton label="Spiegeln beim Zeichnen (X)" active={mirror} onClick={() => setMirror(!mirror)}>
           <Icon.Mirror size={19} />
+          <span className="tool-label">Spiegeln</span>
         </IconButton>
       </div>
       {['pen', 'eraser', 'dither', 'lighten', 'darken'].includes(tool) && (

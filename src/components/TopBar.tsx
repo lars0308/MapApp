@@ -4,18 +4,16 @@ import { Icon } from './icons';
 import { SaveState } from './SaveState';
 import { GenerateButtons } from './GeneratorPanel';
 import { UndoRedo } from '../editor/Toolbar';
-import { PAGES, isPlaceholder, useApp, type Page } from '../store/appStore';
+import { TABS, isPlaceholder, tabOf, useApp, type Tab } from '../store/appStore';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { startPlaytest, stopPlaytest } from '../playtest/controller';
 import { getRenderer } from '../editor/rendererRef';
 
-const PAGE_ICON: Record<Page, (p: { size?: number }) => React.ReactElement> = {
+const PAGE_ICON: Record<Tab, (p: { size?: number }) => React.ReactElement> = {
   project: Icon.Folder,
   map: Icon.Map,
-  character: Icon.Person,
-  creature: Icon.Ghost,
-  object: Icon.Box,
+  figures: Icon.Person,
   animate: Icon.Film,
   settings: Icon.Gear,
 };
@@ -23,7 +21,8 @@ const PAGE_ICON: Record<Page, (p: { size?: number }) => React.ReactElement> = {
 /** Projekt | Karte bauen | Charakter bauen | Objekt bauen | Einstellungen */
 export function PageTabs({ compact }: { compact?: boolean }) {
   const page = useApp((s) => s.page);
-  const goTo = useApp((s) => s.goTo);
+  const tab = tabOf(page);
+  const goToTab = useApp((s) => s.goToTab);
   const ref = useRef<HTMLElement>(null);
   // phones: keep the active tab in view
   useEffect(() => {
@@ -31,17 +30,17 @@ export function PageTabs({ compact }: { compact?: boolean }) {
   }, [page]);
   return (
     <nav ref={ref} className={`page-tabs${compact ? ' is-compact' : ''}`} aria-label="Bereiche">
-      {PAGES.map((p) => {
+      {TABS.map((p) => {
         const I = PAGE_ICON[p.id];
         return (
           <button
             key={p.id}
             type="button"
             data-page={p.id}
-            className={page === p.id ? 'is-active' : ''}
-            aria-current={page === p.id ? 'page' : undefined}
+            className={tab === p.id ? 'is-active' : ''}
+            aria-current={tab === p.id ? 'page' : undefined}
             title={p.label}
-            onClick={() => goTo(p.id)}
+            onClick={() => goToTab(p.id)}
           >
             <I size={compact ? 20 : 17} />
             <span className="tab-long">{p.label}</span>

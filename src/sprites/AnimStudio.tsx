@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSprites } from './store';
+import { compose, toPng, useSprites } from './store';
 import { animsFor, frameKey, frameSize, framesOf, type AnimDef } from './animation';
 import { ANIM_PRESETS } from './animPresets';
 import { exportFramesZip, exportSheetPng, exportSpriteGodot, type ExportChoice } from './exportSprite';
 import { FrameEditor } from './FrameEditor';
 import { VIEWS, type CustomAnim, type SpriteKind, type View } from './types';
+import { HelpTip } from '../components/HelpTip';
 import { Icon } from '../components/icons';
 import { Button, IconButton, NumberField, Segmented, Slider, Toggle } from '../components/ui';
 import { useEditor } from '../store/editorStore';
@@ -78,12 +79,82 @@ function BuiltinThumb({ kind, anim, view, fps, bg }: { kind: SpriteKind; anim: A
   return <Thumb frames={frames} n={frameSize(doc.size)} fps={fps} bg={bg} />;
 }
 
+/** First step: which saved figure should be animated? */
+function FigurePicker({ kind, setKind, onPick }: { kind: SpriteKind; setKind: (k: SpriteKind) => void; onPick: () => void }) {
+  const gallery = useSprites((s) => s.gallery).filter((g) => g.doc.kind === kind);
+  const current = useSprites((s) => s[kind].doc);
+  const rev = useSprites((s) => s.rev);
+  const loaded = useSprites((s) => s.loaded[kind]);
+  const thumb = useMemo(() => (loaded ? toPng(compose(current), current.size) : ''), [current, rev, loaded]);
+  useEffect(() => {
+    void useSprites.getState().load(kind);
+  }, [kind]);
+  const noun = kind === 'object' ? 'Objekt' : kind === 'creature' ? 'Kreatur' : 'Figur';
+  return (
+    <div className="page-inner anim-picker">
+      <h1 className="page-title">Was möchtest du animieren?</h1>
+      <Segmented
+        label="Art"
+        value={kind}
+        onChange={setKind}
+        options={(['character', 'creature', 'object'] as SpriteKind[]).map((k) => ({ value: k, label: KIND_LABEL[k] }))}
+      />
+      <h2 className="subhead">Gespeicherte {kind === 'object' ? 'Objekte' : kind === 'creature' ? 'Kreaturen' : 'Charaktere'}</h2>
+      {gallery.length ? (
+        <ul className="gallery-grid anim-picker-grid">
+          {gallery.map((g) => (
+            <li key={g.doc.id}>
+              <button
+                type="button"
+                className="gallery-open"
+                onClick={async () => {
+                  await useSprites.getState().openFromGallery(kind, g.doc.id);
+                  onPick();
+                }}
+              >
+                <img src={g.thumb} alt="" />
+                <span>{g.doc.name}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted small">
+          Noch nichts gespeichert. Im Baukasten unter <strong>Galerie → Aktuellen speichern</strong> ablegen – dann erscheint es hier.
+        </p>
+      )}
+      <h2 className="subhead">Oder</h2>
+      <div className="anim-picker-more">
+        {loaded && (
+          <button type="button" className="start-continue" onClick={onPick}>
+            {thumb && <img src={thumb} alt="" className="anim-picker-thumb" />}
+            <span>
+              Zuletzt bearbeitet: <strong>{current.name}</strong>
+            </span>
+            <Icon.ChevronRight size={16} />
+          </button>
+        )}
+        <button type="button" className="start-continue" onClick={() => useApp.getState().goTo(kind)}>
+          <Icon.Plus size={18} />
+          <span>{kind === 'object' ? 'Neues Objekt bauen' : `Neue ${noun} bauen`}</span>
+          <Icon.ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function AnimStudio({ desktop }: { desktop: boolean }) {
   const [kind, setKind] = useState<SpriteKind>('character');
+  const [picked, setPicked] = useState(false);
+  if (!picked) return <FigurePicker kind={kind} setKind={setKind} onPick={() => setPicked(true)} />;
+  return <AnimWorkspace desktop={desktop} kind={kind} onBack={() => setPicked(false)} />;
+}
+
+function AnimWorkspace({ desktop, kind, onBack }: { desktop: boolean; kind: SpriteKind; onBack: () => void }) {
   const loaded = useSprites((s) => s.loaded[kind]);
   const doc = useSprites((s) => s[kind].doc);
   const rev = useSprites((s) => s.rev);
-  const gallery = useSprites((s) => s.gallery).filter((g) => g.doc.kind === kind);
   const toast = useEditor((s) => s.toast);
   const list = animsFor(kind);
   const custom = doc.customAnims ?? [];
@@ -264,29 +335,27 @@ export function AnimStudio({ desktop }: { desktop: boolean }) {
   return (
     <div className={`anim-studio${desktop ? ' is-desktop' : ' is-mobile'}`}>
       <div className="studio-bar anim-bar">
-        <Segmented
-          label="Was animieren?"
-          value={kind}
-          onChange={(k) => setKind(k)}
-          options={(['character', 'creature', 'object'] as SpriteKind[]).map((k) => ({ value: k, label: KIND_LABEL[k] }))}
-        />
-        <strong className="anim-name" title="Aus dem Baukasten">
+        <Button variant="ghost" icon={<Icon.ChevronRight size={16} style={{ transform: 'rotate(180deg)' }} />} onClick={onBack}>
+          Auswahl
+        </Button>
+        <strong className="anim-name" title={KIND_LABEL[kind]}>
           {doc.name}
         </strong>
-        {gallery.length > 0 && (
-          <select className="input anim-source" value="" aria-label="Andere Figur laden" onChange={(e) => e.target.value && void st.openFromGallery(kind, e.target.value)}>
-            <option value="">Aus Galerie laden …</option>
-            {gallery.map((g) => (
-              <option key={g.doc.id} value={g.doc.id}>
-                {g.doc.name}
-              </option>
-            ))}
-          </select>
-        )}
+        <Button icon={<Icon.Save size={16} />} onClick={() => toast(st.saveToGallery(kind) ? 'In der Galerie gespeichert – mit Animationen und bearbeiteten Bildern' : 'Speicher voll', 'success')}>
+          Speichern
+        </Button>
         <Button variant="ghost" icon={<Icon.Pencil size={16} />} onClick={() => useApp.getState().goTo(kind)}>
-          Figur bearbeiten
+          Bearbeiten
         </Button>
       </div>
+      <HelpTip
+        id="animate"
+        steps={[
+          <>Eine Animation aus der Liste antippen (oder oben einen <b>Standard</b> wählen) – die Vorschau läuft sofort.</>,
+          <>Mit <b>Richtung</b> prüfen, ob vorne, Seite und hinten gut aussehen. Einzelne Bilder lassen sich mit „Bild bearbeiten“ nachzeichnen.</>,
+          <>Unten <b>Godot-Paket (ZIP)</b> laden, entpacken und den Ordner in dein Godot-Projekt ziehen – die Szene ist sofort spielbar.</>,
+        ]}
+      />
 
       <div className="anim-work">
         <aside className="anim-list" aria-label="Animationen">

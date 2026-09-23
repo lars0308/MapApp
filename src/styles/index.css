@@ -4357,11 +4357,22 @@ body.is-resizing-y * {
   margin: 0;
   justify-content: space-between;
 }
-.sprite-studio.is-mobile .studio-actions .btn span {
-  display: none;
+/* phones: icon with a small label below – every button says what it does */
+.sprite-studio.is-mobile .studio-actions .btn {
+  flex-direction: column;
+  height: 44px;
+  padding: 2px 8px;
+  gap: 1px;
 }
-.sprite-studio.is-mobile .studio-actions .studio-random span {
-  display: inline;
+.sprite-studio.is-mobile .studio-actions .btn span {
+  font-size: 10.5px;
+  line-height: 1.1;
+}
+.sprite-studio.is-mobile .studio-bar > .segmented:first-child {
+  width: 100%;
+}
+.sprite-studio.is-mobile .studio-bar > .segmented:first-child button {
+  flex: 1;
 }
 .sprite-studio.is-mobile .sprite-work {
   display: flex;
@@ -4670,6 +4681,18 @@ body.is-resizing-y * {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 260px;
+}
+.anim-studio.is-mobile .anim-bar {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+.anim-studio.is-mobile .anim-name {
+  flex: 1;
+  min-width: 0;
+}
+.anim-studio.is-mobile .anim-bar .btn {
+  padding: 0 8px;
+  height: 36px;
 }
 .anim-source {
   width: auto;
@@ -5056,4 +5079,128 @@ body.is-resizing-y * {
 }
 .backup-state.is-warn {
   color: #f0b36b;
+}
+.anim-picker .segmented {
+  max-width: 420px;
+  margin-bottom: 8px;
+}
+.anim-picker .subhead {
+  margin: 22px 0 10px;
+}
+.anim-picker-grid {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+.anim-picker-grid .gallery-open img {
+  width: 96px;
+  height: 96px;
+}
+.anim-picker-more {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.anim-picker-more .start-continue {
+  margin: 0;
+}
+.anim-picker-thumb {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+}
+.page-main:has(.anim-picker) {
+  overflow-y: auto;
+}
+
+/* help tips */
+.help-tip {
+  margin: 10px 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  background: var(--accent-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.help-tip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.help-tip-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.help-tip ol {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--text-2);
+}
+.help-tip li + li {
+  margin-top: 3px;
+}
+.help-tip strong {
+  color: var(--text);
+}
+
+/* builder on phones: labelled tools, canvas shrinks while scrolling down */
+.tool-label {
+  display: none;
+}
+.sprite-studio.is-mobile .sprite-tool-buttons .icon-btn {
+  flex: none;
+  flex-direction: column;
+  gap: 2px;
+  width: 54px;
+  height: 50px;
+}
+.sprite-studio.is-mobile .tool-label {
+  display: block;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-2);
+}
+.sprite-studio.is-mobile .icon-btn.is-active .tool-label {
+  color: var(--accent-hi);
+}
+.sprite-studio.is-mobile .sprite-stage {
+  transition: height 0.2s ease;
+}
+.sprite-studio.is-mobile.is-compact .sprite-stage {
+  height: 30vh;
+}
+.sprite-studio.is-mobile.is-compact .sprite-preview,
+.sprite-studio.is-mobile.is-compact .sprite-brush,
+.sprite-studio.is-mobile.is-compact .sprite-palette-select,
+.sprite-studio.is-mobile.is-compact .sprite-view-controls {
+  display: none;
+}
+.sprite-studio.is-mobile.is-compact .sprite-tools {
+  gap: 4px;
+  padding: 4px 8px;
+}
+.sprite-studio.is-mobile.is-compact .sprite-tool-buttons .icon-btn {
+  height: 40px;
+}
+.sprite-studio.is-mobile.is-compact .tool-label {
+  display: none;
+}
+.sprite-studio.is-mobile .sprite-tabs {
+  position: sticky;
+  top: var(--main-h, 0px);
+  z-index: 4;
+  background: var(--bg-2);
+}
+.sprite-studio.is-mobile .help-tip {
+  margin: 8px;
 }
