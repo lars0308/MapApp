@@ -1,7 +1,7 @@
 import type { GeneratorSettings, MapSettings } from '../types';
 import { randomSeed } from './rng';
 
-export const DEFAULT_MAP: MapSettings = { width: 80, height: 80, tileSize: 32 };
+export const DEFAULT_MAP: MapSettings = { width: 80, height: 80, tileSize: 32, perspective: 'top_down', shadows: true };
 
 export function defaultGenerator(seed = randomSeed()): GeneratorSettings {
   return {
@@ -37,6 +37,9 @@ export function defaultGenerator(seed = randomSeed()): GeneratorSettings {
     decoDensity: 30,
     obstacleDensity: 20,
     hazards: 20,
+    lava: true,
+    water: true,
+    abyss: false,
   };
 }
 

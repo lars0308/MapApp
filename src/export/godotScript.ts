@@ -27,6 +27,8 @@ class_name MapForgeLoader
 var map_data: Dictionary = {}
 var tile_set: TileSet
 var tile_size: int = 16
+## top_down | low_top_down | isometric_45 (the map stays an orthogonal 2D grid)
+var perspective: String = "top_down"
 ## MapForge layer id -> TileMapLayer
 var layer_nodes: Dictionary = {}
 ## MapForge tileset id -> TileSet source id
@@ -45,8 +47,9 @@ func load_and_build(path: String) -> void:
 		return
 	var info: Dictionary = map_data.get("map", {})
 	tile_size = int(info.get("tileSize", 16))
-	print("MapForge: '%s' %dx%d tiles, tile size %d px, seed %s" % [
-		info.get("name", ""), int(info.get("width", 0)), int(info.get("height", 0)), tile_size, str(info.get("seed", ""))
+	perspective = str(info.get("perspective", "top_down"))
+	print("MapForge: '%s' %dx%d tiles, tile size %d px, perspective %s, seed %s" % [
+		info.get("name", ""), int(info.get("width", 0)), int(info.get("height", 0)), tile_size, perspective, str(info.get("seed", ""))
 	])
 	tile_set = build_tile_set(map_data, path.get_base_dir())
 	build_layers(map_data)
@@ -102,11 +105,15 @@ func build_layers(data: Dictionary) -> void:
 		node.tile_set = tile_set
 		node.z_index = int(layer.get("zIndex", 0))
 		node.visible = bool(layer.get("visible", true))
-		var is_collision: bool = layer.get("role", "") == "collision"
+		var role: String = layer.get("role", "")
+		var is_collision: bool = role == "collision"
 		if is_collision:
 			node.visible = true
 			if hide_collision_layer:
 				node.self_modulate = Color(1, 1, 1, 0)
+		if role == "shadow":
+			# shadows are drawn on top of the floor but never block anything
+			node.modulate = Color(1, 1, 1, 0.9)
 		add_child(node)
 		layer_nodes[layer["id"]] = node
 

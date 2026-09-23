@@ -10,8 +10,8 @@ export function exportProjectFile(p: Project) {
   downloadText(serializeProject(p), `${safeFileName(p.name)}${PROJECT_EXTENSION}`);
 }
 
-export async function exportJson(p: Project) {
-  const data = await buildGodotData(p, { embedImages: true });
+export async function exportJson(p: Project, includeShadows = true) {
+  const data = await buildGodotData(p, { embedImages: true, includeShadows });
   downloadText(JSON.stringify(data, null, 1), `${safeFileName(p.name)}.map.json`);
 }
 
@@ -21,8 +21,8 @@ export async function exportPng(p: Project, o: PngOptions) {
   downloadBlob(blob, `${safeFileName(p.name)}${suffix}.png`);
 }
 
-export async function exportGodotPackage(p: Project) {
-  const data = await buildGodotData(p, { embedImages: false });
+export async function exportGodotPackage(p: Project, includeShadows = true) {
+  const data = await buildGodotData(p, { embedImages: false, includeShadows });
   const folder = safeFileName(p.name);
   const entries: ZipEntry[] = [
     { path: `${folder}/map.json`, data: JSON.stringify(data, null, 1) },

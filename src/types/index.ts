@@ -11,6 +11,7 @@ export type TileCategory =
   | 'wallBottom'
   | 'wallLeft'
   | 'wallRight'
+  | 'wallFront'
   | 'innerCorner'
   | 'outerCorner'
   | 'door'
@@ -24,7 +25,12 @@ export type TileCategory =
   | 'stairs'
   | 'transition'
   | 'spawn'
-  | 'special';
+  | 'special'
+  | 'shadow';
+
+/** Camera perspective of the map. Controls which wall/tile roles the generator uses. */
+export type Perspective = 'top_down' | 'low_top_down' | 'isometric_45';
+export const PERSPECTIVES: Perspective[] = ['top_down', 'low_top_down', 'isometric_45'];
 
 export interface TileMeta {
   category?: TileCategory;
@@ -50,11 +56,14 @@ export interface Tileset {
   tiles: Record<number, TileMeta>;
   /** Local indices of fully transparent tiles (hidden in the palette). */
   emptyTiles: number[];
+  /** Perspectives this tileset is drawn for (empty = all). */
+  perspectives: Perspective[];
 }
 
 export type LayerRole =
   | 'floor'
   | 'paths'
+  | 'shadow'
   | 'walls'
   | 'objects'
   | 'deco'
@@ -77,6 +86,9 @@ export interface MapSettings {
   width: number;
   height: number;
   tileSize: number;
+  perspective: Perspective;
+  /** generate subtle wall shadows into the shadow layer */
+  shadows: boolean;
 }
 
 export type RoomShape = 'rect' | 'l' | 't' | 'cross' | 'irregular' | 'hall';
@@ -126,6 +138,10 @@ export interface GeneratorSettings {
   decoDensity: number;
   obstacleDensity: number;
   hazards: number;
+  /** which hazard terrains may be used */
+  lava: boolean;
+  water: boolean;
+  abyss: boolean;
 }
 
 export interface Room {
@@ -192,6 +208,9 @@ export interface GenerationResult {
   cells: Uint8Array;
   /** 8-bit neighbour mask of walkable cells for every wall cell (auto-tiling ready). */
   wallMask: Uint8Array;
+  /** 4-bit mask (N=1,E=2,S=4,W=8) of walkable neighbours for every walkable cell. */
+  floorMask: Uint8Array;
+  perspective: Perspective;
   warnings: string[];
 }
 

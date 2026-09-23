@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GeneratorSettings, Layer, LayerRole, Project, TileMeta, Tileset } from '../types';
+import type { GeneratorSettings, Layer, LayerRole, MapSettings, Project, TileMeta, Tileset } from '../types';
 import { DEFAULT_MAP, PRESETS, defaultGenerator } from '../generator/presets';
 import { randomSeed } from '../generator/rng';
 import { generate } from '../generator';
@@ -11,8 +11,11 @@ import { clamp } from '../utils/math';
 import { History, cloneLayers, type DocSnapshot } from './history';
 import { mapEvents } from './events';
 
-export function createProject(name = 'Neues Projekt'): Project {
-  const map = { ...DEFAULT_MAP };
+export function createProject(
+  name = 'Neues Projekt',
+  opts: { map?: Partial<MapSettings>; generator?: GeneratorSettings } = {},
+): Project {
+  const map: MapSettings = { ...DEFAULT_MAP, ...opts.map };
   const demo = createDemoTileset(1);
   const layers = createDefaultLayers(map.width * map.height);
   const now = Date.now();
@@ -23,7 +26,7 @@ export function createProject(name = 'Neues Projekt'): Project {
     createdAt: now,
     updatedAt: now,
     map,
-    generator: defaultGenerator(),
+    generator: opts.generator ? { ...opts.generator } : defaultGenerator(),
     tilesets: [demo],
     nextGid: 1 + demo.columns * demo.rows,
     layers,
@@ -52,13 +55,14 @@ interface ProjectState {
 
   setMapSize: (w: number, h: number) => void;
   setTileSize: (size: number) => void;
+  setMapOptions: (patch: Partial<Pick<MapSettings, 'perspective' | 'shadows'>>) => void;
   updateGenerator: (patch: Partial<GeneratorSettings>) => void;
   applyPreset: (id: string) => void;
   runGenerate: (opts?: { newSeed?: boolean }) => Promise<void>;
 
   addTileset: (ts: Omit<Tileset, 'firstGid'>) => void;
   removeTileset: (id: string) => void;
-  updateTileset: (id: string, patch: Partial<Pick<Tileset, 'name' | 'active'>>) => void;
+  updateTileset: (id: string, patch: Partial<Pick<Tileset, 'name' | 'active' | 'perspectives'>>) => void;
   setTilesetTileSize: (id: string, size: number) => Promise<void>;
   setTileMeta: (gids: number[], patch: Partial<TileMeta>) => void;
 
@@ -164,6 +168,10 @@ export const useProject = create<ProjectState>((set, get) => {
       const p = get().project;
       touch({ ...p, map: { ...p.map, tileSize: clamp(Math.round(size), 4, 256) } });
       mapEvents.emit({ type: 'all' });
+    },
+    setMapOptions: (patch) => {
+      const p = get().project;
+      touch({ ...p, map: { ...p.map, ...patch } });
     },
     updateGenerator: (patch) => {
       const p = get().project;

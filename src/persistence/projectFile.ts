@@ -2,6 +2,7 @@ import type { GenerationResult, Layer, Project } from '../types';
 import { rleDecode, rleEncode } from '../utils/rle';
 import { defaultGenerator } from '../generator/presets';
 import { uid } from '../utils/id';
+import { migrateProject } from './migrate';
 
 // Portable project format (*.mapforge.json). Layer data is run-length encoded.
 
@@ -12,9 +13,10 @@ interface FileLayer extends Omit<Layer, 'data'> {
   data: number[];
 }
 
-interface FileResult extends Omit<GenerationResult, 'cells' | 'wallMask'> {
+interface FileResult extends Omit<GenerationResult, 'cells' | 'wallMask' | 'floorMask'> {
   cells: number[];
   wallMask: number[];
+  floorMask?: number[];
 }
 
 interface ProjectFile {
@@ -34,7 +36,14 @@ export function serializeProject(p: Project): string {
     project: {
       ...p,
       layers: p.layers.map((l) => ({ ...l, data: rleEncode(l.data) })),
-      result: p.result ? { ...p.result, cells: rleEncode(p.result.cells), wallMask: rleEncode(p.result.wallMask) } : null,
+      result: p.result
+        ? {
+            ...p.result,
+            cells: rleEncode(p.result.cells),
+            wallMask: rleEncode(p.result.wallMask),
+            floorMask: rleEncode(p.result.floorMask ?? new Uint8Array(0)),
+          }
+        : null,
     },
   };
   return JSON.stringify(file);
@@ -56,9 +65,11 @@ export function deserializeProject(text: string): Project {
         ...fp.result,
         cells: rleDecode(fp.result.cells, new Uint8Array(fp.result.width * fp.result.height)),
         wallMask: rleDecode(fp.result.wallMask, new Uint8Array(fp.result.width * fp.result.height)),
+        floorMask: rleDecode(fp.result.floorMask ?? [], new Uint8Array(fp.result.width * fp.result.height)),
+        perspective: fp.result.perspective ?? fp.map.perspective ?? 'top_down',
       }
     : null;
-  return {
+  return migrateProject({
     ...fp,
     // imported copies get a fresh id so they never overwrite an existing local project
     id: uid('prj'),
@@ -67,5 +78,5 @@ export function deserializeProject(text: string): Project {
     result,
     activeLayerId: layers.some((l) => l.id === fp.activeLayerId) ? fp.activeLayerId : layers[0]?.id,
     updatedAt: Date.now(),
-  };
+  });
 }

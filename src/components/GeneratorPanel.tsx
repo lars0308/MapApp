@@ -1,51 +1,17 @@
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { PRESETS } from '../generator/presets';
-import type { Distribution, GeneratorSettings, RoomShape, SpecialRoomType } from '../types';
-import { Chip, IconButton, NumberField, Section, Segmented, Slider } from './ui';
+import type { Perspective, RoomShape } from '../types';
+import { PERSPECTIVES } from '../types';
+import { CORRIDOR_OPTS, DISTRIBUTIONS, SHAPES, SPECIALS } from './generatorOptions';
+import { PERSPECTIVE_INFO } from '../generator/perspective';
+import { RoomCountGuard } from './RoomCountGuard';
+import { Chip, IconButton, NumberField, Section, Segmented, Slider, Toggle } from './ui';
 import { Icon } from './icons';
 import { copyText } from '../utils/clipboard';
 import { randomSeed } from '../generator/rng';
 import { COMMON_TILE_SIZES } from '../tilesets/slicing';
 import { Stats } from './Stats';
-
-const SHAPES: { id: RoomShape; label: string }[] = [
-  { id: 'rect', label: 'Rechteck' },
-  { id: 'l', label: 'L-Form' },
-  { id: 't', label: 'T-Form' },
-  { id: 'cross', label: 'Kreuz' },
-  { id: 'irregular', label: 'Unregelmäßig' },
-  { id: 'hall', label: 'Große Halle' },
-];
-
-const DISTRIBUTIONS: { value: Distribution; label: string }[] = [
-  { value: 'even', label: 'Gleichmäßig' },
-  { value: 'random', label: 'Zufällig' },
-  { value: 'cluster', label: 'Cluster' },
-  { value: 'center', label: 'Zentrum' },
-  { value: 'spread', label: 'Weit verteilt' },
-];
-
-const CORRIDOR_OPTS: { id: keyof GeneratorSettings['corridor']; label: string }[] = [
-  { id: 'straight', label: 'Gerade Wege' },
-  { id: 'curves', label: 'Kurven' },
-  { id: 'branches', label: 'Abzweigungen' },
-  { id: 'deadEnds', label: 'Sackgassen' },
-  { id: 'loops', label: 'Schleifen' },
-  { id: 'alternatives', label: 'Alternative Verbindungen' },
-];
-
-export const SPECIALS: { id: SpecialRoomType; label: string; color: string }[] = [
-  { id: 'start', label: 'Start', color: '#7fc59a' },
-  { id: 'end', label: 'Ende', color: '#6fa6d6' },
-  { id: 'boss', label: 'Boss', color: '#d0616b' },
-  { id: 'treasure', label: 'Schatz', color: '#d9b45b' },
-  { id: 'secret', label: 'Geheim', color: '#8a8595' },
-  { id: 'merchant', label: 'Händler', color: '#c89078' },
-  { id: 'quest', label: 'Quest', color: '#b48ad6' },
-  { id: 'arena', label: 'Arena', color: '#e0875a' },
-  { id: 'puzzle', label: 'Rätsel', color: '#5fb8b0' },
-];
 
 export function SeedField() {
   const seed = useProject((s) => s.project.generator.seed);
@@ -81,9 +47,20 @@ export function MapSettingsFields() {
   const map = useProject((s) => s.project.map);
   const setMapSize = useProject((s) => s.setMapSize);
   const setTileSize = useProject((s) => s.setTileSize);
+  const setMapOptions = useProject((s) => s.setMapOptions);
   const custom = !COMMON_TILE_SIZES.includes(map.tileSize);
   return (
     <>
+      <div className="field">
+        <label>Perspektive</label>
+        <Segmented
+          label="Perspektive"
+          value={map.perspective}
+          options={PERSPECTIVES.map((p: Perspective) => ({ value: p, label: PERSPECTIVE_INFO[p].label.replace(' / Isometric-like', '') }))}
+          onChange={(perspective) => setMapOptions({ perspective })}
+        />
+      </div>
+      <Toggle label="Schatten" description="Wandschatten in den Layer „Schatten“ generieren" checked={map.shadows} onChange={(shadows) => setMapOptions({ shadows })} />
       <div className="grid-2">
         <NumberField label="Breite" value={map.width} min={16} max={256} step={1} suffix="Tiles" onChange={(w) => setMapSize(w, map.height)} />
         <NumberField label="Höhe" value={map.height} min={16} max={256} step={1} suffix="Tiles" onChange={(h) => setMapSize(map.width, h)} />
@@ -184,7 +161,7 @@ export function GeneratorPanel() {
           <NumberField label="Max." value={g.corridorMaxWidth} min={g.corridorMinWidth} max={6} onChange={(v) => update({ corridorMaxWidth: v })} />
         </div>
         <Slider label="Verwinkelung" value={g.twistiness} unit=" %" hint={['Direkt', 'Verwinkelt']} onChange={(v) => update({ twistiness: v })} />
-        <Slider label="Direktheit" value={g.directness} unit=" %" hint={['Umwege', 'Direkt']} onChange={(v) => update({ directness: v })} />
+        <Slider label="Direktheit" value={100 - g.directness} unit=" %" hint={['Direkt', 'Umwege']} onChange={(v) => update({ directness: 100 - v })} />
         <div className="chips">
           {CORRIDOR_OPTS.map((o) => (
             <Chip key={o.id} active={g.corridor[o.id]} onClick={() => update({ corridor: { ...g.corridor, [o.id]: !g.corridor[o.id] } })}>
@@ -206,13 +183,17 @@ export function GeneratorPanel() {
             </Chip>
           ))}
         </div>
+        <RoomCountGuard specials={g.specials} roomCount={g.roomCount} onFix={(n) => update({ roomCount: n })} />
       </Section>
 
       <Section title="Ausstattung" defaultOpen={false}>
+        <Toggle label="Lava" checked={g.lava} onChange={(lava) => update({ lava })} />
+        <Toggle label="Wasser" checked={g.water} onChange={(water) => update({ water })} />
+        <Toggle label="Abgrund" checked={g.abyss} onChange={(abyss) => update({ abyss })} />
         <Slider label="Boden-Varianten" value={g.floorVariation} unit=" %" onChange={(v) => update({ floorVariation: v })} />
         <Slider label="Deko" value={g.decoDensity} unit=" %" onChange={(v) => update({ decoDensity: v })} />
         <Slider label="Hindernisse" value={g.obstacleDensity} unit=" %" onChange={(v) => update({ obstacleDensity: v })} />
-        <Slider label="Lava / Wasser" value={g.hazards} unit=" %" onChange={(v) => update({ hazards: v })} />
+        <Slider label="Menge Lava / Wasser / Abgrund" value={g.hazards} unit=" %" onChange={(v) => update({ hazards: v })} />
       </Section>
     </div>
   );

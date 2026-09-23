@@ -6,6 +6,7 @@ export const LAYER_COLORS = ['#8fa8c8', '#c8a878', '#9d93b5', '#c89078', '#8fbf9
 export const DEFAULT_LAYERS: { name: string; role: LayerRole; color: string; visible?: boolean }[] = [
   { name: 'Boden', role: 'floor', color: '#8fa8c8' },
   { name: 'Wege', role: 'paths', color: '#c8a878' },
+  { name: 'Schatten', role: 'shadow', color: '#6b6f86' },
   { name: 'Wände', role: 'walls', color: '#9d93b5' },
   { name: 'Objekte', role: 'objects', color: '#c89078' },
   { name: 'Deko', role: 'deco', color: '#8fbf9f' },
@@ -17,6 +18,7 @@ export const DEFAULT_LAYERS: { name: string; role: LayerRole; color: string; vis
 export const ROLE_LABEL: Record<LayerRole, string> = {
   floor: 'Boden',
   paths: 'Wege',
+  shadow: 'Schatten',
   walls: 'Wände',
   objects: 'Objekte',
   deco: 'Deko',

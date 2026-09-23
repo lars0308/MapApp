@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { viewEvents } from '../store/events';
-import { SPECIALS } from '../components/GeneratorPanel';
+import { SPECIALS } from '../components/generatorOptions';
 import { Button } from '../components/ui';
 import { Icon } from '../components/icons';
 import type { Room } from '../types';

@@ -62,14 +62,31 @@ export function Slider({
 }) {
   const id = useId();
   const pct = ((value - min) / (max - min)) * 100;
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+  const commit = () => {
+    const n = Number(draft.replace(',', '.'));
+    const v = Number.isFinite(n) ? clamp(Math.round(n / step) * step, min, max) : value;
+    setDraft(String(v));
+    if (v !== value) onChange(v);
+  };
   return (
     <div className="field slider-field">
       <div className="field-head">
         <label htmlFor={id}>{label}</label>
-        <output htmlFor={id}>
-          {value}
-          {unit}
-        </output>
+        <span className="slider-value">
+          <input
+            className="slider-num"
+            inputMode="numeric"
+            aria-label={`${label} Wert`}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onFocus={(e) => e.target.select()}
+            onBlur={commit}
+            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+          />
+          {unit && <span className="slider-unit">{unit.trim()}</span>}
+        </span>
       </div>
       <input
         id={id}

@@ -1,0 +1,44 @@
+import type { Perspective, SpecialRoomType } from '../types';
+
+export interface PerspectiveInfo {
+  id: Perspective;
+  label: string;
+  short: string;
+  points: string[];
+  /** rows of visible wall front below a wall cap (0 = flat top-down walls) */
+  faceRows: number;
+  /** side walls show their face */
+  sideFaces: boolean;
+}
+
+export const PERSPECTIVE_INFO: Record<Perspective, PerspectiveInfo> = {
+  top_down: {
+    id: 'top_down',
+    label: 'Top-Down',
+    short: 'Klassische Draufsicht',
+    points: ['Kamera direkt von oben', 'Flache Wände als Kanten', 'Klassische 2D-Dungeons und RPGs'],
+    faceRows: 0,
+    sideFaces: false,
+  },
+  low_top_down: {
+    id: 'low_top_down',
+    label: 'Low Top-Down',
+    short: '3/4-Ansicht mit Wandhöhe',
+    points: ['Kamera leicht schräg von oben', 'Sichtbare Wandfronten', 'Tiefe durch Oberkante + Front + Schatten'],
+    faceRows: 1,
+    sideFaces: false,
+  },
+  isometric_45: {
+    id: 'isometric_45',
+    label: '45° / Isometric-like',
+    short: 'Stärkere Schräge',
+    points: ['Doppelt hohe Wandfronten', 'Sichtbare Wandseiten', 'Braucht passende Tilesets'],
+    faceRows: 2,
+    sideFaces: true,
+  },
+};
+
+/** Special rooms that each need a room of their own. */
+export function requiredRooms(specials: Record<SpecialRoomType, boolean>): number {
+  return Object.values(specials).filter(Boolean).length;
+}

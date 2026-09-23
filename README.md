@@ -2,6 +2,8 @@
 
 Prozeduraler 2D-Map-Generator und Tile-Editor für Pixelart-Spiele – direkt im Browser, auf dem Handy wie am Desktop, mit Export nach Godot 4.
 
+- Setup-Assistent für neue Projekte (Perspektive → Map → Räume → Wege → Spezialräume → Ausstattung → Zusammenfassung)
+- Drei Perspektiven: Top-Down, Low Top-Down (3/4 mit Wandfronten) und 45° / Isometric-like – alles weiterhin 2D-Tiles
 - Dungeon-Generierung aus Räumen, Gängen, Wänden und Spezialräumen (Seed-basiert, reproduzierbar)
 - Canvas-Editor mit Pinsel, Radierer, Füllen, Rechteck, Pipette, Auswahl, Hand, Undo/Redo
 - Layer-System, eigene PNG-Tilesets, Tile-Kategorien, Tags und Gewichtungen
@@ -53,6 +55,40 @@ vercel --prod   # Production-Deployment
 
 ---
 
+## Neues Projekt: Setup-Assistent
+
+Beim ersten Start und bei **Neues Projekt** (Desktop: Kopfzeile oder Projekt & Export; Handy: **+** oben) öffnet sich ein Assistent. Erst **Map erstellen** im letzten Schritt generiert die Map und öffnet den Editor.
+
+| Schritt | Inhalt |
+| --- | --- |
+| 1 Ansicht | Top-Down, Low Top-Down oder 45° (mit Vorschaubild), Schatten an/aus |
+| 2 Map | Breite, Höhe, Tilegröße (16/32/48/64/frei) inkl. Pixelgröße, Seed |
+| 3 Räume | Anzahl, Min/Max-Größen, Abstand, Raumformen, Regelmäßigkeit |
+| 4 Wege | Gangbreite (Standard/Min/Max), Optionen, Verwinkelung, Direktheit, Vernetzung |
+| 5 Spezialräume | Start, Ende, Boss, Schatz, Händler, Quest, Arena, Geheimraum, Rätsel |
+| 6 Ausstattung | Boden-Varianten, Deko, Hindernisse, Lava, Wasser – oder **Später konfigurieren** |
+| 7 Zusammenfassung | Projektname, alle Werte auf einen Blick, **MAP ERSTELLEN** |
+
+Sind mehr Spezialräume aktiv, als Räume existieren, erscheint „Für diese Auswahl werden mindestens N Räume benötigt“ mit einem Button zum Erhöhen. Wird trotzdem erstellt, erhöht die App die Raumanzahl automatisch und meldet das. Alle Einstellungen des Assistenten werden im Projekt gespeichert und bleiben im Generator-Panel änderbar. Schließen des Assistenten ändert das aktuelle Projekt nicht (beim allerersten Start wird dann eine Demo-Map erzeugt).
+
+## Perspektiven
+
+Die Map bleibt immer ein orthogonales 2D-Raster. Die Perspektive bestimmt, **welche Tile-Rollen** der Generator an Wänden einsetzt:
+
+| Perspektive | Wandlogik |
+| --- | --- |
+| `top_down` | Wände als flache Kanten (Wand oben/unten/links/rechts, Ecken) |
+| `low_top_down` | Wand über einem Raum = **Wandfront** (1 Reihe, Tag `base`) + **Wand oben** als Oberkante darüber; Seitenwände flach |
+| `isometric_45` | Wandfront 2 Reihen hoch (`base` + `upper`), Seitenwände mit sichtbarer Fläche (Tag `side`), Schatten auch seitlich |
+
+Tile-Rollen für 3/4-Ansichten: Boden, Wand oben, **Wandfront**, Wand links, Wand rechts, Innenecke, Außenecke, Tür, **Schatten**. Das Demo-Tileset enthält passende Tiles für alle drei Perspektiven.
+
+**Schatten:** Mit „Schatten“ (Assistent oder Generator → Map) schreibt der Generator subtile Schatten unter Wandfronten (bzw. seitlich bei 45°) in den eigenen Layer **Schatten**. Der Layer ist wie jeder andere ein-/ausblendbar und im JSON/Godot-Export optional („Schatten-Layer exportieren“).
+
+**Tilesets & Perspektive:** Unter Tiles → Tilesets lässt sich pro Tileset festlegen, für welche Perspektiven es geeignet ist. Der Generator nutzt nur passende, aktive Tilesets; unpassende werden in der Liste markiert.
+
+**Auto-Tile-Logik:** `generator/autotile.ts` bestimmt für jede Zelle eine Rolle aus ihrer Nachbarschaft (8-Bit-Wandmaske, 4-Bit-Bodenmaske): Wandrichtung, Ecken, Wandfront/Oberkante, Schatten, Boden-Mitte vs. Rand (Boden-Tiles mit Tag `edge` werden automatisch an Rändern verwendet). Masken und Rollen werden exportiert; ein echtes Terrain-System kann später `wallRequest()` ersetzen.
+
 ## Bedienung
 
 | Aktion | Handy / Tablet | Desktop |
@@ -66,7 +102,13 @@ vercel --prod   # Production-Deployment
 | Speichern | Export → Speichern | Strg+S (zusätzlich Auto-Speichern) |
 | Generieren | GENERIEREN | Umschalt+Enter |
 
-Handy-Navigation: **Map · Generator · Tiles · Layer · Export**. Panels öffnen sich als Bottom Sheet; die Map verkleinert sich darüber, bleibt also sichtbar. Griff antippen oder ziehen = Sheet vergrößern/verkleinern. Im Querformat werden Navigation und Panels seitlich angeordnet.
+Handy-Navigation: **Map · Generator · Tiles · Layer · Export**. Panels öffnen sich als Bottom Sheet mit drei Zuständen:
+
+- **eingeklappt** – nur Kopfzeile, Map fast vollständig sichtbar
+- **halb geöffnet** – Map verkleinert sich darüber und bleibt sichtbar
+- **vollständig geöffnet** – Panel reicht fast bis oben; die Map dahinter ist abgedunkelt und gesperrt
+
+Griff oder Kopfzeile nach oben/unten wischen (ganz nach unten = schließen), Kopfzeile antippen oder ⌃-Button = vollständig öffnen, ✕ = schließen. Der Inhalt scrollt, der Kopfbereich bleibt fixiert. Im Querformat werden Navigation und Panels seitlich angeordnet. Alle Slider haben ein editierbares Zahlenfeld.
 
 **Seeds:** `GENERIEREN` nutzt den aktuellen Seed – gleicher Seed + gleiche Einstellungen = exakt dieselbe Map. `Neuer Seed` würfelt und generiert sofort. Seeds dürfen Zahlen oder beliebiger Text sein.
 
@@ -90,10 +132,11 @@ Handy-Navigation: **Map · Generator · Tiles · Layer · Export**. Panels öffn
 {
   "version": 1,
   "format": "mapforge-godot",
-  "map": { "name": "Dungeon", "width": 80, "height": 80, "tileSize": 32, "seed": "12345" },
+  "map": { "name": "Dungeon", "width": 60, "height": 60, "tileSize": 48, "perspective": "low_top_down", "shadows": true, "seed": "12345" },
   "tilesets": [
     { "id": "demo_dungeon", "name": "Demo Dungeon", "image": "tilesets/demo_dungeon.png",
-      "tileSize": 32, "sourceTileSize": 16, "columns": 8, "rows": 5,
+      "tileSize": 48, "sourceTileSize": 16, "columns": 8, "rows": 6,
+      "perspectives": ["top_down", "low_top_down", "isometric_45"],
       "tiles": [{ "id": 0, "atlas": [0, 0], "category": "floor", "tags": ["stone"], "weight": 70 }] }
   ],
   "layers": [
@@ -108,7 +151,7 @@ Handy-Navigation: **Map · Generator · Tiles · Layer · Export**. Panels öffn
   "doors": [{ "x": 22, "y": 9, "roomId": 0 }],
   "spawnPoints": [{ "id": "player_0", "type": "player", "x": 15, "y": 9, "roomId": 0, "properties": {} }],
   "spawnTypes": ["player", "enemy", "loot", "npc", "quest"],
-  "structure": { "encoding": "rle", "legend": { "0": "void", "1": "room", "2": "corridor", "3": "wall", "4": "hazard" }, "cells": [], "wallMask": [] }
+  "structure": { "encoding": "rle", "legend": { "0": "void", "1": "room", "2": "corridor", "3": "wall", "4": "hazard" }, "cells": [], "wallMask": [], "floorMask": [] }
 }
 ```
 
@@ -132,6 +175,8 @@ Das Script liest die Metadaten, baut ein `TileSet` mit einer `TileSetAtlasSource
 src/
   types/        Datenmodell (Project, Layer, Tileset, Room, GenerationResult …)
   generator/    Prozedurale Generierung – reine Funktionen, keine DOM-Abhängigkeit
+    perspective.ts Perspektiven (Wandreihen, Seitenflächen), benötigte Raumanzahl
+    autotile.ts   Rollen je Zelle: Wandrichtung, Front/Oberkante, Schatten, Boden-Rand
     rng.ts        deterministischer Zufall (mulberry32), Seed-Hashing
     shapes.ts     Raumformen (Rechteck, L, T, Kreuz, unregelmäßig, Halle)
     rooms.ts      Platzierung + Verteilungsmodi, Überschneidungsschutz
@@ -145,9 +190,10 @@ src/
   tilesets/     Demo-Tileset (prozedural gezeichnet), Zuschnitt, Kategorien, Palette, Gewichtungen
   layers/       Standard-Layer, Layer-Panel
   export/       JSON/Godot, PNG, ZIP-Writer, GDScript
-  persistence/  IndexedDB, Auto-Speichern, Projektdatei (RLE)
+  persistence/  IndexedDB, Auto-Speichern, Projektdatei (RLE), Migration älterer Projekte
   store/        Zustand (zustand), Undo/Redo-History, Event-Kanäle Store → Renderer
   components/   Desktop-Layout, UI-Bausteine, Generator-Panel
+    wizard/       Setup-Assistent + Perspektiv-Vorschauen
   mobile/       Mobile-Layout, Bottom Sheet
 ```
 
@@ -159,9 +205,11 @@ Wichtige Entscheidungen:
 - **Determinismus**: jeder Generator-Schritt hat einen eigenen, aus dem Seed abgeleiteten Zufallsstrom. Deko-Einstellungen ändern daher nicht das Layout.
 - **Generator-Layer** besitzen eine Rolle (`floor`, `walls`, `objects` …). Beim Generieren werden nur diese Layer neu geschrieben; eigene/duplizierte Layer (`custom`) bleiben erhalten.
 
-## Bekannte Einschränkungen (Version 1)
+## Bekannte Einschränkungen
 
-- Wände nutzen eine vereinfachte Zuordnung (oben/unten/links/rechts/Ecken). Echtes 47-Tile-Auto-Tiling ist vorbereitet (`wallMask`), aber noch nicht umgesetzt; Eckkacheln werden nicht gedreht.
+- Wände nutzen eine regelbasierte Zuordnung (Richtung, Ecken, Wandfront/Oberkante). Echtes 47-Tile-Auto-Tiling ist vorbereitet (`wallMask`, `floorMask`), aber noch nicht umgesetzt; Eckkacheln werden nicht gedreht.
+- 45° / Isometric-like ist kein echtes isometrisches Rautenraster, sondern eine 2D-Darstellung mit doppelt hohen Wandfronten und sichtbaren Seitenwänden. Ein Rautenraster (Godot `TILE_SHAPE_ISOMETRIC`) wäre eine spätere Erweiterung.
+- Schatten sind einfache Tiles (kein Licht), nur an Wänden.
 - Spezialräume sind im Datensatz und im Room Graph markiert, haben aber noch keine Spielmechanik.
 - Spawnpunkte werden nur für Start/Boss/Schatz/Händler/Quest automatisch gesetzt; weitere Spawns manuell über Tiles.
 - Auswahl-Werkzeug kann füllen und leeren, aber (noch) nicht verschieben/kopieren.
@@ -180,3 +228,20 @@ Wichtige Entscheidungen:
 - Automatische Platzierung von Gegnern/Loot nach Raumtyp und Distanz zum Start
 - Minimap, Layer-Deckkraft, Tile-Rotation/Spiegelung
 - Tileset-Optionen für Rand/Abstand und nicht-quadratische Tiles
+
+---
+
+## Änderungen
+
+**Version 1.1**
+
+- Neues Projekt öffnet einen 7-stufigen Setup-Assistenten (Desktop: Dialog, Handy: Vollbild); die Map wird erst mit „Map erstellen“ generiert. Beim ersten Start erscheint der Assistent automatisch.
+- Perspektive (`top_down`, `low_top_down`, `isometric_45`) im Datenmodell, im Projekt, in der Projektdatei, im JSON- und im Godot-Export; im Editor unter Generator → Map umschaltbar.
+- Neue Tile-Rollen **Wandfront** und **Schatten**, neuer Layer **Schatten**, perspektivabhängige Wandlogik (`generator/autotile.ts`), Boden-Randmaske.
+- Demo-Tileset erweitert (Wandfronten, Seitenwände, Schatten); flache Wandkanten für Top-Down.
+- Tilesets können Perspektiven zugeordnet werden.
+- Prüfung „mehr Spezialräume als Räume“ mit Button zum Erhöhen (Assistent + Generator-Panel) und Warnung, falls der Generator nicht alle vergeben kann.
+- Lava / Wasser / Abgrund einzeln schaltbar.
+- Mobile Bottom Sheets: eingeklappt / halb / vollständig, Wischgesten, Maximieren, Map im Vollbild blockiert.
+- Slider mit editierbarem Zahlenfeld; Direktheit wird als „Direkt ↔ Umwege“ angezeigt.
+- Ältere Projekte werden beim Öffnen/Importieren automatisch migriert (Top-Down, Schatten-Layer ergänzt).

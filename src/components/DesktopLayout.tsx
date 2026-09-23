@@ -8,6 +8,8 @@ import { TilesPanel } from '../tilesets/TilesPanel';
 import { PanelTabs } from './ui';
 import { BrushSize, HoverInfo, ToolButtons, UndoRedo, ViewControls } from '../editor/Toolbar';
 import { SaveState } from './SaveState';
+import { Icon } from './icons';
+import { useEditor } from '../store/editorStore';
 
 export function DesktopLayout() {
   const [left, setLeft] = useState<'generator' | 'project'>('generator');
@@ -15,7 +17,13 @@ export function DesktopLayout() {
     <div className="desktop">
       <header className="topbar">
         <Logo />
-        <SaveState />
+        <div className="topbar-project">
+          <SaveState />
+          <button type="button" className="btn btn-ghost btn-new" onClick={() => useEditor.getState().openWizard()}>
+            <Icon.Plus size={16} />
+            <span>Neues Projekt</span>
+          </button>
+        </div>
         <div className="topbar-center">
           <ViewSwitch />
         </div>

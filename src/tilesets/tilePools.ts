@@ -1,4 +1,4 @@
-import type { TileCategory, Tileset } from '../types';
+import type { Perspective, TileCategory, Tileset } from '../types';
 import { Rng, weightedIndex } from '../generator/rng';
 
 export interface PoolTile {
@@ -7,13 +7,18 @@ export interface PoolTile {
   tags: string[];
 }
 
-/** Weighted tile pools per category, built from all *active* tilesets. */
+export function tilesetSupports(ts: Tileset, perspective: Perspective): boolean {
+  return !ts.perspectives?.length || ts.perspectives.includes(perspective);
+}
+
+/** Weighted tile pools per category, built from all *active* tilesets (matching the perspective). */
 export class TilePools {
   private pools = new Map<TileCategory, PoolTile[]>();
 
-  constructor(tilesets: Tileset[]) {
+  constructor(tilesets: Tileset[], perspective?: Perspective) {
     for (const ts of tilesets) {
       if (!ts.active) continue;
+      if (perspective && !tilesetSupports(ts, perspective)) continue;
       const count = ts.columns * ts.rows;
       // iterate indices in order → deterministic pool order
       for (let i = 0; i < count; i++) {
@@ -70,5 +75,32 @@ export class TilePools {
       list.map((t) => t.weight),
     );
     return list[i].gid;
+  }
+
+  hasTag(cat: TileCategory, tag: string): boolean {
+    return (this.pools.get(cat) ?? []).some((t) => t.tags.includes(tag));
+  }
+
+  /**
+   * First category with tiles; inside it prefer tiles carrying `prefer`
+   * and skip tiles carrying any `avoid` tag (each only if something remains).
+   */
+  pickPref(rng: Rng, cats: TileCategory[], prefer?: string, avoid?: string[]): number {
+    const cat = this.resolve(cats);
+    if (!cat) return 0;
+    let list = this.pools.get(cat)!;
+    if (avoid?.length) {
+      const kept = list.filter((t) => !t.tags.some((g) => avoid.includes(g)));
+      if (kept.length) list = kept;
+    }
+    if (prefer) {
+      const tagged = list.filter((t) => t.tags.includes(prefer));
+      if (tagged.length) list = tagged;
+    }
+    const i = weightedIndex(
+      rng,
+      list.map((t) => t.weight),
+    );
+    return i < 0 ? 0 : list[i].gid;
   }
 }

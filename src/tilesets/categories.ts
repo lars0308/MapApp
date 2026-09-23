@@ -14,6 +14,7 @@ export const CATEGORIES: CategoryInfo[] = [
   { id: 'wallBottom', label: 'Wand unten', group: 'Wände' },
   { id: 'wallLeft', label: 'Wand links', group: 'Wände' },
   { id: 'wallRight', label: 'Wand rechts', group: 'Wände' },
+  { id: 'wallFront', label: 'Wandfront', group: 'Wände' },
   { id: 'innerCorner', label: 'Innenecke', group: 'Wände' },
   { id: 'outerCorner', label: 'Außenecke', group: 'Wände' },
   { id: 'door', label: 'Tür', group: 'Wände' },
@@ -28,6 +29,7 @@ export const CATEGORIES: CategoryInfo[] = [
   { id: 'transition', label: 'Übergang', group: 'Gameplay' },
   { id: 'spawn', label: 'Spawn', group: 'Gameplay' },
   { id: 'special', label: 'Spezialtile', group: 'Gameplay' },
+  { id: 'shadow', label: 'Schatten', group: 'Gelände' },
 ];
 
 export const CATEGORY_LABEL: Record<TileCategory, string> = Object.fromEntries(
@@ -50,4 +52,7 @@ export const SUGGESTED_TAGS = [
   'loot',
   'npc',
   'quest',
+  'side',
+  'upper',
+  'edge',
 ];

@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { DesktopLayout } from './components/DesktopLayout';
 import { MobileLayout } from './mobile/MobileLayout';
 import { Toasts } from './components/Toasts';
+import { SetupWizard } from './components/wizard/SetupWizard';
 import { useMediaQuery } from './utils/useMediaQuery';
 import { useShortcuts } from './editor/useShortcuts';
 import { useProject } from './store/projectStore';
 import { useEditor } from './store/editorStore';
 import { lastProjectId, loadProject } from './persistence/db';
-import { saveNow, startAutosave } from './persistence/autosave';
+import { startAutosave } from './persistence/autosave';
 
 /** Wide screens (desktop, tablet landscape) get the three-column editor. */
 export const DESKTOP_QUERY = '(min-width: 1000px) and (min-height: 560px)';
@@ -25,9 +26,8 @@ async function boot() {
   } catch (e) {
     console.warn('Gespeichertes Projekt konnte nicht geladen werden', e);
   }
-  // first start: generate a demo map right away
-  await useProject.getState().runGenerate();
-  await saveNow();
+  // first start: guided setup instead of an instant map
+  useEditor.getState().openWizard(true);
 }
 
 export function App() {
@@ -64,6 +64,7 @@ export function App() {
   return (
     <div className={`app${ready ? ' is-ready' : ''}`}>
       {desktop ? <DesktopLayout /> : <MobileLayout />}
+      <SetupWizard />
       <Toasts />
     </div>
   );

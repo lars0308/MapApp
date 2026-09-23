@@ -45,6 +45,9 @@ export function MobileLayout() {
         <LogoMark size={26} />
         <SaveState />
         <div className="m-top-actions">
+          <IconButton label="Neues Projekt" onClick={() => useEditor.getState().openWizard()}>
+            <Icon.Plus size={20} />
+          </IconButton>
           <UndoRedo />
           <button type="button" className="btn btn-primary m-generate" disabled={busy} onClick={() => run()}>
             <Icon.Spark size={18} />

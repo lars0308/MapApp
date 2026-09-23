@@ -15,6 +15,7 @@ export function ExportPanel() {
   const [pngGrid, setPngGrid] = useState(false);
   const [pngBg, setPngBg] = useState(true);
   const [pngScale, setPngScale] = useState<'1' | '0.5' | '0.25'>('1');
+  const [withShadows, setWithShadows] = useState(true);
 
   const tilePx = Math.max(1, Math.round(project.map.tileSize * Number(pngScale)));
   const size = pngSize(project, tilePx);
@@ -37,6 +38,12 @@ export function ExportPanel() {
       <ProjectSection />
 
       <Section title="Export">
+        <Toggle
+          label="Schatten-Layer exportieren"
+          description="Gilt für JSON und Godot-Paket"
+          checked={withShadows}
+          onChange={setWithShadows}
+        />
         <div className="export-list">
           <ExportItem
             title="Projektdatei"
@@ -48,13 +55,13 @@ export function ExportPanel() {
             title="JSON"
             meta="Map-Daten für Godot, Tilesets eingebettet"
             busy={busy === 'json'}
-            onClick={() => run('json', () => exportJson(project), 'JSON exportiert')}
+            onClick={() => run('json', () => exportJson(project, withShadows), 'JSON exportiert')}
           />
           <ExportItem
             title="Godot-Paket"
             meta="ZIP: map.json, Tileset-PNGs, Loader-Script"
             busy={busy === 'godot'}
-            onClick={() => run('godot', () => exportGodotPackage(project), 'Godot-Paket exportiert')}
+            onClick={() => run('godot', () => exportGodotPackage(project, withShadows), 'Godot-Paket exportiert')}
           />
           <ExportItem
             title="GDScript"

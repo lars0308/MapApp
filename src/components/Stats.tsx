@@ -1,4 +1,5 @@
 import { useProject } from '../store/projectStore';
+import { PERSPECTIVE_INFO } from '../generator/perspective';
 
 export function Stats() {
   const result = useProject((s) => s.project.result);
@@ -17,6 +18,7 @@ export function Stats() {
     ['Verbindungen', result.connections.length],
     ['Sackgassen', result.deadEnds],
     ['Spezial', specials],
+    ['Ansicht', PERSPECTIVE_INFO[result.perspective ?? 'top_down'].label.replace(' / Isometric-like', '')],
     ['Seed', result.seed],
   ];
   return (

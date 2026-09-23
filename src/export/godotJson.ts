@@ -41,7 +41,7 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(bin);
 }
 
-export async function buildGodotData(p: Project, opts: { embedImages: boolean }) {
+export async function buildGodotData(p: Project, opts: { embedImages: boolean; includeShadows?: boolean }) {
   const { width: W, height: H, tileSize } = p.map;
   const used = new Set<number>();
   for (const l of p.layers) for (let i = 0; i < l.data.length; i++) if (l.data[i]) used.add(l.data[i]);
@@ -73,11 +73,13 @@ export async function buildGodotData(p: Project, opts: { embedImages: boolean })
       columns: ts.columns,
       rows: ts.rows,
       active: ts.active,
+      perspectives: ts.perspectives?.length ? ts.perspectives : ['top_down', 'low_top_down', 'isometric_45'],
       tiles,
     });
   }
 
-  const layers = p.layers.map((l, z) => {
+  const exported = opts.includeShadows === false ? p.layers.filter((l) => l.role !== 'shadow') : p.layers;
+  const layers = exported.map((l, z) => {
     const tiles: GodotTile[] = [];
     for (let y = 0; y < H; y++)
       for (let x = 0; x < W; x++) {
@@ -104,7 +106,15 @@ export async function buildGodotData(p: Project, opts: { embedImages: boolean })
     format: GODOT_FORMAT,
     generator: 'MapForge',
     exportedAt: new Date().toISOString(),
-    map: { name: p.name, width: W, height: H, tileSize, seed: r?.seed ?? p.generator.seed },
+    map: {
+      name: p.name,
+      width: W,
+      height: H,
+      tileSize,
+      perspective: p.map.perspective,
+      shadows: p.map.shadows,
+      seed: r?.seed ?? p.generator.seed,
+    },
     tilesets,
     layers,
     rooms: (r?.rooms ?? []).map((room) => ({
@@ -133,6 +143,8 @@ export async function buildGodotData(p: Project, opts: { embedImages: boolean })
           cells: rleEncode(r.cells),
           wallMaskBits: { N: 1, NE: 2, E: 4, SE: 8, S: 16, SW: 32, W: 64, NW: 128 },
           wallMask: rleEncode(r.wallMask),
+          floorMaskBits: { N: 1, E: 2, S: 4, W: 8 },
+          floorMask: rleEncode(r.floorMask),
         }
       : null,
   };

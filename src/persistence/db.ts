@@ -1,4 +1,5 @@
 import type { Project } from '../types';
+import { migrateProject } from './migrate';
 
 // Minimal promise wrapper around IndexedDB.
 // Projects are stored as structured clones (typed arrays are supported natively).
@@ -75,7 +76,7 @@ export async function saveProject(p: Project): Promise<void> {
 
 export async function loadProject(id: string): Promise<Project | null> {
   const rec = await tx<StoredProject | undefined>(STORE, 'readonly', (s) => s.get(id));
-  return rec?.project ?? null;
+  return rec?.project ? migrateProject(rec.project) : null;
 }
 
 export async function listProjects(): Promise<ProjectSummary[]> {

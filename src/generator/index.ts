@@ -24,6 +24,8 @@ import { buildGraph } from './graph';
 import { carveBranches, carveCorridors, computeNearRoom, type Grid } from './corridors';
 import { assignSpecialRooms } from './specials';
 import { TilePools } from '../tilesets/tilePools';
+import { WallRole, resolveAutoTiles, wallRequest } from './autotile';
+import { requiredRooms } from './perspective';
 
 export interface GenerateInput {
   settings: GeneratorSettings;
@@ -112,6 +114,10 @@ export function generate(input: GenerateInput): GenerateOutput {
     }
   for (let i = 0; i < W * H; i++) if (wallMask[i]) grid.cells[i] = CELL_WALL;
 
+  // 11b: perspective-aware wall roles (fronts, caps), shadow + floor masks
+  const perspective = map.perspective ?? 'top_down';
+  const auto = resolveAutoTiles(grid, wallMask, perspective, map.shadows ?? false);
+
   // 12: doors where corridors meet rooms (narrow openings only)
   const doors = findDoors(grid);
   const doorSet = new Set(doors.map((d) => d.y * W + d.x));
@@ -119,11 +125,14 @@ export function generate(input: GenerateInput): GenerateOutput {
   // 13: special rooms
   const specials = assignSpecialRooms(placed, edges, s, rSpecial);
 
-  const pools = new TilePools(input.tilesets);
+  const pools = new TilePools(input.tilesets, perspective);
+  const missingSpecials = requiredRooms(s.specials) - specials.size;
+  if (missingSpecials > 0)
+    warnings.push(`${missingSpecials} Spezialraum/-räume ohne freien Raum – Raumanzahl erhöhen.`);
   if (!pools.has('floor')) warnings.push('Keine aktive Kachel der Kategorie „Boden“ – Boden-Layer bleibt leer.');
 
   // hazards (lava / water / abyss pools inside larger rooms)
-  const hazardCats = HAZARD_CATS.filter((c) => pools.has(c));
+  const hazardCats = HAZARD_CATS.filter((c) => pools.has(c) && s[c as 'lava' | 'water' | 'abyss'] !== false);
   const hazardType = new Map<number, TileCategory>();
   if (s.hazards > 0 && hazardCats.length) {
     const count = Math.round((s.hazards / 100) * placed.length * 0.5);
@@ -232,6 +241,7 @@ export function generate(input: GenerateInput): GenerateOutput {
   }
   const floorL = byRole.get('floor');
   const pathL = byRole.get('paths');
+  const shadowL = byRole.get('shadow');
   const wallL = byRole.get('walls');
   const objL = byRole.get('objects');
   const decoL = byRole.get('deco');
@@ -240,6 +250,7 @@ export function generate(input: GenerateInput): GenerateOutput {
   const spawnL = byRole.get('spawn');
 
   const variation = s.floorVariation / 100;
+  const edgeFloor = pools.hasTag('floor', 'edge');
   const collisionGid = pools.pickTagged(rTiles, 'special', 'collision');
 
   for (let y = 0; y < H; y++)
@@ -249,14 +260,25 @@ export function generate(input: GenerateInput): GenerateOutput {
       if (c === CELL_ROOM || c === CELL_CORRIDOR) {
         if (floorL) {
           const variant = pools.has('floorVariant') && rTiles.chance(variation);
-          floorL[i] = pools.pick(rTiles, variant ? ['floorVariant', 'floor'] : ['floor']);
+          // edge-aware floor: tiles tagged "edge" go to cells at the border of a floor area
+          const edge = auto.floorMask[i] !== 15;
+          floorL[i] = variant
+            ? pools.pick(rTiles, ['floorVariant', 'floor'])
+            : edgeFloor
+              ? pools.pickPref(rTiles, ['floor'], edge ? 'edge' : undefined, edge ? undefined : ['edge'])
+              : pools.pick(rTiles, ['floor']);
         }
+        const sh = auto.shadows[i];
+        if (sh && shadowL) shadowL[i] = pools.pickPref(rTiles, ['shadow'], sh);
         if (c === CELL_CORRIDOR && pathL) pathL[i] = pools.pick(rTiles, ['path']);
       } else if (c === CELL_HAZARD) {
         if (floorL) floorL[i] = pools.pick(rTiles, [hazardType.get(i) ?? 'lava', ...HAZARD_CATS]);
         if (colL && collisionGid) colL[i] = collisionGid;
       } else if (c === CELL_WALL) {
-        if (wallL) wallL[i] = pools.pick(rTiles, wallCategories(wallMask[i]));
+        if (wallL) {
+          const req = wallRequest(auto.wallRoles[i] as WallRole, perspective);
+          wallL[i] = pools.pickPref(rTiles, req.cats, req.prefer, req.avoid);
+        }
         if (colL && collisionGid) colL[i] = collisionGid;
       }
     }
@@ -318,26 +340,11 @@ export function generate(input: GenerateInput): GenerateOutput {
     spawnPoints,
     cells: grid.cells,
     wallMask,
+    floorMask: auto.floorMask,
+    perspective,
     warnings,
   };
   return { result, layerData };
-}
-
-/** Wall category by walkable neighbours; falls back to other wall categories. */
-function wallCategories(m: number): TileCategory[] {
-  const n = !!(m & N);
-  const s = !!(m & S);
-  const e = !!(m & E);
-  const w = !!(m & W_);
-  const orth = +n + +s + +e + +w;
-  const all: TileCategory[] = ['wallTop', 'wallBottom', 'wallLeft', 'wallRight'];
-  const order = (first: TileCategory[]): TileCategory[] => [...first, ...all.filter((c) => !first.includes(c))];
-  if (orth >= 2 && !(n && s && !e && !w) && !(e && w && !n && !s)) return order(['innerCorner', s ? 'wallTop' : 'wallBottom']);
-  if (s) return order(['wallTop']);
-  if (n) return order(['wallBottom']);
-  if (e) return order(['wallLeft']);
-  if (w) return order(['wallRight']);
-  return order(['outerCorner', 'innerCorner']);
 }
 
 function isInterior(g: Grid, x: number, y: number, r: number): boolean {

@@ -1,4 +1,4 @@
-import type { TileCategory, TileMeta, Tileset } from '../types';
+import type { Perspective, TileCategory, TileMeta, Tileset } from '../types';
 import { Rng } from '../generator/rng';
 
 // Built-in pixel-art demo tileset, drawn procedurally at 16×16 px.
@@ -6,7 +6,7 @@ import { Rng } from '../generator/rng';
 
 const T = 16;
 const COLS = 8;
-const ROWS = 5;
+const ROWS = 6;
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -118,13 +118,59 @@ function bricks(d: Draw, broken: boolean) {
   }
 }
 
-function ledge(d: Draw, side: 'top' | 'left' | 'right') {
+/** Full-height brick wall face (front of a wall in 3/4 perspectives). */
+function brickFace(d: Draw, opts: { base: boolean; broken?: boolean; capEdge?: boolean }) {
+  d.rect(0, 0, T, T, '#4a4351');
+  for (let r = 0; r < 4; r++) {
+    const y = r * 4;
+    d.rect(0, y + 3, T, 1, '#2e2934');
+    const off = r % 2 ? 4 : 0;
+    for (let x = off; x < T; x += 8) d.rect(x, y, 1, 3, '#2e2934');
+    d.rect(0, y, T, 1, '#554d5d');
+  }
+  d.speckle(['#554d5d', '#3f3946'], 0.08);
+  if (opts.capEdge) d.rect(0, 0, T, 1, '#6a6273');
+  if (opts.base) {
+    d.rect(0, 14, T, 2, '#2a2530');
+    d.rect(0, 15, T, 1, '#1b181f');
+  }
+  if (opts.broken) {
+    d.rect(9, 2, 4, 3, '#2a2530');
+    d.rect(10, 5, 2, 2, '#2a2530');
+    d.px(3, 9, '#2e2934');
+    d.px(4, 10, '#2e2934');
+  }
+}
+
+/** Visible side face of a wall (45° view): brick strip along one edge. */
+function sideFace(d: Draw, side: 'left' | 'right') {
+  wallCap(d);
+  const x0 = side === 'left' ? 0 : T - 6;
+  d.rect(x0, 0, 6, T, '#3f3946');
+  for (let y = 0; y < T; y += 4) d.rect(x0, y + 3, 6, 1, '#2a2530');
+  d.rect(side === 'left' ? 5 : T - 6, 0, 1, T, '#5e5667');
+}
+
+/** Soft shadow gradient cast by a wall. */
+function shadow(d: Draw, dir: 'top' | 'left' | 'corner') {
+  for (let i = 0; i < 7; i++) {
+    const a = (0.34 * (1 - i / 7)).toFixed(3);
+    const c = `rgba(8,6,12,${a})`;
+    if (dir === 'top' || dir === 'corner') d.rect(0, i, T, 1, c);
+    if (dir === 'left' || dir === 'corner') d.rect(i, dir === 'corner' ? 7 : 0, 1, dir === 'corner' ? T - 7 : T, c);
+  }
+}
+
+function ledge(d: Draw, side: 'top' | 'bottom' | 'left' | 'right') {
   wallCap(d);
   const hi = '#5e5667';
   const mid = '#3d3744';
   if (side === 'top') {
     d.rect(0, 0, T, 2, mid);
     d.rect(0, 0, T, 1, hi);
+  } else if (side === 'bottom') {
+    d.rect(0, T - 2, T, 2, mid);
+    d.rect(0, T - 1, T, 1, hi);
   } else if (side === 'left') {
     d.rect(0, 0, 2, T, mid);
     d.rect(0, 0, 1, T, hi);
@@ -190,7 +236,7 @@ const DEFS: (TileDef | null)[] = [
     tags: ['stone'],
   },
   // row 1 – walls
-  { draw: (d) => bricks(d, false), category: 'wallTop', weight: 80, tags: ['stone', 'dungeon'] },
+  { draw: (d) => ledge(d, 'bottom'), category: 'wallTop', weight: 100, tags: ['stone', 'dungeon'] },
   { draw: (d) => ledge(d, 'top'), category: 'wallBottom', weight: 100, tags: ['stone'] },
   { draw: (d) => ledge(d, 'right'), category: 'wallLeft', weight: 100, tags: ['stone'] },
   { draw: (d) => ledge(d, 'left'), category: 'wallRight', weight: 100, tags: ['stone'] },
@@ -210,7 +256,7 @@ const DEFS: (TileDef | null)[] = [
     weight: 100,
     tags: ['stone'],
   },
-  { draw: (d) => bricks(d, true), category: 'wallTop', weight: 20, tags: ['stone', 'broken'] },
+  { draw: (d) => bricks(d, true), category: 'wallFront', weight: 20, tags: ['stone', 'broken'] },
   {
     draw: (d) => {
       d.rect(0, 0, T, T, '#2a2530');
@@ -490,7 +536,16 @@ const DEFS: (TileDef | null)[] = [
     weight: 30,
     tags: ['stone'],
   },
-  null,
+  // row 4 (rest) + row 5 – perspective tiles (wall fronts, side faces, shadows)
+  { draw: (d) => bricks(d, false), category: 'wallFront', weight: 80, tags: ['stone', 'dungeon'] },
+  { draw: (d) => brickFace(d, { base: true }), category: 'wallFront', weight: 70, tags: ['stone', 'base'] },
+  { draw: (d) => brickFace(d, { base: true, broken: true }), category: 'wallFront', weight: 15, tags: ['stone', 'base', 'broken'] },
+  { draw: (d) => brickFace(d, { base: false, capEdge: true }), category: 'wallFront', weight: 100, tags: ['stone', 'upper'] },
+  { draw: (d) => sideFace(d, 'right'), category: 'wallLeft', weight: 100, tags: ['stone', 'side'] },
+  { draw: (d) => sideFace(d, 'left'), category: 'wallRight', weight: 100, tags: ['stone', 'side'] },
+  { draw: (d) => shadow(d, 'top'), category: 'shadow', weight: 100, tags: ['top'] },
+  { draw: (d) => shadow(d, 'left'), category: 'shadow', weight: 100, tags: ['side'] },
+  { draw: (d) => shadow(d, 'corner'), category: 'shadow', weight: 100, tags: ['corner'] },
   null,
   null,
 ];
@@ -528,5 +583,6 @@ export function createDemoTileset(firstGid = 1): Tileset {
     active: true,
     tiles,
     emptyTiles: empty,
+    perspectives: ['top_down', 'low_top_down', 'isometric_45'] as Perspective[],
   };
 }

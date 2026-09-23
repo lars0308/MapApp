@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useProject, createProject } from '../store/projectStore';
+import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { Button, IconButton, Section } from '../components/ui';
 import { Icon } from '../components/icons';
@@ -12,7 +12,7 @@ export function ProjectSection() {
   const name = useProject((s) => s.project.name);
   const id = useProject((s) => s.project.id);
   const dirty = useProject((s) => s.revision !== s.savedRevision);
-  const { setName, loadProject: load, runGenerate } = useProject.getState();
+  const { setName, loadProject: load } = useProject.getState();
   const toast = useEditor((s) => s.toast);
   const [list, setList] = useState<ProjectSummary[] | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -29,15 +29,6 @@ export function ProjectSection() {
   const save = async () => {
     const ok = await saveNow();
     toast(ok ? 'Projekt gespeichert' : 'Speichern fehlgeschlagen', ok ? 'success' : 'error');
-    void refresh();
-  };
-
-  const newProject = async () => {
-    await saveNow();
-    load(createProject());
-    await runGenerate();
-    await saveNow();
-    toast('Neues Projekt erstellt', 'success');
     void refresh();
   };
 
@@ -86,8 +77,8 @@ export function ProjectSection() {
         <Button variant="primary" icon={<Icon.Save size={18} />} onClick={save}>
           Speichern
         </Button>
-        <Button icon={<Icon.Plus size={18} />} onClick={newProject}>
-          Neu
+        <Button icon={<Icon.Plus size={18} />} onClick={() => useEditor.getState().openWizard()}>
+          Neues Projekt
         </Button>
         <Button icon={<Icon.Upload size={18} />} onClick={() => fileRef.current?.click()}>
           Import

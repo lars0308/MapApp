@@ -25,6 +25,12 @@ interface EditorState {
   hoverCell: { x: number; y: number } | null;
   zoom: number;
   toasts: Toast[];
+  /** new-project setup wizard */
+  wizardOpen: boolean;
+  /** opened automatically on first start (closing it creates a demo map) */
+  wizardFirstRun: boolean;
+  openWizard: (firstRun?: boolean) => void;
+  closeWizard: () => void;
   setTool: (t: ToolId) => void;
   setBrushSize: (n: number) => void;
   selectTile: (gid: number) => void;
@@ -58,6 +64,10 @@ export const useEditor = create<EditorState>((set, get) => ({
   hoverCell: null,
   zoom: 1,
   toasts: [],
+  wizardOpen: false,
+  wizardFirstRun: false,
+  openWizard: (firstRun = false) => set({ wizardOpen: true, wizardFirstRun: firstRun, mobilePanel: null }),
+  closeWizard: () => set({ wizardOpen: false, wizardFirstRun: false }),
   setTool: (tool) => set({ tool, selection: tool === 'select' ? get().selection : null }),
   setBrushSize: (brushSize) => set({ brushSize }),
   selectTile: (gid) => {

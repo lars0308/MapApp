@@ -1,7 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
-import type { TileCategory, Tileset } from '../types';
+import type { Perspective, TileCategory, Tileset } from '../types';
+import { PERSPECTIVES } from '../types';
+import { PERSPECTIVE_INFO } from '../generator/perspective';
 import { CATEGORIES, CATEGORY_LABEL, SUGGESTED_TAGS } from './categories';
 import { TileThumb } from './TileThumb';
 import { resolveGid, createTilesetFromFile, COMMON_TILE_SIZES } from './slicing';
@@ -307,6 +309,8 @@ function TilesetCard({ ts }: { ts: Tileset }) {
   const custom = !COMMON_TILE_SIZES.includes(ts.tileSize);
   const count = ts.columns * ts.rows - ts.emptyTiles.length;
   const categorized = Object.values(ts.tiles).filter((m) => m.category).length;
+  const perspective = useProject((s) => s.project.map.perspective);
+  const supportsCurrent = !ts.perspectives?.length || ts.perspectives.includes(perspective);
 
   return (
     <div className={`tileset-card${ts.active ? '' : ' is-inactive'}`}>
@@ -322,9 +326,33 @@ function TilesetCard({ ts }: { ts: Tileset }) {
           <span className="muted">
             {count} Tiles · {ts.tileSize} px · {categorized} kategorisiert
           </span>
+          {!supportsCurrent && <span className="badge badge-warn">Nicht für {PERSPECTIVE_INFO[perspective].label.replace(' / Isometric-like', '')}</span>}
         </div>
       </div>
       <Toggle label="Aktiv" description="Im Generator und in der Palette verwenden" checked={ts.active} onChange={(v) => updateTileset(ts.id, { active: v })} />
+      <div className="field">
+        <label>Geeignet für</label>
+        <div className="chips">
+          {PERSPECTIVES.map((p: Perspective) => {
+            const list = ts.perspectives ?? [];
+            const on = list.length === 0 || list.includes(p);
+            return (
+              <Chip
+                key={p}
+                active={on}
+                onClick={() => {
+                  const base = list.length ? list : [...PERSPECTIVES];
+                  const next = on ? base.filter((x) => x !== p) : [...base, p];
+                  if (next.length) updateTileset(ts.id, { perspectives: next.length === PERSPECTIVES.length ? [] : next });
+                }}
+              >
+                {PERSPECTIVE_INFO[p].label.replace(' / Isometric-like', '')}
+              </Chip>
+            );
+          })}
+        </div>
+        <p className="hint">Der Generator nutzt nur Tilesets, die zur Perspektive der Map passen.</p>
+      </div>
       <div className="field">
         <label>Tilegröße</label>
         <Segmented

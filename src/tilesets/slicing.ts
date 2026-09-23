@@ -60,6 +60,7 @@ export async function createTilesetFromFile(
     active: true,
     tiles: {},
     emptyTiles: empty,
+    perspectives: [],
   };
 }
 
