@@ -76,8 +76,8 @@ export function createDefaultLayers(size: number): Layer[] {
 }
 
 /** Resize layer data, keeping content anchored top-left. */
-export function resizeData(data: Uint32Array, oldW: number, oldH: number, w: number, h: number): Uint32Array {
-  const out = new Uint32Array(w * h);
+export function resizeData<T extends Uint32Array | Uint8Array>(data: T, oldW: number, oldH: number, w: number, h: number): T {
+  const out = new (data.constructor as new (n: number) => T)(w * h);
   const cw = Math.min(oldW, w);
   const ch = Math.min(oldH, h);
   for (let y = 0; y < ch; y++) out.set(data.subarray(y * oldW, y * oldW + cw), y * w);

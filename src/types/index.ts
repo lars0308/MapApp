@@ -351,8 +351,16 @@ export interface GenerationResult {
   warnings: string[];
 }
 
+/**
+ * How the map is built: `generate` = procedural generator (default),
+ * `manual` = empty map, the user places rooms, paths, abysses … with the editor tools
+ * (the structure grid in `result` is kept up to date by auto-walls).
+ */
+export type ProjectMode = 'generate' | 'manual';
+
 export interface Project {
   formatVersion: 1;
+  mode: ProjectMode;
   id: string;
   name: string;
   createdAt: number;

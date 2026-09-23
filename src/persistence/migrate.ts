@@ -77,5 +77,6 @@ export function migrateProject(p: Project): Project {
     result,
     terrains: p.terrains ?? defaultTerrainSets(),
     objects: p.objects ?? [],
+    mode: p.mode ?? 'generate',
   };
 }

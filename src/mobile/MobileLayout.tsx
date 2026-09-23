@@ -44,6 +44,7 @@ export function MobileLayout() {
   const playtest = useEditor((s) => s.playtest);
   const run = useProject((s) => s.runGenerate);
   const busy = useProject((s) => s.generating);
+  const manual = useProject((s) => s.project.mode === 'manual');
 
   return (
     <div className={`mobile${panel ? ' has-sheet' : ''}${playtest ? ' is-playtest' : ''}`}>
@@ -58,10 +59,12 @@ export function MobileLayout() {
           <IconButton label="Playtest" active={playtest} onClick={() => startPlaytest()}>
             <Icon.Play size={18} />
           </IconButton>
-          <button type="button" className="btn btn-primary m-generate" disabled={busy} onClick={() => run()}>
-            <Icon.Spark size={18} />
-            <span>{busy ? '…' : 'Generieren'}</span>
-          </button>
+          {!manual && (
+            <button type="button" className="btn btn-primary m-generate" disabled={busy} onClick={() => run()}>
+              <Icon.Spark size={18} />
+              <span>{busy ? '…' : 'Generieren'}</span>
+            </button>
+          )}
         </div>
       </header>
 

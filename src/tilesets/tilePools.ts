@@ -90,15 +90,13 @@ function pickFrom(rng: Rng, list: PoolTile[], prefer?: string[], avoid?: string[
   return i < 0 ? 0 : list[i].gid;
 }
 
-/** Weighted tile pools per category and role, built from all *active* tilesets (matching the perspective). */
-export class TilePools {
-  private pools = new Map<TileCategory, PoolTile[]>();
-  private roles = new Map<TileRole, PoolTile[]>();
+/** Pools of one priority tier (a group of tilesets). */
+class Tier {
+  pools = new Map<TileCategory, PoolTile[]>();
+  roles = new Map<TileRole, PoolTile[]>();
 
-  constructor(tilesets: Tileset[], perspective?: Perspective) {
+  constructor(tilesets: Tileset[]) {
     for (const ts of tilesets) {
-      if (!ts.active) continue;
-      if (perspective && !tilesetSupports(ts, perspective)) continue;
       const count = ts.columns * ts.rows;
       // iterate indices in order → deterministic pool order
       for (let i = 0; i < count; i++) {
@@ -119,50 +117,19 @@ export class TilePools {
     }
   }
 
-  has(cat: TileCategory): boolean {
+  get empty() {
+    return this.pools.size === 0 && this.roles.size === 0;
+  }
+
+  has(cat: TileCategory) {
     return (this.pools.get(cat)?.length ?? 0) > 0;
   }
 
-  hasRole(role: TileRole): boolean {
-    return (this.roles.get(role)?.length ?? 0) > 0;
-  }
-
-  /** First category of the list that has tiles. */
   resolve(cats: TileCategory[]): TileCategory | null {
     for (const c of cats) if (this.has(c)) return c;
     return null;
   }
 
-  pick(rng: Rng, cats: TileCategory[], tag?: string): number {
-    const cat = this.resolve(cats);
-    if (!cat) return 0;
-    return pickFrom(rng, this.pools.get(cat)!, tag ? [tag] : undefined);
-  }
-
-  /** Only tiles carrying the tag (no fallback). */
-  pickTagged(rng: Rng, cat: TileCategory, tag: string): number {
-    const list = (this.pools.get(cat) ?? []).filter((t) => t.tags.includes(tag));
-    return list.length ? pickFrom(rng, list) : 0;
-  }
-
-  hasTag(cat: TileCategory, tag: string): boolean {
-    return (this.pools.get(cat) ?? []).some((t) => t.tags.includes(tag));
-  }
-
-  /**
-   * First category with tiles; inside it prefer tiles carrying `prefer`
-   * and skip tiles carrying any `avoid` tag (each only if something remains).
-   */
-  pickPref(rng: Rng, cats: TileCategory[], prefer?: string, avoid?: string[]): number {
-    const cat = this.resolve(cats);
-    if (!cat) return 0;
-    return pickFrom(rng, this.pools.get(cat)!, prefer ? [prefer] : undefined, avoid);
-  }
-
-  /**
-   * Pick a tile for an auto-tile role. Role tiles win; otherwise the fallback
-   * roles and categories of ROLE_FALLBACK are tried (so plain category tilesets work).
-   */
   pickRole(rng: Rng, role: TileRole, prefer?: string[], avoid?: string[], seen = new Set<TileRole>()): number {
     seen.add(role);
     const own = this.roles.get(role);
@@ -175,5 +142,110 @@ export class TilePools {
     }
     const cat = this.resolve(fb?.cats ?? []);
     return cat ? pickFrom(rng, this.pools.get(cat)!, prefer, avoid) : 0;
+  }
+}
+
+/**
+ * Weighted tile pools per category and role.
+ *
+ * Tiles are looked up in priority tiers, so a missing role never leaves the map empty:
+ *   1. active tilesets that support the map perspective
+ *   2. active tilesets drawn for another perspective
+ *   3. the built-in demo tilesets (even when switched off)
+ * Every lookup that had to use tier 2/3 – or found nothing at all – is recorded
+ * in `fallbacks` / `missing`, so the UI can tell the user which roles are missing.
+ */
+export class TilePools {
+  private tiers: Tier[];
+  /** role / category names served by a fallback tier */
+  readonly fallbacks = new Set<string>();
+  /** role / category names without any tile */
+  readonly missing = new Set<string>();
+  /** no active tileset supports the perspective */
+  readonly noCompatible: boolean;
+
+  constructor(tilesets: Tileset[], perspective?: Perspective) {
+    const active = tilesets.filter((ts) => ts.active);
+    if (!perspective) {
+      this.tiers = [new Tier(active)];
+      this.noCompatible = false;
+      return;
+    }
+    const fits = active.filter((ts) => tilesetSupports(ts, perspective));
+    const other = active.filter((ts) => !tilesetSupports(ts, perspective));
+    const demo = tilesets.filter((ts) => !ts.active && ts.source === 'demo');
+    // demo sets matching the perspective first
+    demo.sort((a, b) => Number(tilesetSupports(b, perspective)) - Number(tilesetSupports(a, perspective)));
+    this.tiers = [new Tier(fits), new Tier(other), new Tier(demo)];
+    this.noCompatible = this.tiers[0].empty;
+  }
+
+  /** First tier with a result; records fallback / missing lookups. */
+  private lookup(key: string, fn: (t: Tier) => number): number {
+    for (let k = 0; k < this.tiers.length; k++) {
+      const g = fn(this.tiers[k]);
+      if (g) {
+        if (k > 0) this.fallbacks.add(key);
+        return g;
+      }
+    }
+    this.missing.add(key);
+    return 0;
+  }
+
+  has(cat: TileCategory): boolean {
+    return this.tiers.some((t) => t.has(cat));
+  }
+
+  hasRole(role: TileRole): boolean {
+    return this.tiers.some((t) => (t.roles.get(role)?.length ?? 0) > 0);
+  }
+
+  /** First category of the list that has tiles. */
+  resolve(cats: TileCategory[]): TileCategory | null {
+    for (const t of this.tiers) {
+      const c = t.resolve(cats);
+      if (c) return c;
+    }
+    return null;
+  }
+
+  pick(rng: Rng, cats: TileCategory[], tag?: string): number {
+    return this.lookup(cats[0], (t) => {
+      const cat = t.resolve(cats);
+      return cat ? pickFrom(rng, t.pools.get(cat)!, tag ? [tag] : undefined) : 0;
+    });
+  }
+
+  /** Only tiles carrying the tag (no fallback to untagged tiles). */
+  pickTagged(rng: Rng, cat: TileCategory, tag: string): number {
+    for (const t of this.tiers) {
+      const list = (t.pools.get(cat) ?? []).filter((x) => x.tags.includes(tag));
+      if (list.length) return pickFrom(rng, list);
+    }
+    return 0;
+  }
+
+  hasTag(cat: TileCategory, tag: string): boolean {
+    return this.tiers.some((t) => (t.pools.get(cat) ?? []).some((x) => x.tags.includes(tag)));
+  }
+
+  /**
+   * First category with tiles; inside it prefer tiles carrying `prefer`
+   * and skip tiles carrying any `avoid` tag (each only if something remains).
+   */
+  pickPref(rng: Rng, cats: TileCategory[], prefer?: string, avoid?: string[]): number {
+    return this.lookup(cats[0], (t) => {
+      const cat = t.resolve(cats);
+      return cat ? pickFrom(rng, t.pools.get(cat)!, prefer ? [prefer] : undefined, avoid) : 0;
+    });
+  }
+
+  /**
+   * Pick a tile for an auto-tile role. Role tiles win; otherwise the fallback
+   * roles and categories of ROLE_FALLBACK are tried (so plain category tilesets work).
+   */
+  pickRole(rng: Rng, role: TileRole, prefer?: string[], avoid?: string[]): number {
+    return this.lookup(role, (t) => t.pickRole(rng, role, prefer, avoid));
   }
 }

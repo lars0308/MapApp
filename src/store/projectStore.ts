@@ -1,43 +1,66 @@
 import { create } from 'zustand';
-import type { GeneratorSettings, Layer, LayerRole, MapObject, MapSettings, Project, TerrainSet, TileMeta, Tileset } from '../types';
+import type { GeneratorSettings, Layer, LayerRole, MapObject, MapSettings, Project, ProjectMode, TerrainSet, TileMeta, Tileset } from '../types';
 import { DEFAULT_MAP, PRESETS, defaultGenerator, defaultTerrainSets } from '../generator/presets';
 import { randomSeed } from '../generator/rng';
-import { generate } from '../generator';
+import { emptyResult, generate } from '../generator';
 import { createDemoTileset } from '../tilesets/demoTileset';
 import { createDemoAutotileSets } from '../tilesets/demoAutotiles';
-import { findEmptyTiles } from '../tilesets/slicing';
+import { applyTileMeta, findEmptyTiles } from '../tilesets/slicing';
+import { libraryToProjectTilesets, withTerrainsFor } from '../tilesets/library';
+import type { LibraryTileset } from '../persistence/db';
 import { LAYER_COLORS, createDefaultLayers, createLayer, resizeData } from '../layers/defaults';
 import { uid } from '../utils/id';
 import { clamp } from '../utils/math';
 import { History, cloneLayers, type DocSnapshot, type HistoryEntry } from './history';
 import { mapEvents } from './events';
+import { useEditor } from './editorStore';
 
 export function createProject(
   name = 'Neues Projekt',
-  opts: { map?: Partial<MapSettings>; generator?: GeneratorSettings; terrains?: TerrainSet[] } = {},
+  opts: {
+    map?: Partial<MapSettings>;
+    generator?: GeneratorSettings;
+    terrains?: TerrainSet[];
+    mode?: ProjectMode;
+    /** tilesets from the library (added after the demo sets) */
+    library?: LibraryTileset[];
+    /** demo tilesets active (they always stay in the project as fallback) */
+    demoActive?: boolean;
+  } = {},
 ): Project {
   const map: MapSettings = { ...DEFAULT_MAP, ...opts.map };
-  const demo = createDemoTileset(1);
-  const auto = createDemoAutotileSets(1 + demo.columns * demo.rows);
+  const demoActive = opts.demoActive ?? true;
+  const demo = { ...createDemoTileset(1), active: demoActive };
+  const auto = createDemoAutotileSets(1 + demo.columns * demo.rows).map((ts) => ({ ...ts, active: demoActive }));
   const last = auto[auto.length - 1];
+  const own = libraryToProjectTilesets(opts.library ?? [], last.firstGid + last.columns * last.rows);
   const layers = createDefaultLayers(map.width * map.height);
   const now = Date.now();
+  const mode = opts.mode ?? 'generate';
+  const generator = opts.generator ? { ...opts.generator } : defaultGenerator();
   return {
     formatVersion: 1,
+    mode,
     id: uid('prj'),
     name,
     createdAt: now,
     updatedAt: now,
     map,
-    generator: opts.generator ? { ...opts.generator } : defaultGenerator(),
-    tilesets: [demo, ...auto],
-    nextGid: last.firstGid + last.columns * last.rows,
+    generator,
+    tilesets: [demo, ...auto, ...own.tilesets],
+    nextGid: own.nextGid,
     layers,
     activeLayerId: layers[0].id,
-    result: null,
-    terrains: opts.terrains ?? defaultTerrainSets(),
+    // manual mode starts with an empty structure grid so auto-walls work from the first stroke
+    result: mode === 'manual' ? emptyResult(map.width, map.height, generator.seed, map.perspective) : null,
+    terrains: withTerrainsFor(opts.terrains ?? defaultTerrainSets(), own.tilesets),
     objects: [],
   };
+}
+
+function resizeResult(r: NonNullable<Project['result']>, width: number, height: number): NonNullable<Project['result']> {
+  const rs = <T extends Uint8Array>(a: T) => resizeData(a, r.width, r.height, width, height);
+  return { ...r, width, height, cells: rs(r.cells), wallMask: rs(r.wallMask), floorMask: rs(r.floorMask), terrain: rs(r.terrain), heights: rs(r.heights) };
 }
 
 interface Stroke {
@@ -63,6 +86,7 @@ interface ProjectState {
   setMapSize: (w: number, h: number) => void;
   setTileSize: (size: number) => void;
   setMapOptions: (patch: Partial<Pick<MapSettings, 'perspective' | 'shadows'>>) => void;
+  setMode: (mode: ProjectMode) => void;
   updateGenerator: (patch: Partial<GeneratorSettings>) => void;
   applyPreset: (id: string) => void;
   runGenerate: (opts?: { newSeed?: boolean }) => Promise<void>;
@@ -195,13 +219,21 @@ export const useProject = create<ProjectState>((set, get) => {
         ...p,
         map: { ...p.map, width, height },
         layers: p.layers.map((l) => ({ ...l, data: resizeData(l.data, p.map.width, p.map.height, width, height) })),
-        result: null,
+        // manual mode: keep the hand-built structure (auto-walls need it); generated maps are regenerated anyway
+        result: p.mode === 'manual' && p.result ? resizeResult(p.result, width, height) : null,
       }));
     },
     setTileSize: (size) => {
       const p = get().project;
       touch({ ...p, map: { ...p.map, tileSize: clamp(Math.round(size), 4, 256) } });
       mapEvents.emit({ type: 'all' });
+    },
+    setMode: (mode) => {
+      const p = get().project;
+      if (p.mode === mode) return;
+      // manual building needs a structure grid; a generated one is kept as starting point
+      const result = mode === 'manual' && !p.result ? emptyResult(p.map.width, p.map.height, p.generator.seed, p.map.perspective) : p.result;
+      touch({ ...p, mode, result });
     },
     setMapOptions: (patch) => {
       const p = get().project;
@@ -233,6 +265,11 @@ export const useProject = create<ProjectState>((set, get) => {
           result: out.result,
           objects: out.objects,
         }));
+        // missing tiles for the perspective: say so instead of silently drawing nothing
+        if (out.tileNotice) useEditor.getState().toast(out.tileNotice, 'error');
+      } catch (e) {
+        console.error(e);
+        useEditor.getState().toast(`Generieren fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`, 'error');
       } finally {
         set({ generating: false });
       }
@@ -283,20 +320,7 @@ export const useProject = create<ProjectState>((set, get) => {
     },
     setTileMeta: (gids, patch) => {
       const p = get().project;
-      const tilesets = p.tilesets.map((ts) => {
-        const n = ts.columns * ts.rows;
-        const mine = gids.filter((g) => g >= ts.firstGid && g < ts.firstGid + n);
-        if (!mine.length) return ts;
-        const tiles = { ...ts.tiles };
-        for (const g of mine) {
-          const idx = g - ts.firstGid;
-          const cur = tiles[idx] ?? { tags: [], weight: 50 };
-          tiles[idx] = { ...cur, ...patch };
-          if (patch.category === undefined && 'category' in patch) delete tiles[idx].category;
-        }
-        return { ...ts, tiles };
-      });
-      touch({ ...p, tilesets });
+      touch({ ...p, tilesets: applyTileMeta(p.tilesets, gids, patch) });
     },
 
     addObject: (o) =>

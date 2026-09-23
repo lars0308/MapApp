@@ -56,47 +56,44 @@ export function PerspectivePreview({ perspective }: { perspective: Perspective }
     );
   }
   if (perspective === 'low_top_down') {
-    // 3/4 view: back wall shows its front face, side walls are raised (cap + visible inner face),
-    // the south wall shows cap and outer face, everything casts a shadow onto the floor.
+    // Classic 2D 3/4 view: the back (top) wall shows its full height, the side walls are raised
+    // (cap + visible inner face), the front (bottom) wall is only a narrow top edge – the room is
+    // open towards the viewer.
     return (
       <svg viewBox="0 0 120 84" className="persp-svg" aria-hidden="true" shapeRendering="crispEdges">
         <rect width="120" height="84" fill={C.bg} />
-        <Floor x={22} y={24} w={76} h={42} />
-        {/* back wall: cap (upper edge) + front face */}
+        <Floor x={22} y={24} w={76} h={54} />
+        {/* back wall: cap (upper edge) + full-height front face */}
         <rect x="12" y="3" width="96" height="8" fill={C.cap} />
         <rect x="12" y="10" width="96" height="1" fill={C.capEdge} />
         <Bricks x={22} y={11} w={76} h={13} />
         <rect x="22" y="23" width="76" height="1" fill={C.faceLine} />
-        {/* left wall: raised cap + lit inner face (the wall visibly stands up) */}
-        <rect x="12" y="3" width="7" height="70" fill={C.cap} />
-        <rect x="18" y="11" width="1" height="62" fill={C.capEdge} />
-        <rect x="19" y="11" width="6" height="55" fill={C.faceHi} />
-        <rect x="24" y="11" width="1" height="55" fill={C.faceLine} />
-        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((k) => (
+        {/* left wall: raised cap + lit inner face (visible wall height) */}
+        <rect x="12" y="3" width="7" height="77" fill={C.cap} />
+        <rect x="18" y="11" width="1" height="69" fill={C.capEdge} />
+        <rect x="19" y="11" width="6" height="67" fill={C.faceHi} />
+        <rect x="24" y="11" width="1" height="67" fill={C.faceLine} />
+        {Array.from({ length: 17 }, (_, k) => (
           <rect key={k} x={19} y={12 + k * 4} width={5} height={0.8} fill={C.face} />
         ))}
         {/* right wall: raised cap + shaded inner face */}
-        <rect x="101" y="3" width="7" height="70" fill={C.cap} />
-        <rect x="101" y="11" width="1" height="62" fill={C.capEdge} />
-        <rect x="97" y="11" width="4" height="55" fill={C.side} />
-        <rect x="97" y="11" width="1" height="55" fill={C.faceLine} />
+        <rect x="101" y="3" width="7" height="77" fill={C.cap} />
+        <rect x="101" y="11" width="1" height="69" fill={C.capEdge} />
+        <rect x="97" y="11" width="4" height="67" fill={C.side} />
+        <rect x="97" y="11" width="1" height="67" fill={C.faceLine} />
         {/* corner transitions (back wall meets the side faces) */}
         <polygon points="19,11 25,11 25,24 19,18" fill={C.face} />
         <polygon points="97,11 101,11 101,18 97,24" fill={C.faceLine} />
-        {/* shadows: under the back wall and along the lit left wall */}
+        {/* soft shadows: under the back wall and along both side walls */}
         <rect x="25" y="24" width="72" height="3" fill={C.shadow} />
         <rect x="25" y="27" width="72" height="2" fill="rgba(6,5,10,0.22)" />
-        <rect x="25" y="27" width="3" height="39" fill="rgba(6,5,10,0.3)" />
-        <rect x="93" y="24" width="4" height="42" fill="rgba(6,5,10,0.4)" />
-        {/* south wall: cap + outer face, door gap */}
-        <rect x="12" y="66" width="96" height="7" fill={C.cap} />
-        <rect x="12" y="66" width="96" height="1" fill={C.capEdge} />
-        <Bricks x={12} y={73} w={96} h={8} />
-        <rect x="52" y="66" width="16" height="15" fill={C.floorB} />
-        <rect x="52" y="73" width="16" height="8" fill={C.door} />
-        <rect x="59.5" y="73" width="1" height="8" fill={C.faceLine} />
-        <rect x="51" y="66" width="1" height="15" fill={C.capEdge} />
-        <rect x="68" y="66" width="1" height="15" fill={C.capEdge} />
+        <rect x="25" y="27" width="3" height="51" fill="rgba(6,5,10,0.3)" />
+        <rect x="93" y="24" width="4" height="54" fill="rgba(6,5,10,0.4)" />
+        {/* front wall: only its narrow top edge, open towards the viewer (gap = doorway) */}
+        <rect x="12" y="78" width="40" height="3" fill={C.cap} />
+        <rect x="68" y="78" width="40" height="3" fill={C.cap} />
+        <rect x="12" y="78" width="40" height="1" fill={C.capEdge} />
+        <rect x="68" y="78" width="40" height="1" fill={C.capEdge} />
         {/* pillar for depth: cap, front, contact shadow */}
         <rect x="68" y="50" width="12" height="3" fill={C.shadow} />
         <rect x="68" y="34" width="10" height="4" fill={C.cap} />

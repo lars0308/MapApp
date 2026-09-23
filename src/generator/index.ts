@@ -20,6 +20,7 @@ import {
   type LayerRole,
   type MapObject,
   type MapSettings,
+  type Perspective,
   type Room,
   type SpawnPoint,
   type SpawnType,
@@ -35,7 +36,7 @@ import { carveBranches, carveCorridors, computeNearRoom, type Grid } from './cor
 import { assignSpecialRooms } from './specials';
 import { TilePools } from '../tilesets/tilePools';
 import { NO_ROLE, resolveWalls, roleAt, wallNeighbourMask } from './autotile';
-import { requiredRooms } from './perspective';
+import { PERSPECTIVE_INFO, requiredRooms } from './perspective';
 import { createTerrainState, placeTerrain, placeTransitions } from './terrain';
 import { placeObjects, type ObjectContext } from './objectsGen';
 import { OBJECT_DEFS } from '../objects/defs';
@@ -54,9 +55,33 @@ export interface GenerateOutput {
   /** new data for generator-owned layers (by layer id) */
   layerData: Record<string, Uint32Array>;
   objects: MapObject[];
+  /** set when tiles for the perspective were missing and fallbacks were used */
+  tileNotice: string | null;
 }
 
 const LIQUID_ROLE: Record<number, TileRole> = { [T_WATER]: 'water', [T_LAVA]: 'lava', [T_ABYSS]: 'abyss' };
+
+/** Empty structure for the manual build mode: everything void, no rooms yet. */
+export function emptyResult(W: number, H: number, seed: string, perspective: Perspective): GenerationResult {
+  const n = W * H;
+  return {
+    seed,
+    width: W,
+    height: H,
+    rooms: [],
+    connections: [],
+    doors: [],
+    deadEnds: 0,
+    spawnPoints: [],
+    cells: new Uint8Array(n),
+    wallMask: new Uint8Array(n),
+    floorMask: new Uint8Array(n),
+    terrain: new Uint8Array(n),
+    heights: new Uint8Array(n),
+    perspective,
+    warnings: [],
+  };
+}
 
 export function generate(input: GenerateInput): GenerateOutput {
   const { settings: s, map } = input;
@@ -415,6 +440,9 @@ export function generate(input: GenerateInput): GenerateOutput {
     }
   }
 
+  const tileNotice = describeTileFallback(pools, PERSPECTIVE_INFO[perspective].label);
+  if (tileNotice) warnings.push(tileNotice);
+
   const result: GenerationResult = {
     seed: s.seed,
     width: W,
@@ -432,7 +460,20 @@ export function generate(input: GenerateInput): GenerateOutput {
     perspective,
     warnings,
   };
-  return { result, layerData, objects };
+  return { result, layerData, objects, tileNotice };
+}
+
+/** Human readable note when roles had to be served by fallback tiles (or are missing). */
+function describeTileFallback(pools: TilePools, label: string): string | null {
+  const list = (set: Set<string>) => {
+    const all = [...set].sort();
+    return all.slice(0, 6).join(', ') + (all.length > 6 ? ` … (+${all.length - 6})` : '');
+  };
+  const parts: string[] = [];
+  if (pools.noCompatible) parts.push(`Kein aktives Tileset ist für „${label}“ markiert – es werden vorhandene Tiles anderer Perspektiven bzw. die Demo-Tiles verwendet.`);
+  else if (pools.fallbacks.size) parts.push(`Für „${label}“ fehlen Tile-Rollen (${list(pools.fallbacks)}) – ersatzweise aus anderen Tilesets bzw. Demo-Tiles.`);
+  if (pools.missing.size) parts.push(`Keine Tiles für: ${list(pools.missing)}.`);
+  return parts.length ? parts.join(' ') : null;
 }
 
 function isInterior(g: Grid, terrain: Uint8Array, x: number, y: number, r: number): boolean {

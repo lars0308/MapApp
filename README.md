@@ -2,7 +2,8 @@
 
 Prozeduraler 2D-Map-Builder und Tile-Editor für Pixelart-Spiele – direkt im Browser, auf dem Handy wie am Desktop, mit editierbarem Export nach Godot 4.
 
-- Setup-Assistent in 8 Schritten (Perspektive → Map → Räume → Wege → Spezialräume → Gelände → Ausstattung → Zusammenfassung)
+- Setup-Assistent: Modus (automatisch / manuell) → Perspektive → **Tiles** (Bibliothek, Upload oder Demo) → Map → Generator-Einstellungen → Zusammenfassung
+- Tileset-Bibliothek: eigene Tilesets mit Rollen, Tags und Perspektiven einmal einrichten und in jedem neuen Projekt wiederverwenden
 - Drei Perspektiven mit eigenen Tile-Rollen: Top-Down, Low Top-Down (3/4 mit Wandfronten und erhöhten Seitenwänden), 45° / Isometric-like
 - Dungeon-Generierung aus Räumen, Gängen, Wänden, Türen und Spezialräumen (Seed-basiert, reproduzierbar)
 - Gelände: Wasser, Lava, Abgründe mit Inseln, Klippen/Plateaus mit Treppen, Brücken, Übergangsflächen – der Startraum und alle Pflichtwege bleiben immer erreichbar
@@ -61,20 +62,38 @@ vercel --prod   # Production-Deployment
 
 ## Neues Projekt: Setup-Assistent
 
-Beim ersten Start und bei **Neues Projekt** (Desktop: Kopfzeile oder Projekt & Export; Handy: **+** oben) öffnet sich ein Assistent. Erst **Map erstellen** im letzten Schritt generiert die Map und öffnet den Editor.
+Beim ersten Start und bei **Neues Projekt** (Desktop: Kopfzeile oder Projekt & Export; Handy: **+** oben) öffnet sich ein Assistent. Erst der letzte Schritt erzeugt das Projekt.
 
 | Schritt | Inhalt |
 | --- | --- |
-| 1 Perspektive | Top-Down, Low Top-Down oder 45° (mit Vorschaubild), Schatten an/aus |
-| 2 Map | Breite, Höhe, Tilegröße (16/32/48/64/frei) inkl. Pixelgröße, Seed |
-| 3 Räume | Anzahl, Min/Max-Größen, Abstand, Raumformen, Regelmäßigkeit |
-| 4 Wege | Gangbreite (Standard/Min/Max), Optionen, Verwinkelung, Direktheit, Vernetzung |
-| 5 Spezialräume | Start, Ende, Boss, Schatz, Händler, Quest, Arena, Geheimraum, Rätsel |
-| 6 Gelände | Terrain-Sets für Räume, Wasser, Lava, Abgründe (Anteil, Min/Max-Größe, Inseln, Brücken, in/zwischen Räumen), Klippen, Brücken, Übergänge |
-| 7 Ausstattung | Boden-Varianten, Deko, Hindernisse, Bäume, Felsen, Torbögen, Säulen – oder **Später konfigurieren** |
-| 8 Zusammenfassung | Projektname, alle Werte auf einen Blick, **MAP ERSTELLEN** |
+| 1 Modus | **Automatisch generieren** oder **Manuell bauen** (Baukasten) |
+| 2 Perspektive | Top-Down, Low Top-Down oder 45° (mit Vorschaubild), Schatten an/aus |
+| 3 Tiles | „Welche Tiles möchtest du verwenden?“ – Vorhandenes Tileset auswählen · Neues Tileset hochladen · Demo-Tiles verwenden |
+| 4 Map | Breite, Höhe, Tilegröße (16/32/48/64/frei) inkl. Pixelgröße, Seed |
+| 5 Räume | Anzahl, Min/Max-Größen, Abstand, Raumformen, Regelmäßigkeit *(nur automatisch)* |
+| 6 Wege | Gangbreite (Standard/Min/Max), Optionen, Verwinkelung, Direktheit, Vernetzung *(nur automatisch)* |
+| 7 Spezialräume | Start, Ende, Boss, Schatz, Händler, Quest, Arena, Geheimraum, Rätsel *(nur automatisch)* |
+| 8 Gelände | Terrain-Sets, Wasser, Lava, Abgründe, Klippen, Brücken, Übergänge *(nur automatisch)* |
+| 9 Ausstattung | Boden-Varianten, Deko, Hindernisse, Bäume, Felsen, Torbögen, Säulen – oder **Später konfigurieren** *(nur automatisch)* |
+| 10 Zusammenfassung | Projektname, alle Werte, **MAP ERSTELLEN** bzw. **BAUKASTEN ÖFFNEN** |
 
-Sind mehr Spezialräume aktiv, als Räume existieren, erscheint „Für diese Auswahl werden mindestens N Räume benötigt“ mit einem Button zum Erhöhen. Wird trotzdem erstellt, erhöht die App die Raumanzahl automatisch und meldet das. Alle Einstellungen des Assistenten werden im Projekt gespeichert und bleiben im Generator-Panel änderbar. Schließen des Assistenten ändert das aktuelle Projekt nicht (beim allerersten Start wird dann eine Demo-Map erzeugt).
+Automatisch: Tilesets auswählen → Generator konfigurieren → Map erzeugen. Manuell: Tilesets auswählen → Setup abschließen → Baukasten öffnet sich (5 Schritte).
+
+Sind mehr Spezialräume aktiv, als Räume existieren, erscheint „Für diese Auswahl werden mindestens N Räume benötigt“ mit einem Button zum Erhöhen. Schließen des Assistenten ändert das aktuelle Projekt nicht (beim allerersten Start wird dann eine Demo-Map erzeugt).
+
+### Tiles-Schritt und Tileset-Bibliothek
+
+- **Vorhandenes Tileset auswählen** – zeigt alle gespeicherten Tilesets der Bibliothek mit Vorschau, Tilegröße, Anzahl Tiles, unterstützten Perspektiven, zugewiesenen Rollen und Terrains (Material-Tags der Böden). Mehrfachauswahl möglich; nicht zur Perspektive passende Sets sind markiert. Einträge lassen sich hier auch löschen.
+- **Neues Tileset hochladen** – PNG wählen, Tilegröße wird erkannt (16/32/48/64/frei änderbar), Tiles werden angezeigt. Tiles antippen/markieren und im Inspektor Kategorie, **Rolle**, Kollision, Sortier-Offset, Gewichtung und Tags setzen, Perspektive festlegen, **In Bibliothek speichern**. Das Set ist danach ausgewählt und steht in allen künftigen Projekten zur Verfügung.
+- **Demo-Tiles verwenden** – wie bisher, sofort ohne eigene Dateien.
+
+Die Bibliothek liegt in IndexedDB (Store `library`), unabhängig von den Projekten. Tilesets aus bestehenden Projekten kommen über Tiles → Tilesets → **In Bibliothek** hinein. Werden eigene Tilesets gewählt, bleiben die Demo-Tilesets inaktiv im Projekt und liefern nur fehlende Rollen. Material-Tags der Boden-Tiles (z. B. `#grass`) werden automatisch zu Terrain-Sets.
+
+### Manueller Baukasten
+
+„Manuell bauen“ erzeugt eine leere Map mit leerem Strukturraster (`project.mode = 'manual'`). Der Editor startet mit Boden-Layer und Boden-Pinsel: Boden malen (Pinsel, Rechteck, Füllen) legt Räume und Wege an, **Auto-Wände** baut Wände, Ecken, Fronten und Schatten automatisch, Türen auf Wände öffnen sie; Objekte, Wasser, Abgründe und Brücken werden über ihre Tiles/Objekte gesetzt. Der Generieren-Button ist in diesem Modus ausgeblendet; im Generator-Panel lässt sich die automatische Generierung jederzeit aktivieren.
+
+Vorbereitung für eine Bauteil-Bibliothek (Räume, Wege, Abgründe, Klippen, Brücken): Bauteile müssen nur das Strukturraster (`result.cells` / `result.terrain`) setzen und `applyAutoWalls()` aufrufen – Wände, Türrahmen, Kollision und Export funktionieren dann wie beim Malen. Beim Ändern der Map-Größe bleibt das Raster im manuellen Modus erhalten.
 
 ## Perspektiven
 
@@ -87,6 +106,10 @@ Die Map bleibt ein orthogonales 2D-Raster. Die Perspektive bestimmt, **welche Ti
 | `isometric_45` | Wandfront 2 Reihen hoch (`wall_front` + `wall_front_upper`), Seitenwände mit sichtbarer Fläche, Schatten auch seitlich |
 
 Die Perspektive steht im Projekt, in der Projektdatei und im Export (`map.perspective`). Tilesets lassen sich Perspektiven zuordnen (Tiles → Tilesets); der Generator nutzt nur passende, aktive Tilesets. Mitgeliefert: „Demo Wände Top-Down“, „Demo Wände 3/4“ (Low Top-Down + 45°) und „Demo Gelände“.
+
+### Fehlende Tiles / Fallback
+
+Der Generator sucht Tiles in drei Stufen: 1. aktive Tilesets, die zur Perspektive passen · 2. aktive Tilesets anderer Perspektiven · 3. die mitgelieferten Demo-Tilesets (auch wenn deaktiviert). Fehlen Rollen, erscheint eine Meldung mit den betroffenen Rollen (z. B. „Für Low Top-Down fehlen Tile-Rollen (wall_front, door …) – ersatzweise …“), die Map bleibt vollständig sichtbar und bedienbar.
 
 ### Wand-Autotiling
 
@@ -304,6 +327,19 @@ Wichtige Entscheidungen:
 ---
 
 ## Änderungen
+
+**Version 1.3 – Tileset-Auswahl, Bibliothek, Baukasten-Vorbereitung**
+
+- **Fehler behoben: schwarzer Bildschirm** bei Low Top-Down bzw. nach dem Deaktivieren von Tilesets. Ursache: Der Generator nutzte nur aktive Tilesets, die für die Perspektive markiert sind; gab es keine (z. B. alle Demo-Sets aus, eigenes Set nur „Top-Down“), blieben alle Layer leer – ohne Meldung. Jetzt: Fallback über andere aktive Tilesets und die Demo-Tiles, Meldung mit fehlenden Rollen, Fehler beim Generieren werden abgefangen und angezeigt.
+- Setup: neue Schritte **Modus** und **Tiles** (Vorhandenes Tileset / Hochladen / Demo), Flow abhängig vom Modus.
+- Tileset-Bibliothek in IndexedDB, „In Bibliothek“ im Tileset-Panel; Upload-Editor im Assistenten nutzt denselben Tile-Inspektor wie der Editor.
+- Manueller Modus (`project.mode`) mit leerem Strukturraster, Baukasten-Hinweis im Generator-Panel, Umschalten auf automatisch.
+- Perspektiv-Vorschau Low Top-Down: obere Wand mit Wandhöhe, linke/rechte Wand mit sichtbarer Seitenfläche, unten nur schmale Abschlusskante (Raum offen zum Spieler).
+
+**Geänderte / neue Dateien (1.3)**
+
+- Neu: `components/wizard/TilesStep.tsx`, `tilesets/library.ts`
+- Geändert: `tilesets/tilePools.ts` (Stufen-Fallback), `generator/index.ts` (Hinweis, `emptyResult`), `store/projectStore.ts` (Modus, Bibliothek, Fehlerbehandlung), `persistence/db.ts` (Store `library`), `persistence/migrate.ts`, `types/index.ts` (`ProjectMode`), `tilesets/slicing.ts` (`applyTileMeta`), `tilesets/TilesPanel.tsx` (Inspektor wiederverwendbar, „In Bibliothek“), `components/wizard/SetupWizard.tsx`, `components/wizard/PerspectivePreview.tsx`, `generator/perspective.ts`, `components/GeneratorPanel.tsx`, `mobile/MobileLayout.tsx`, `editor/useShortcuts.ts`, `layers/defaults.ts`, `styles/index.css`
 
 **Version 1.2 – Godot-4-Map-Builder**
 

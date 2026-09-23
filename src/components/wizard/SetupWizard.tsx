@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { GeneratorSettings, MapSettings, Perspective, RoomShape, SpecialRoomType, TerrainSet } from '../../types';
+import type { GeneratorSettings, MapSettings, Perspective, ProjectMode, RoomShape, SpecialRoomType, TerrainSet, Tileset } from '../../types';
 import { PERSPECTIVES } from '../../types';
 import { DEFAULT_MAP, defaultGenerator, defaultTerrainSets } from '../../generator/presets';
 import { TerrainFields } from '../TerrainFields';
@@ -14,8 +14,31 @@ import { Icon } from '../icons';
 import { PerspectivePreview } from './PerspectivePreview';
 import { RoomCountGuard } from '../RoomCountGuard';
 import { SHAPES, CORRIDOR_OPTS, SPECIALS } from '../generatorOptions';
+import { TilesStep, type TilesChoice } from './TilesStep';
+import { listLibraryTilesets, type LibraryTileset } from '../../persistence/db';
+import { TilePools } from '../../tilesets/tilePools';
+import { Rng } from '../../generator/rng';
 
-const STEPS = ['Perspektive', 'Map', 'Räume', 'Wege', 'Spezialräume', 'Gelände', 'Ausstattung', 'Zusammenfassung'] as const;
+type StepId = 'mode' | 'perspective' | 'tiles' | 'map' | 'rooms' | 'paths' | 'specials' | 'terrain' | 'equip' | 'summary';
+
+const STEP_LABEL: Record<StepId, string> = {
+  mode: 'Modus',
+  perspective: 'Perspektive',
+  tiles: 'Tiles',
+  map: 'Map',
+  rooms: 'Räume',
+  paths: 'Wege',
+  specials: 'Spezialräume',
+  terrain: 'Gelände',
+  equip: 'Ausstattung',
+  summary: 'Zusammenfassung',
+};
+
+/** automatic: tiles → generator settings → map; manual: tiles → finish → build kit (editor) */
+const FLOW: Record<ProjectMode, StepId[]> = {
+  generate: ['mode', 'perspective', 'tiles', 'map', 'rooms', 'paths', 'specials', 'terrain', 'equip', 'summary'],
+  manual: ['mode', 'perspective', 'tiles', 'map', 'summary'],
+};
 
 const SPECIAL_HINT: Record<SpecialRoomType, string> = {
   start: 'Startpunkt des Spielers',
@@ -30,6 +53,8 @@ const SPECIAL_HINT: Record<SpecialRoomType, string> = {
 };
 
 interface Draft {
+  mode: ProjectMode;
+  tiles: TilesChoice;
   name: string;
   map: MapSettings;
   gen: GeneratorSettings;
@@ -38,6 +63,8 @@ interface Draft {
 
 function freshDraft(): Draft {
   return {
+    mode: 'generate',
+    tiles: { source: 'demo', selected: [] },
     name: 'Neues Projekt',
     map: { ...DEFAULT_MAP, perspective: 'low_top_down', shadows: true },
     gen: defaultGenerator(randomSeed()),
@@ -57,7 +84,20 @@ function WizardDialog() {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>(freshDraft);
   const [busy, setBusy] = useState(false);
+  const [library, setLibrary] = useState<LibraryTileset[] | null>(null);
+  const [upload, setUpload] = useState<Tileset | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const steps = FLOW[draft.mode];
+  const id = steps[Math.min(step, steps.length - 1)];
+
+  const reloadLibrary = async () => {
+    const list = await listLibraryTilesets().catch(() => []);
+    setLibrary(list);
+    return list;
+  };
+  useEffect(() => {
+    void reloadLibrary();
+  }, []);
 
   const setMap = (patch: Partial<MapSettings>) => setDraft((d) => ({ ...d, map: { ...d.map, ...patch } }));
   const setGen = (patch: Partial<GeneratorSettings>) => setDraft((d) => ({ ...d, gen: { ...d.gen, ...patch } }));
@@ -87,22 +127,42 @@ function WizardDialog() {
       gen = { ...gen, roomCount: need };
       toast(`Raumanzahl automatisch auf ${need} erhöht`);
     }
+    const lib = draft.tiles.source === 'library' ? (library ?? []).filter((e) => draft.tiles.selected.includes(e.id)) : [];
     try {
       // keep the current project, except the untouched placeholder on first start
       if (!firstRun) await saveNow();
       const store = useProject.getState();
-      store.loadProject(createProject(draft.name.trim() || 'Neues Projekt', { map: draft.map, generator: gen, terrains: draft.terrains }));
-      await useProject.getState().runGenerate();
+      store.loadProject(
+        createProject(draft.name.trim() || 'Neues Projekt', {
+          map: draft.map,
+          generator: gen,
+          terrains: draft.terrains,
+          mode: draft.mode,
+          library: lib,
+          // own tilesets chosen → demo tiles only serve as fallback for missing roles
+          demoActive: lib.length === 0,
+        }),
+      );
+      if (draft.mode === 'generate') await useProject.getState().runGenerate();
+      else prepareBuildKit();
       await saveNow();
       closeWizard();
       setView('map');
-      toast('Map erstellt', 'success');
+      toast(draft.mode === 'generate' ? 'Map erstellt' : 'Baukasten geöffnet – Boden malen legt Räume und Wege an, Wände entstehen automatisch', 'success');
     } finally {
       setBusy(false);
     }
   };
 
-  const last = step === STEPS.length - 1;
+  const last = id === 'summary';
+  const blocked =
+    id === 'tiles' && draft.tiles.source === 'library' && !draft.tiles.selected.length
+      ? 'Mindestens ein Tileset auswählen'
+      : id === 'tiles' && draft.tiles.source === 'upload'
+        ? upload
+          ? 'Tileset erst in der Bibliothek speichern'
+          : 'PNG hochladen oder andere Option wählen'
+        : null;
   const { map, gen } = draft;
 
   return (
@@ -112,7 +172,7 @@ function WizardDialog() {
           <div className="wizard-title">
             <h2 id="wizard-title">Neues Projekt</h2>
             <span className="muted">
-              Schritt {step + 1} von {STEPS.length} · {STEPS[step]}
+              Schritt {step + 1} von {steps.length} · {STEP_LABEL[id]}
             </span>
           </div>
           <IconButton label="Assistent schließen" onClick={() => void cancel()}>
@@ -121,18 +181,46 @@ function WizardDialog() {
         </header>
 
         <ol className="wizard-steps" aria-label="Fortschritt">
-          {STEPS.map((label, i) => (
-            <li key={label} className={i === step ? 'is-current' : i < step ? 'is-done' : ''}>
+          {steps.map((sid, i) => (
+            <li key={sid} className={i === step ? 'is-current' : i < step ? 'is-done' : ''}>
               <button type="button" onClick={() => setStep(i)} aria-current={i === step ? 'step' : undefined}>
                 <span className="step-num">{i < step ? <Icon.Check size={13} /> : i + 1}</span>
-                <span className="step-label">{label}</span>
+                <span className="step-label">{STEP_LABEL[sid]}</span>
               </button>
             </li>
           ))}
         </ol>
 
         <div className="wizard-body" ref={bodyRef}>
-          {step === 0 && (
+          {id === 'mode' && (
+            <StepSection title="Wie möchtest du deine Map bauen?">
+              <div className="choice-grid" role="radiogroup" aria-label="Modus">
+                {(
+                  [
+                    ['generate', 'Automatisch generieren', 'Räume, Wege, Gelände und Ausstattung werden aus deinen Einstellungen erzeugt – danach frei bearbeitbar.', <Icon.Spark size={22} key="i" />],
+                    ['manual', 'Manuell bauen', 'Leere Map als Baukasten: Räume und Wege selbst mit dem Boden-Pinsel anlegen, Wände entstehen automatisch.', <Icon.Brush size={22} key="i" />],
+                  ] as const
+                ).map(([m, title, text, icon]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={draft.mode === m}
+                    className={`choice-card${draft.mode === m ? ' is-selected' : ''}`}
+                    onClick={() => setDraft((d) => ({ ...d, mode: m }))}
+                  >
+                    <span className="choice-icon">{icon}</span>
+                    <span className="choice-text">
+                      <strong>{title}</strong>
+                      <small>{text}</small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </StepSection>
+          )}
+
+          {id === 'perspective' && (
             <StepSection title="Wie soll deine Map dargestellt werden?">
               <div className="persp-grid" role="radiogroup" aria-label="Perspektive">
                 {PERSPECTIVES.map((p) => (
@@ -154,7 +242,21 @@ function WizardDialog() {
             </StepSection>
           )}
 
-          {step === 1 && (
+          {id === 'tiles' && (
+            <StepSection title="Welche Tiles möchtest du verwenden?">
+              <TilesStep
+                perspective={map.perspective}
+                value={draft.tiles}
+                onChange={(tiles) => setDraft((d) => ({ ...d, tiles }))}
+                library={library}
+                reloadLibrary={reloadLibrary}
+                upload={upload}
+                setUpload={setUpload}
+              />
+            </StepSection>
+          )}
+
+          {id === 'map' && (
             <StepSection title="Wie groß soll die Map werden?">
               <div className="grid-2">
                 <NumberField label="Breite" value={map.width} min={16} max={256} suffix="Tiles" onChange={(v) => setMap({ width: v })} />
@@ -192,7 +294,7 @@ function WizardDialog() {
             </StepSection>
           )}
 
-          {step === 2 && (
+          {id === 'rooms' && (
             <StepSection title="Räume">
               <Slider label="Anzahl Räume" value={gen.roomCount} min={2} max={60} onChange={(v) => setGen({ roomCount: v })} />
               <div className="grid-2">
@@ -223,7 +325,7 @@ function WizardDialog() {
             </StepSection>
           )}
 
-          {step === 3 && (
+          {id === 'paths' && (
             <StepSection title="Wege & Gänge">
               <div className="grid-3">
                 <NumberField
@@ -250,7 +352,7 @@ function WizardDialog() {
             </StepSection>
           )}
 
-          {step === 4 && (
+          {id === 'specials' && (
             <StepSection title="Welche Spezialräume soll es geben?">
               <div className="special-grid">
                 {SPECIALS.map((sp) => {
@@ -277,7 +379,7 @@ function WizardDialog() {
             </StepSection>
           )}
 
-          {step === 5 && (
+          {id === 'terrain' && (
             <StepSection title="Gelände">
               <div className="field">
                 <label>Terrain-Sets für Räume</label>
@@ -301,11 +403,11 @@ function WizardDialog() {
             </StepSection>
           )}
 
-          {step === 6 && (
+          {id === 'equip' && (
             <StepSection
               title="Ausstattung"
               aside={
-                <Button variant="ghost" onClick={() => setStep(7)}>
+                <Button variant="ghost" onClick={() => setStep(steps.indexOf('summary'))}>
                   Später konfigurieren
                 </Button>
               }
@@ -320,9 +422,16 @@ function WizardDialog() {
             </StepSection>
           )}
 
-          {step === 7 && <Summary draft={draft} onName={(name) => setDraft((d) => ({ ...d, name }))} onFixRooms={(n) => setGen({ roomCount: n })} />}
+          {id === 'summary' && (
+            <Summary draft={draft} library={library} onName={(name) => setDraft((d) => ({ ...d, name }))} onFixRooms={(n) => setGen({ roomCount: n })} />
+          )}
         </div>
 
+        {blocked && (
+          <p className="wizard-hint" role="status">
+            {blocked}
+          </p>
+        )}
         <footer className="wizard-foot">
           <Button variant="secondary" disabled={step === 0 || busy} onClick={() => setStep(step - 1)} icon={<Icon.Undo size={16} />}>
             Zurück
@@ -330,10 +439,10 @@ function WizardDialog() {
           {last ? (
             <button type="button" className="btn btn-primary btn-create" disabled={busy} onClick={() => void create()}>
               <Icon.Spark size={18} />
-              <span>{busy ? 'Erstelle …' : 'Map erstellen'}</span>
+              <span>{busy ? 'Erstelle …' : draft.mode === 'generate' ? 'Map erstellen' : 'Baukasten öffnen'}</span>
             </button>
           ) : (
-            <Button variant="primary" className="btn-next" onClick={() => setStep(step + 1)}>
+            <Button variant="primary" className="btn-next" disabled={!!blocked} title={blocked ?? undefined} onClick={() => setStep(step + 1)}>
               Weiter
             </Button>
           )}
@@ -373,7 +482,7 @@ function PerspectiveCard({ id, selected, onSelect }: { id: Perspective; selected
   );
 }
 
-function Summary({ draft, onName, onFixRooms }: { draft: Draft; onName: (n: string) => void; onFixRooms: (n: number) => void }) {
+function Summary({ draft, library, onName, onFixRooms }: { draft: Draft; library: LibraryTileset[] | null; onName: (n: string) => void; onFixRooms: (n: number) => void }) {
   const { map, gen } = draft;
   const specials = SPECIALS.filter((s) => gen.specials[s.id]).map((s) => s.label);
   const shapes = SHAPES.filter((s) => gen.shapes[s.id]).map((s) => s.label);
@@ -388,10 +497,21 @@ function Summary({ draft, onName, onFixRooms }: { draft: Draft; onName: (n: stri
     ]
       .filter(Boolean)
       .join(', ') || 'nur Boden';
-  const rows: [string, string][] = [
+  const tiles =
+    draft.tiles.source === 'library'
+      ? (library ?? [])
+          .filter((e) => draft.tiles.selected.includes(e.id))
+          .map((e) => e.name)
+          .join(', ') + ' (+ Demo-Tiles als Ersatz)'
+      : 'Demo-Tiles';
+  const base: [string, string][] = [
+    ['Modus', draft.mode === 'generate' ? 'Automatisch generieren' : 'Manuell bauen (Baukasten)'],
     ['Perspektive', PERSPECTIVE_INFO[map.perspective].label + (map.shadows ? ' · mit Schatten' : '')],
+    ['Tiles', tiles],
     ['Map', `${map.width} × ${map.height} Tiles`],
     ['Tilegröße', `${map.tileSize} px (${map.width * map.tileSize} × ${map.height * map.tileSize} px)`],
+  ];
+  const generatorRows: [string, string][] = [
     ['Räume', String(gen.roomCount)],
     ['Raumgröße', `${gen.roomMinW}–${gen.roomMaxW} × ${gen.roomMinH}–${gen.roomMaxH} Tiles`],
     ['Raumformen', shapes.join(', ')],
@@ -405,6 +525,7 @@ function Summary({ draft, onName, onFixRooms }: { draft: Draft; onName: (n: stri
     ['Ausstattung', `Deko ${gen.decoDensity} % · Bäume ${gen.objects.trees} % · Felsen ${gen.objects.rocks} %`],
     ['Seed', gen.seed],
   ];
+  const rows = draft.mode === 'generate' ? [...base, ...generatorRows] : base;
   return (
     <StepSection title="Zusammenfassung">
       <div className="field">
@@ -419,7 +540,18 @@ function Summary({ draft, onName, onFixRooms }: { draft: Draft; onName: (n: stri
           </div>
         ))}
       </dl>
-      <RoomCountGuard specials={gen.specials} roomCount={gen.roomCount} onFix={onFixRooms} />
+      {draft.mode === 'generate' && <RoomCountGuard specials={gen.specials} roomCount={gen.roomCount} onFix={onFixRooms} />}
     </StepSection>
   );
+}
+
+/** Manual mode: floor layer active, brush with a floor tile of the chosen tiles. */
+function prepareBuildKit() {
+  const p = useProject.getState().project;
+  const floor = p.layers.find((l) => l.role === 'floor');
+  if (floor) useProject.getState().setActiveLayer(floor.id);
+  const gid = new TilePools(p.tilesets, p.map.perspective).pickPref(new Rng(1), ['floor']);
+  const editor = useEditor.getState();
+  if (gid) editor.selectTile(gid);
+  editor.setTool('brush');
 }

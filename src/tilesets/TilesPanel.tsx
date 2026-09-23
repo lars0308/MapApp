@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
-import type { Perspective, TileCategory, TileRole, Tileset } from '../types';
+import type { Perspective, TileCategory, TileMeta, TileRole, Tileset } from '../types';
 import { PERSPECTIVES, TILE_ROLES } from '../types';
 import { OBJECT_DEFS, OBJECT_TYPES } from '../objects/defs';
 import { ObjectThumb } from '../objects/ObjectThumb';
@@ -13,6 +13,7 @@ import { resolveGid, createTilesetFromFile, COMMON_TILE_SIZES } from './slicing'
 import { Button, Chip, IconButton, NumberField, PanelTabs, Segmented, Slider, Toggle } from '../components/ui';
 import { Icon } from '../components/icons';
 import { readFileAsDataUrl } from '../utils/download';
+import { saveLibraryTileset, toLibraryTileset } from '../persistence/db';
 
 type Tab = 'palette' | 'objects' | 'tilesets';
 
@@ -170,9 +171,15 @@ function WeightList({ items, category }: { items: PaletteItem[]; category: TileC
   );
 }
 
-function TileInspector({ gids }: { gids: number[] }) {
-  const tilesets = useProject((s) => s.project.tilesets);
-  const setTileMeta = useProject((s) => s.setTileMeta);
+/**
+ * Tile meta editor (category, role, collision, sort offset, weight, tags).
+ * Works on the project by default; the setup wizard passes a draft tileset list + setter.
+ */
+export function TileInspector({ gids, tilesets: draftTilesets, onMeta }: { gids: number[]; tilesets?: Tileset[]; onMeta?: (gids: number[], patch: Partial<TileMeta>) => void }) {
+  const projectTilesets = useProject((s) => s.project.tilesets);
+  const projectSetMeta = useProject((s) => s.setTileMeta);
+  const tilesets = draftTilesets ?? projectTilesets;
+  const setTileMeta = onMeta ?? projectSetMeta;
   const [tagDraft, setTagDraft] = useState('');
   if (!gids.length) return <div className="inspector is-empty">Tile antippen, um es zu malen und zu kategorisieren.</div>;
 
@@ -338,6 +345,7 @@ function TilesetManager() {
 }
 
 function TilesetCard({ ts }: { ts: Tileset }) {
+  const toast = useEditor((s) => s.toast);
   const updateTileset = useProject((s) => s.updateTileset);
   const removeTileset = useProject((s) => s.removeTileset);
   const setTilesetTileSize = useProject((s) => s.setTilesetTileSize);
@@ -404,6 +412,17 @@ function TilesetCard({ ts }: { ts: Tileset }) {
       {custom && <NumberField label="Freie Tilegröße" value={ts.tileSize} min={4} max={512} suffix="px" onChange={(v) => void setTilesetTileSize(ts.id, v)} />}
       <p className="hint">Beim Ändern wird neu zugeschnitten; platzierte Tiles dieses Tilesets werden entfernt (Rückgängig möglich).</p>
       <div className="tileset-actions">
+        <Button
+          variant="secondary"
+          icon={<Icon.Save size={16} />}
+          onClick={() =>
+            void saveLibraryTileset(toLibraryTileset(ts))
+              .then(() => toast(`„${ts.name}“ in der Tileset-Bibliothek gespeichert – bei neuen Projekten wählbar`, 'success'))
+              .catch(() => toast('Speichern in der Bibliothek fehlgeschlagen', 'error'))
+          }
+        >
+          In Bibliothek
+        </Button>
         {confirm ? (
           <>
             <span className="muted">Tileset und platzierte Tiles entfernen?</span>

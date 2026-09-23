@@ -1,13 +1,15 @@
-import type { Project } from '../types';
+import type { Project, Tileset } from '../types';
 import { migrateProject } from './migrate';
 
 // Minimal promise wrapper around IndexedDB.
 // Projects are stored as structured clones (typed arrays are supported natively).
 
 const DB_NAME = 'mapforge';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'projects';
 const META = 'meta';
+/** reusable tilesets (incl. roles, tags, perspectives), independent of projects */
+const LIBRARY = 'library';
 
 export interface ProjectSummary {
   id: string;
@@ -32,6 +34,7 @@ function open(): Promise<IDBDatabase> {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'id' });
       if (!db.objectStoreNames.contains(META)) db.createObjectStore(META);
+      if (!db.objectStoreNames.contains(LIBRARY)) db.createObjectStore(LIBRARY, { keyPath: 'id' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -91,4 +94,32 @@ export async function deleteProject(id: string): Promise<void> {
 export async function lastProjectId(): Promise<string | null> {
   const id = await tx<string | undefined>(META, 'readonly', (s) => s.get('lastProjectId'));
   return id ?? null;
+}
+
+/* ---------------------------- tileset library ---------------------------- */
+
+/** A tileset stored for reuse in new projects (gid range and active flag belong to a project). */
+export type LibraryTileset = Omit<Tileset, 'firstGid' | 'active'> & { savedAt: number };
+
+export function toLibraryTileset(ts: Tileset): LibraryTileset {
+  const { firstGid: _g, active: _a, ...rest } = ts;
+  void _g;
+  void _a;
+  const entry = { ...structuredClone(rest), savedAt: Date.now() };
+  // copies of built-in demo sets get their own id (new projects always contain the originals)
+  if (ts.source === 'demo') return { ...entry, id: `lib_${ts.id}`, source: 'upload' };
+  return entry;
+}
+
+export async function saveLibraryTileset(entry: LibraryTileset): Promise<void> {
+  await tx(LIBRARY, 'readwrite', (s) => s.put(entry));
+}
+
+export async function listLibraryTilesets(): Promise<LibraryTileset[]> {
+  const all = await tx<LibraryTileset[]>(LIBRARY, 'readonly', (s) => s.getAll());
+  return all.sort((a, b) => b.savedAt - a.savedAt);
+}
+
+export async function deleteLibraryTileset(id: string): Promise<void> {
+  await tx(LIBRARY, 'readwrite', (s) => s.delete(id));
 }

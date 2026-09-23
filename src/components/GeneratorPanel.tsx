@@ -6,7 +6,7 @@ import { PERSPECTIVES } from '../types';
 import { CORRIDOR_OPTS, DISTRIBUTIONS, SHAPES, SPECIALS } from './generatorOptions';
 import { PERSPECTIVE_INFO } from '../generator/perspective';
 import { RoomCountGuard } from './RoomCountGuard';
-import { Chip, IconButton, NumberField, Section, Segmented, Slider, Toggle } from './ui';
+import { Button, Chip, IconButton, NumberField, Section, Segmented, Slider, Toggle } from './ui';
 import { Icon } from './icons';
 import { copyText } from '../utils/clipboard';
 import { randomSeed } from '../generator/rng';
@@ -100,6 +100,7 @@ export function GeneratorPanel() {
 
   return (
     <div className="panel-scroll">
+      <BuildModeCard />
       <Stats />
       <Section title="Presets">
         <div className="chips">
@@ -200,9 +201,32 @@ export function GeneratorPanel() {
   );
 }
 
+/** Manual build mode: explains the build kit and lets the user switch to the generator. */
+function BuildModeCard() {
+  const mode = useProject((s) => s.project.mode);
+  const setMode = useProject((s) => s.setMode);
+  if (mode !== 'manual') return null;
+  return (
+    <div className="build-card">
+      <strong>Manueller Baukasten</strong>
+      <p>
+        Räume und Wege mit dem Boden-Pinsel (Layer „Boden“) malen – mit Auto-Wände entstehen Wände, Ecken und Fronten automatisch. Türen auf Wände setzen öffnet sie, Objekte
+        unter Tiles → Objekte, Abgründe/Wasser/Brücken über ihre Tiles.
+      </p>
+      <Button variant="secondary" onClick={() => setMode('generate')}>
+        Automatische Generierung aktivieren
+      </Button>
+      <p className="hint">Danach erzeugt „Generieren“ eine komplette Map nach den Einstellungen unten (Rückgängig möglich).</p>
+    </div>
+  );
+}
+
 export function GenerateButtons({ compact }: { compact?: boolean }) {
   const run = useProject((s) => s.runGenerate);
   const busy = useProject((s) => s.generating);
+  const manual = useProject((s) => s.project.mode === 'manual');
+  // manual build mode: nothing is generated automatically (switch in the generator panel)
+  if (manual) return null;
   return (
     <div className={`generate-row${compact ? ' is-compact' : ''}`}>
       <button type="button" className="btn btn-primary btn-generate" disabled={busy} onClick={() => run()}>

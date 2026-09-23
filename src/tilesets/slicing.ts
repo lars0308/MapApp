@@ -1,4 +1,4 @@
-import type { Tileset } from '../types';
+import type { TileMeta, Tileset } from '../types';
 import { loadImage } from '../utils/image';
 import { uid } from '../utils/id';
 
@@ -76,4 +76,21 @@ export function resolveGid(tilesets: Tileset[], gid: number): { ts: Tileset; ind
     if (gid >= ts.firstGid && gid < ts.firstGid + n) return { ts, index: gid - ts.firstGid };
   }
   return null;
+}
+
+/** Apply a meta patch to the tiles with the given gids (pure; shared by the store and the setup wizard). */
+export function applyTileMeta(tilesets: Tileset[], gids: number[], patch: Partial<TileMeta>): Tileset[] {
+  return tilesets.map((ts) => {
+    const n = ts.columns * ts.rows;
+    const mine = gids.filter((g) => g >= ts.firstGid && g < ts.firstGid + n);
+    if (!mine.length) return ts;
+    const tiles = { ...ts.tiles };
+    for (const g of mine) {
+      const idx = g - ts.firstGid;
+      const cur = tiles[idx] ?? { tags: [], weight: 50 };
+      tiles[idx] = { ...cur, ...patch };
+      if (patch.category === undefined && 'category' in patch) delete tiles[idx].category;
+    }
+    return { ...ts, tiles };
+  });
 }

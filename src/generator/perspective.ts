@@ -24,7 +24,7 @@ export const PERSPECTIVE_INFO: Record<Perspective, PerspectiveInfo> = {
     id: 'low_top_down',
     label: 'Low Top-Down',
     short: '3/4-Ansicht mit Wandhöhe',
-    points: ['Kamera leicht schräg von oben', 'Sichtbare Wandfronten', 'Tiefe durch Oberkante + Front + Schatten'],
+    points: ['Kamera leicht schräg von oben', 'Oben und seitlich sichtbare Wandhöhe', 'Vorne nur Wandkante – Raum ist offen zum Spieler'],
     faceRows: 1,
     sideFaces: false,
   },
