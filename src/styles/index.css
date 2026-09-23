@@ -4438,3 +4438,23 @@ body.is-resizing-y * {
 .sprite-studio.is-mobile .sprite-preview img:last-child {
   display: none;
 }
+
+/* wizard: game step */
+.choice-card.is-soon {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.choice-card .badge {
+  margin-left: 8px;
+  vertical-align: 2px;
+}
+.game-genres,
+.game-effort {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+.game-summary strong {
+  color: var(--text);
+}
+.start-profile {
+  margin: -4px 0 12px;
+}

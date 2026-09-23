@@ -1,3 +1,4 @@
+import { profileFromPerspective } from '../profiles';
 import type { GeneratorSettings, Layer, Project } from '../types';
 import { DEFAULT_MAP, defaultGenerator, defaultTerrain, defaultTerrainSets } from '../generator/presets';
 import { DEFAULT_LAYERS, layerFromDef } from '../layers/defaults';
@@ -78,5 +79,6 @@ export function migrateProject(p: Project): Project {
     terrains: p.terrains ?? defaultTerrainSets(),
     objects: p.objects ?? [],
     mode: p.mode ?? 'generate',
+    profile: p.profile ?? profileFromPerspective(map.perspective),
   };
 }

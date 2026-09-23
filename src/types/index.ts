@@ -1,3 +1,4 @@
+import type { GameProfile } from '../profiles';
 // Central data model of MapForge.
 // Tiles are referenced on layers by a numeric "gid" (global tile id, 0 = empty).
 // Each tileset owns a contiguous gid range starting at `firstGid` (Tiled-style),
@@ -363,6 +364,8 @@ export type ProjectMode = 'generate' | 'manual';
 export interface Project {
   formatVersion: 1;
   mode: ProjectMode;
+  /** answers from the setup wizard (view, genre, effort) – see profiles/ */
+  profile?: GameProfile;
   id: string;
   name: string;
   createdAt: number;

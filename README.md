@@ -346,6 +346,11 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 1.8 – Spiel-Profil im Setup**
+
+- Neuer erster Schritt im Assistenten **„Spiel“**: Ansicht (Top-Down, Isometrisch; Side-Scroller und Hexagonal als „bald“ markiert), **Genre** (Action-Roguelite, Dungeon-Crawler, RPG/Abenteuer, Taktik, Puzzle, Anderes) und **Aufwand** (Klein & schnell, Mittel, Groß & detailliert). Daraus werden Map-Größe, Raumanzahl und -größen, Gänge, Spezialräume, Deko, Gelände und Boden-Varianten voreingestellt – alle Regler bleiben in den folgenden Schritten änderbar. Die Perspektiven-Auswahl zeigt nur, was zur Ansicht passt.
+- Das Profil wird im Projekt gespeichert (`project.profile`), ältere Projekte bekommen es automatisch; angezeigt auf der Seite „Projekt“. Neu: `profiles/index.ts`.
+
 **Version 1.7 – Reiter, Startseite**
 
 - Neue Kopfzeile mit Reitern: **Projekt · Karte bauen · Charakter bauen · Objekt bauen · Einstellungen**, dazu der runde **▶ Testen**-Knopf (startet den Playtest, wechselt dafür bei Bedarf zur Karte). **Generieren** und der Würfel **Neue Variante** (neuer Seed = gleiche Einstellungen, andere Zufallsverteilung) erscheinen nur auf „Karte bauen“ im automatischen Modus.

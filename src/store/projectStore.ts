@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { profileFromPerspective, type GameProfile } from '../profiles';
 import { CELL_VOID } from '../types';
 import type { GeneratorSettings, Layer, LayerRole, MapObject, MapSettings, Project, ProjectMode, TerrainSet, TileMeta, Tileset } from '../types';
 import { DEFAULT_MAP, PRESETS, defaultGenerator, defaultTerrainSets } from '../generator/presets';
@@ -24,6 +25,7 @@ export function createProject(
     generator?: GeneratorSettings;
     terrains?: TerrainSet[];
     mode?: ProjectMode;
+    profile?: GameProfile;
     /** tilesets from the library (added after the demo sets) */
     library?: LibraryTileset[];
     /** demo tilesets active (they always stay in the project as fallback) */
@@ -43,6 +45,7 @@ export function createProject(
   return {
     formatVersion: 1,
     mode,
+    profile: opts.profile ?? profileFromPerspective(map.perspective),
     id: uid('prj'),
     name,
     createdAt: now,

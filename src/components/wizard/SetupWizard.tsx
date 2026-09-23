@@ -9,6 +9,7 @@ import { COMMON_TILE_SIZES } from '../../tilesets/slicing';
 import { createProject, useProject } from '../../store/projectStore';
 import { useEditor } from '../../store/editorStore';
 import { useApp } from '../../store/appStore';
+import { DEFAULT_PROFILE, EFFORTS, GENRES, VIEWS, applyProfile, deriveConfig, genreInfo, profileLabel, type GameProfile } from '../../profiles';
 import { saveNow } from '../../persistence/autosave';
 import { Button, Chip, IconButton, NumberField, Segmented, Slider, Toggle } from '../ui';
 import { Icon } from '../icons';
@@ -20,9 +21,10 @@ import { listLibraryTilesets, type LibraryTileset } from '../../persistence/db';
 import { TilePools } from '../../tilesets/tilePools';
 import { Rng } from '../../generator/rng';
 
-type StepId = 'mode' | 'perspective' | 'tiles' | 'map' | 'rooms' | 'paths' | 'specials' | 'terrain' | 'equip' | 'summary';
+type StepId = 'game' | 'mode' | 'perspective' | 'tiles' | 'map' | 'rooms' | 'paths' | 'specials' | 'terrain' | 'equip' | 'summary';
 
 const STEP_LABEL: Record<StepId, string> = {
+  game: 'Spiel',
   mode: 'Modus',
   perspective: 'Perspektive',
   tiles: 'Tiles',
@@ -37,8 +39,8 @@ const STEP_LABEL: Record<StepId, string> = {
 
 /** automatic: tiles → generator settings → map; manual: tiles → finish → build kit (editor) */
 const FLOW: Record<ProjectMode, StepId[]> = {
-  generate: ['mode', 'perspective', 'tiles', 'map', 'rooms', 'paths', 'specials', 'terrain', 'equip', 'summary'],
-  manual: ['mode', 'perspective', 'tiles', 'map', 'summary'],
+  generate: ['game', 'mode', 'perspective', 'tiles', 'map', 'rooms', 'paths', 'specials', 'terrain', 'equip', 'summary'],
+  manual: ['game', 'mode', 'perspective', 'tiles', 'map', 'summary'],
 };
 
 const SPECIAL_HINT: Record<SpecialRoomType, string> = {
@@ -54,6 +56,7 @@ const SPECIAL_HINT: Record<SpecialRoomType, string> = {
 };
 
 interface Draft {
+  profile: GameProfile;
   mode: ProjectMode;
   tiles: TilesChoice;
   name: string;
@@ -64,6 +67,7 @@ interface Draft {
 
 function freshDraft(): Draft {
   return {
+    profile: DEFAULT_PROFILE,
     mode: 'generate',
     tiles: { source: 'demo', selected: [] },
     name: 'Neues Projekt',
@@ -102,6 +106,16 @@ function WizardDialog() {
 
   const setMap = (patch: Partial<MapSettings>) => setDraft((d) => ({ ...d, map: { ...d.map, ...patch } }));
   const setGen = (patch: Partial<GeneratorSettings>) => setDraft((d) => ({ ...d, gen: { ...d.gen, ...patch } }));
+  /** new answers → sliders and map size start from the profile (seed and tile size stay) */
+  const setProfile = (patch: Partial<GameProfile>) =>
+    setDraft((d) => {
+      const profile = { ...d.profile, ...patch };
+      if (!genreInfo(profile.genre).views.includes(profile.view)) profile.genre = 'other';
+      const { gen, map } = applyProfile(profile, defaultGenerator(d.gen.seed), DEFAULT_MAP);
+      const allowed = deriveConfig(profile).perspectives;
+      return { ...d, profile, gen, map: { ...d.map, ...map, perspective: allowed.includes(d.map.perspective) ? d.map.perspective : allowed[allowed.length - 1] } };
+    });
+  const allowedPerspectives = deriveConfig(draft.profile).perspectives;
 
   // braces matter: newer Chrome returns a Promise from scrollTo(), React would call it as cleanup
   useEffect(() => {
@@ -142,6 +156,7 @@ function WizardDialog() {
           generator: gen,
           terrains: draft.terrains,
           mode: draft.mode,
+          profile: draft.profile,
           library: lib,
           // own tilesets chosen → demo tiles only serve as fallback for missing roles
           demoActive: lib.length === 0,
@@ -200,6 +215,8 @@ function WizardDialog() {
         </ol>
 
         <div className="wizard-body" ref={bodyRef}>
+          {id === 'game' && <GameStep draft={draft} onChange={setProfile} />}
+
           {id === 'mode' && (
             <StepSection title="Wie möchtest du deine Map bauen?">
               <div className="choice-grid" role="radiogroup" aria-label="Modus">
@@ -231,7 +248,7 @@ function WizardDialog() {
           {id === 'perspective' && (
             <StepSection title="Wie soll deine Map dargestellt werden?">
               <div className="persp-grid" role="radiogroup" aria-label="Perspektive">
-                {PERSPECTIVES.map((p) => (
+                {PERSPECTIVES.filter((p) => allowedPerspectives.includes(p)).map((p) => (
                   <PerspectiveCard key={p} id={p} selected={map.perspective === p} onSelect={() => setMap({ perspective: p })} />
                 ))}
               </div>
@@ -516,6 +533,7 @@ function Summary({ draft, library, onName, onFixRooms }: { draft: Draft; library
           .join(', ') + ' (+ Demo-Tiles als Ersatz)'
       : 'Demo-Tiles';
   const base: [string, string][] = [
+    ['Spiel', profileLabel(draft.profile)],
     ['Modus', draft.mode === 'generate' ? 'Automatisch generieren' : 'Manuell bauen (Baukasten)'],
     ['Perspektive', PERSPECTIVE_INFO[map.perspective].label + (map.shadows ? ' · mit Schatten' : '')],
     ['Tiles', tiles],
@@ -565,4 +583,76 @@ function prepareBuildKit() {
   const editor = useEditor.getState();
   if (gid) editor.selectTile(gid);
   editor.setTool('brush');
+}
+
+/** Step 1: what kind of game – view, genre, effort. Changes the start values of all later steps. */
+function GameStep({ draft, onChange }: { draft: Draft; onChange: (p: Partial<GameProfile>) => void }) {
+  const { profile, gen, map } = draft;
+  const genres = GENRES.filter((g) => g.views.includes(profile.view));
+  const specials = SPECIALS.filter((s) => gen.specials[s.id]).map((s) => s.label);
+  return (
+    <StepSection title="Was für ein Spiel baust du?">
+      <div className="field">
+        <label>Ansicht</label>
+        <div className="choice-grid game-views" role="radiogroup" aria-label="Ansicht">
+          {VIEWS.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              role="radio"
+              aria-checked={profile.view === v.id}
+              disabled={!v.available}
+              className={`choice-card${profile.view === v.id ? ' is-selected' : ''}${v.available ? '' : ' is-soon'}`}
+              onClick={() => onChange({ view: v.id })}
+            >
+              <span className="choice-text">
+                <strong>
+                  {v.label}
+                  {!v.available && <span className="badge">bald</span>}
+                </strong>
+                <small>{v.text}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="field">
+        <label>Genre / Art des Spiels</label>
+        <div className="choice-grid game-genres" role="radiogroup" aria-label="Genre">
+          {genres.map((g) => (
+            <button key={g.id} type="button" role="radio" aria-checked={profile.genre === g.id} className={`choice-card${profile.genre === g.id ? ' is-selected' : ''}`} onClick={() => onChange({ genre: g.id })}>
+              <span className="choice-text">
+                <strong>{g.label}</strong>
+                <small>{g.text}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="field">
+        <label>Wie aufwendig?</label>
+        <div className="choice-grid game-effort" role="radiogroup" aria-label="Aufwand">
+          {EFFORTS.map((e) => (
+            <button
+              key={e.id}
+              type="button"
+              role="radio"
+              aria-checked={(profile.effort ?? 'medium') === e.id}
+              className={`choice-card${(profile.effort ?? 'medium') === e.id ? ' is-selected' : ''}`}
+              onClick={() => onChange({ effort: e.id })}
+            >
+              <span className="choice-text">
+                <strong>{e.label}</strong>
+                <small>{e.text}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="note game-summary">
+        Voreingestellt: <strong>{map.width} × {map.height} Tiles</strong> · <strong>{gen.roomCount} Räume</strong> ({gen.roomMinW}–{gen.roomMaxW} Tiles breit) · Deko {gen.decoDensity} % ·
+        Spezialräume: {specials.join(', ') || 'keine'}. Alle Regler lassen sich in den nächsten Schritten ändern.
+      </p>
+    </StepSection>
+  );
 }

@@ -9,6 +9,7 @@ import { saveNow } from '../persistence/autosave';
 import { deserializeProject, PROJECT_EXTENSION } from '../persistence/projectFile';
 import { readFileAsText } from '../utils/download';
 import { ExportPanel } from '../export/ExportPanel';
+import { profileLabel } from '../profiles';
 
 const when = (t: number) => new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -18,6 +19,7 @@ const when = (t: number) => new Date(t).toLocaleString('de-DE', { dateStyle: 'sh
  */
 export function StartPage() {
   const name = useProject((s) => s.project.name);
+  const profile = useProject((s) => s.project.profile);
   const id = useProject((s) => s.project.id);
   const revision = useProject((s) => s.revision);
   const dirty = useProject((s) => s.revision !== s.savedRevision);
@@ -165,6 +167,7 @@ export function StartPage() {
         {!placeholder && (
           <section className="start-block" aria-labelledby="current-title">
             <h2 id="current-title">Aktuelles Projekt</h2>
+            <p className="muted small start-profile">Spiel: {profileLabel(profile)}</p>
             <div className="field">
               <label htmlFor="project-name">Name</label>
               <input id="project-name" className="input" value={name} onChange={(e) => useProject.getState().setName(e.target.value)} />
