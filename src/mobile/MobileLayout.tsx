@@ -4,7 +4,8 @@ import { Workspace, ViewSwitch } from '../components/Workspace';
 import { GeneratorPanel, GenerateButtons } from '../components/GeneratorPanel';
 import { LayersPanel } from '../layers/LayersPanel';
 import { TilesPanel } from '../tilesets/TilesPanel';
-import { ActiveTileChip, BrushSize, CollisionToggle, TileTurn, ToolButtons, UndoRedo } from '../editor/Toolbar';
+import { ActiveTileChip, BrushSize, CollisionToggle, MinimapToggle, TileTurn, ToolButtons, UndoRedo } from '../editor/Toolbar';
+import { Minimap } from '../editor/Minimap';
 import { BottomSheet } from './BottomSheet';
 import { useEditor, type MobilePanel } from '../store/editorStore';
 import { useProject } from '../store/projectStore';
@@ -76,12 +77,16 @@ export function MobileLayout() {
               <Icon.Grid size={20} />
             </IconButton>
             <CollisionToggle size={20} active={showCollision} onToggle={() => useEditor.getState().setFlag('showCollision', !showCollision)} />
+            <MinimapToggle size={20} />
             <IconButton label="Einstellungen" onClick={() => useApp.getState().goTo('settings')}>
               <Icon.Gear size={20} />
             </IconButton>
             <IconButton label="Einpassen" onClick={() => viewEvents.emit({ type: 'fit' })}>
               <Icon.Fit size={20} />
             </IconButton>
+          </div>
+          <div className="m-minimap">
+            <Minimap compact />
           </div>
           <PlaytestOverlay touch />
           {!panel && !playtest && (

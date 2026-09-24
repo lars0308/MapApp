@@ -93,6 +93,8 @@ export class MapRenderer {
   /** background behind the tiles: plain, sky with hills (side view outside), dark cave */
   backdrop: 'plain' | 'sky' | 'cave' = 'plain';
   onCameraChange?: (cam: Camera) => void;
+  /** more listeners for camera moves (minimap) */
+  readonly cameraListeners = new Set<() => void>();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -147,6 +149,7 @@ export class MapRenderer {
     this.canvas.height = Math.max(1, Math.round(cssH * this.dpr));
     this.canvas.style.width = `${cssW}px`;
     this.canvas.style.height = `${cssH}px`;
+    this.cameraListeners.forEach((f) => f());
     this.requestRender();
   }
 
@@ -191,7 +194,15 @@ export class MapRenderer {
     this.cam.x += (tx - this.cam.x) * k;
     this.cam.y += (ty - this.cam.y) * k;
     this.onCameraChange?.(this.cam);
+    this.cameraListeners.forEach((f) => f());
     this.requestRender();
+  }
+
+  /** put a world point in the middle of the view (minimap) */
+  centerOn(wx: number, wy: number) {
+    this.cam.x = wx - this.viewW / this.cam.zoom / 2;
+    this.cam.y = wy - this.viewH / this.cam.zoom / 2;
+    this.cameraChanged();
   }
 
   zoomAt(sx: number, sy: number, factor: number) {
@@ -217,6 +228,7 @@ export class MapRenderer {
     this.cam.x = clamp(this.cam.x, -vw + 2, this.worldW - 2);
     this.cam.y = clamp(this.cam.y, -vh + 2, this.worldH - 2);
     this.onCameraChange?.(this.cam);
+    this.cameraListeners.forEach((f) => f());
     this.requestRender();
   }
 
@@ -262,6 +274,7 @@ export class MapRenderer {
       if (!layer.visible) continue;
       // non-sorted layers above the y-sorted group are drawn after objects (not cached)
       if (firstYs >= 0 && li > firstYs && !layer.ySort) continue;
+      c.globalAlpha = layer.opacity ?? 1;
       const d = layer.data;
       for (let y = cy0; y < y1; y++)
         for (let x = cx0; x < x1; x++) {
@@ -269,6 +282,7 @@ export class MapRenderer {
           if (g && !this.hiddenGids.has(tileOf(g))) drawGid(c, this.table, g, (x - cx0) * ppt, (y - cy0) * ppt, ppt, ppt);
         }
     }
+    c.globalAlpha = 1;
     chunk.dirty = false;
     return chunk.canvas;
   }
@@ -353,6 +367,7 @@ export class MapRenderer {
     });
 
     const drawLayerDirect = (layer: Layer) => {
+      ctx.globalAlpha = layer.opacity ?? 1;
       const d = layer.data;
       for (let y = y0; y < y1; y++) {
         const dy = sy(y);
@@ -364,6 +379,7 @@ export class MapRenderer {
           drawGid(ctx, this.table, g, dx, dy, sx(x + 1) - dx, dh);
         }
       }
+      ctx.globalAlpha = 1;
     };
 
     // sortable items: y-sorted tiles, objects, test character
@@ -433,6 +449,7 @@ export class MapRenderer {
       const yEnd = Math.min(this.H, y1 + 3);
       for (const layer of ys) {
         const d = layer.data;
+        const alpha = layer.opacity ?? 1;
         for (let y = y0; y < yEnd; y++)
           for (let x = x0; x < x1; x++) {
             const g = d[y * this.W + x];
@@ -443,7 +460,9 @@ export class MapRenderer {
               draw: () => {
                 const dx = sx(x);
                 const dy = sy(y);
+                ctx.globalAlpha = alpha;
                 drawGid(ctx, this.table, g, dx, dy, sx(x + 1) - dx, sy(y + 1) - dy);
+                ctx.globalAlpha = 1;
               },
             });
           }
@@ -550,6 +569,7 @@ export class MapRenderer {
     ctx.imageSmoothingEnabled = smooth;
     for (const layer of this.layers) {
       if (!layer.visible) continue;
+      ctx.globalAlpha = layer.opacity ?? 1;
       const d = layer.data;
       for (let y = y0; y < y1; y++)
         for (let x = x0; x < x1; x++) {
@@ -560,6 +580,7 @@ export class MapRenderer {
           drawGid(ctx, this.table, g, dx, dy, w + (smooth ? 1 : 0), h + (smooth ? 1 : 0));
         }
     }
+    ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = false;
     const hexPath = (x: number, y: number, inset = 0) => {
       const [ox, oy] = hexOrigin(x, y);

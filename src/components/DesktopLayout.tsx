@@ -6,6 +6,7 @@ import { LayersPanel } from '../layers/LayersPanel';
 import { TilesPanel } from '../tilesets/TilesPanel';
 import { PanelTabs } from './ui';
 import { BrushSize, HoverInfo, TileTurn, ToolButtons, ViewControls } from '../editor/Toolbar';
+import { Minimap } from '../editor/Minimap';
 import { TerrainPanel } from './TerrainPanel';
 import { PlaytestOverlay } from '../playtest/PlaytestOverlay';
 import { TopBar } from './TopBar';
@@ -133,6 +134,9 @@ export function DesktopLayout() {
               </div>
             </>
           )}
+          <div className="float-top-right">
+            <Minimap />
+          </div>
           <div className="float-bottom-right">
             <ViewControls onSettings={() => useApp.getState().goTo('settings')} />
           </div>

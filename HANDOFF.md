@@ -1,4 +1,4 @@
-# Übergabe – MapForge (Stand 2026-09-24)
+# Übergabe – MapForge (Stand 2026-09-24, Version 3.0)
 
 Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (letzter Commit: „8 Richtungen …“, Version 2.9 im README).
 Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI auf Deutsch, UI selbsterklärend, mobil zuerst, keine Fake-Features.
@@ -11,10 +11,10 @@ Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI 
 - Godot-4.3-Export (Karte + Spieler/Gegner-Skripte), headless in Godot 4.3 geprüft.
 - Wichtige Dateien: `src/editor/MapCanvas.tsx` (Eingabe/Werkzeuge), `src/editor/tools.ts`, `src/store/editorStore.ts`, `src/store/projectStore.ts` (beginStroke/strokeSet/strokeSetLayer/endStroke = Undo-Schritt), `src/renderer/MapRenderer.ts` (overlay.preview/selection), `src/editor/Toolbar.tsx`, `src/editor/useShortcuts.ts`, `src/layers/LayersPanel.tsx`, Sprites in `src/sprites/*`.
 
-## Gerade in Arbeit (noch nicht begonnen im Code)
-1. **Kopieren/Einfügen + Stempel**: Auswahl (Werkzeug „Auswahl“) → Kopieren (Strg+C / Knopf) speichert alle Layer-Tiles des Bereichs (+ Objekte) im editorStore als `clipboard`; Werkzeug „Stempel“/Einfügen zeigt Vorschau unter dem Finger, Tippen setzt ein (ein Undo-Schritt, danach `applyAutoWalls`). Auch: Strg+X, Entf löscht Auswahl.
-2. **Tiles drehen/spiegeln**: Tile-Flags in gid (z. B. hohe Bits wie Tiled: H/V/Diagonal) → Renderer, Pipette, Godot-Export (TileMapLayer alternative tiles bzw. `TileSetAtlasSource.TRANSFORM_FLIP_H/V/TRANSPOSE`) berücksichtigen. Knöpfe „↻ drehen“ / „⇋ spiegeln“ in der Toolbar für den aktuellen Pinsel/Stempel.
-3. **Minimap + Layer-Deckkraft**: kleine Übersichtskarte (antippen = hinspringen, Rahmen = sichtbarer Bereich); Deckkraft-Regler pro Layer im LayersPanel (Renderer + im Projekt speichern, Export ignoriert sie).
+## Zuletzt fertig (Version 3.0)
+- Kopieren/Ausschneiden/Stempel: `src/editor/clipboard.ts` (Clip, copyArea, pasteClip via `editDoc`, transformClip), Werkzeug `stamp`, Vorschau `overlay.stamp` im Renderer.
+- Tile drehen/spiegeln: Bits in der Zellenzahl (`src/tilesets/gid.ts`: FLIP_H 0x10000000, FLIP_V 0x20000000, TRANSPOSE 0x40000000). Überall, wo ein gid inhaltlich gelesen wird, `tileOf(v)` benutzen! Editor-State `tileTurn`. Godot-Export: `alternative` im Tile-JSON.
+- Minimap `src/editor/Minimap.tsx` (`renderer.cameraListeners`, `centerOn`), Layer-Deckkraft `layer.opacity` (nur Editor).
 
 ## Danach offen
 4. Eigene Figuren/Objekte aus dem Baukasten als Objekte auf die Karte (+ Godot-Export).
@@ -23,7 +23,6 @@ Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI 
 7. Echtes isometrisches Rautenraster + Höhenebenen.
 8. Godot-Terrain-Set für Wände; direkter `.tscn`/`.tres`-Export.
 9. Tilesets mit Rand/Abstand, nicht-quadratische Tiles; Generator im Web Worker.
-10. README „Bekannte Einschränkungen“: Satz „Godot-Script nicht in Godot getestet“ ist veraltet → entfernen.
 
 ## Tests
 Playwright-Skripte lagen nur im Scratchpad der Sitzung (nicht im Repo). Vorgehen: `npm run build`, `npx vite preview --port 4173`, mit Playwright (Chromium unter `/opt/pw-browsers`) prüfen, Handy 390 px ohne horizontales Scrollen. Beim Start erscheint zuerst eine Auswahlseite (Karte/Figuren/Animieren fragen erst, was man machen will).

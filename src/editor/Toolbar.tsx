@@ -186,6 +186,7 @@ export function ViewControls({ onSettings, settingsOpen }: { onSettings?: () => 
       <IconButton label="Koordinaten" active={showCoords} onClick={toggleCoords}>
         <Icon.Crosshair size={18} />
       </IconButton>
+      <MinimapToggle size={18} />
       <span className="divider" />
       <IconButton label="Verkleinern" onClick={() => viewEvents.emit({ type: 'zoom', factor: 1 / 1.4 })}>
         <Icon.Minus size={18} />
@@ -208,6 +209,16 @@ export function ViewControls({ onSettings, settingsOpen }: { onSettings?: () => 
         </>
       )}
     </div>
+  );
+}
+
+/** overview map on / off */
+export function MinimapToggle({ size = 18 }: { size?: number }) {
+  const on = useEditor((s) => s.showMinimap);
+  return (
+    <IconButton label="Übersichtskarte" title="Übersichtskarte ein / aus – antippen springt dorthin" active={on} onClick={() => useEditor.getState().toggleMinimap()}>
+      <Icon.Minimap size={size} />
+    </IconButton>
   );
 }
 

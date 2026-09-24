@@ -67,6 +67,11 @@ function LayerRow({ layer, active, isTop, isBottom, canDelete }: { layer: Layer;
               {layer.name}
               {ROLE_LABEL[layer.role] !== layer.name && <small>{ROLE_LABEL[layer.role]}</small>}
               {layer.ySort && <small className="ysort-badge" title="Y-Sort aktiv">Y</small>}
+              {layer.opacity !== undefined && layer.opacity < 1 && (
+                <small className="opacity-badge" title="Durchsichtig (nur im Editor)">
+                  {Math.round(layer.opacity * 100)} %
+                </small>
+              )}
             </span>
           )}
         </button>
@@ -123,6 +128,19 @@ function LayerRow({ layer, active, isTop, isBottom, canDelete }: { layer: Layer;
           >
             <Icon.Trash size={18} />
           </IconButton>
+          <label className="layer-opacity" title="Durchsichtig anzeigen, um darunter zu sehen – nur im Editor, der Export bleibt unverändert">
+            <span>Deckkraft</span>
+            <input
+              type="range"
+              min={10}
+              max={100}
+              step={5}
+              value={Math.round((layer.opacity ?? 1) * 100)}
+              aria-label={`Deckkraft ${layer.name}`}
+              onChange={(e) => s.setLayerOpacity(layer.id, Number(e.target.value) / 100)}
+            />
+            <span className="mono">{Math.round((layer.opacity ?? 1) * 100)} %</span>
+          </label>
         </div>
       )}
     </li>

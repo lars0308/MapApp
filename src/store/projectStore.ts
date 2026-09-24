@@ -113,6 +113,8 @@ interface ProjectState {
   clearArea: (r: { x: number; y: number; w: number; h: number }) => number;
   /** one undoable change of the whole document (stamp, …) */
   editDoc: (label: string, fn: (p: Project) => Project) => void;
+  /** editor-only see-through layer (0.1 – 1) */
+  setLayerOpacity: (id: string, opacity: number) => void;
   /** merge metas into a tileset (automatic assignment, confirm suggestions) */
   mergeTileMetas: (tilesetId: string, tiles: Record<number, TileMeta>) => void;
 
@@ -450,6 +452,10 @@ export const useProject = create<ProjectState>((set, get) => {
       }),
     toggleLayerVisible: (id) => {
       mapLayers((l) => (l.id === id ? { ...l, visible: !l.visible } : l));
+      mapEvents.emit({ type: 'all' });
+    },
+    setLayerOpacity: (id, opacity) => {
+      mapLayers((l) => (l.id === id ? { ...l, opacity: opacity >= 0.99 ? undefined : Math.max(0.1, opacity) } : l));
       mapEvents.emit({ type: 'all' });
     },
     toggleLayerLocked: (id) => mapLayers((l) => (l.id === id ? { ...l, locked: !l.locked } : l)),

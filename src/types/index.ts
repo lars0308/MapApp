@@ -182,6 +182,8 @@ export interface Layer {
   locked: boolean;
   /** participates in the y-sorted pass together with objects and characters */
   ySort: boolean;
+  /** shown see-through in the editor (0.1 – 1, default 1) – the export is not affected */
+  opacity?: number;
   data: Uint32Array;
 }
 

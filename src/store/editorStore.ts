@@ -38,6 +38,9 @@ interface EditorState {
   /** object brush (null = tiles) */
   selectedObject: ObjectType | null;
   playtest: boolean;
+  /** overview map in the corner */
+  showMinimap: boolean;
+  toggleMinimap: () => void;
   /** turn / mirror of the painted tile (TRANSFORM bits, see tilesets/gid.ts) */
   tileTurn: number;
   setTileTurn: (t: number) => void;
@@ -74,6 +77,17 @@ interface EditorState {
 
 let toastId = 1;
 
+/** minimap: remembered, else on for big screens */
+function readMinimap(): boolean {
+  try {
+    const v = localStorage.getItem('mapforge.minimap');
+    if (v) return v === '1';
+  } catch {
+    // ignore
+  }
+  return typeof window !== 'undefined' && window.innerWidth >= 900;
+}
+
 export const useEditor = create<EditorState>((set, get) => ({
   tool: 'hand',
   brushSize: 1,
@@ -95,6 +109,16 @@ export const useEditor = create<EditorState>((set, get) => ({
   autoWalls: true,
   selectedObject: null,
   playtest: false,
+  showMinimap: readMinimap(),
+  toggleMinimap: () => {
+    const showMinimap = !get().showMinimap;
+    set({ showMinimap });
+    try {
+      localStorage.setItem('mapforge.minimap', showMinimap ? '1' : '0');
+    } catch {
+      // not stored
+    }
+  },
   tileTurn: 0,
   setTileTurn: (tileTurn) => set({ tileTurn }),
   clipboard: null,

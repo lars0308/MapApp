@@ -320,7 +320,7 @@ Wichtige Entscheidungen:
 - 45° / Isometric-like ist kein echtes isometrisches Rautenraster, sondern ein orthogonales Raster mit doppelt hohen Wandfronten und sichtbaren Seitenwänden. Ein Rautenraster (Godot `TILE_SHAPE_ISOMETRIC`) wäre eine spätere Erweiterung.
 - Klippen und Plateaus sind Bildschirm-Höhe (eine Stufe), keine echten Höhenebenen; die Höhe steht in `navigation.heights`.
 - Die Wandrollen sind regelbasiert; eigene Tilesets brauchen Tiles mit passender Rolle (fehlende Rollen fallen auf verwandte Rollen bzw. Kategorien zurück). Kein Export als Godot-Terrain-Set.
-- Das Godot-Script ist gegen die Godot-4.3-API geschrieben, aber nicht automatisiert in Godot getestet (kein Godot in der Build-Umgebung).
+- Das Godot-Script ist gegen die Godot-4.3-API geschrieben und wird bei Änderungen in einem echten Godot 4.3 (headless) geprüft, aber nicht per CI.
 - Objekte haben feste Sprites aus dem mitgelieferten Objekt-Atlas; eigene Objekt-Sprites sind noch nicht möglich.
 - Der Playtest ist bewusst einfach (keine Physik-Engine, keine Gegner, keine Höhenwechsel-Animation).
 - Spezialräume sind im Datensatz und im Room Graph markiert, haben aber noch keine Spielmechanik.
@@ -336,15 +336,20 @@ Wichtige Entscheidungen:
 - Eigene Objekt-Sprites aus Tilesets
 - Direkter `.tscn`/`.tres`-Export (TileSet-Ressource + Szene)
 - Generator im Web Worker, Fortschrittsanzeige für sehr große Maps
-- Auswahl kopieren/einfügen, Stempel aus mehreren Tiles
 - Weitere Biome (Höhlen per Cellular Automata, Außenbereiche, Dörfer)
 - Automatische Platzierung von Gegnern/Loot nach Raumtyp und Distanz zum Start
-- Minimap, Layer-Deckkraft, Tile-Rotation/Spiegelung
 - Tileset-Optionen für Rand/Abstand und nicht-quadratische Tiles
 
 ---
 
 ## Änderungen
+
+**Version 3.0 – Kopieren & Stempel, Drehen & Spiegeln, Übersichtskarte**
+
+- **Kopieren / Ausschneiden / Stempel:** Mit *Auswahl* einen Bereich markieren → in der Leiste *Kopieren*, *Ausschneiden* oder gleich **Stempel**. Der Stempel nimmt alle Layer, Objekte und die Struktur darunter mit (Auto-Wände arbeiten danach weiter). Die Kopie hängt halb durchsichtig unter Finger / Maus, loslassen setzt sie ein; leere Felder der Kopie lassen stehen, was darunter ist. Ein Stempel = ein Rückgängig-Schritt. Tastatur: Strg+C, Strg+X, Strg+V (Stempel), Entf löscht die Auswahl auf allen Layern, S = Stempel.
+- **Tiles drehen und spiegeln:** Neben der Pinselgröße ↻ (90° drehen) und ⇋ (spiegeln) – für Pinsel, Rechteck, Füllen und den ganzen Stempel. Die Pipette übernimmt die Drehung. Kollision, Auto-Wände und Export erkennen das Tile weiterhin. Godot: als *alternative tile* mit `TRANSFORM_FLIP_H / FLIP_V / TRANSPOSE` (in Godot 4.3 geprüft).
+- **Übersichtskarte:** kleine Karte in der Ecke mit Rahmen für den sichtbaren Ausschnitt; antippen oder ziehen springt dorthin. Ein/aus über das Kartensymbol (am Handy standardmäßig aus).
+- **Layer-Deckkraft:** im Layer-Menü (⋯) ein Regler – Layer halb durchsichtig anzeigen, um darunter zu arbeiten. Nur im Editor, der Export bleibt unverändert.
 
 **Version 2.9 – 8 Richtungen (Schrägansichten)**
 

@@ -213,6 +213,12 @@ export const Icon = {
       <path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 15v3.5A1.5 1.5 0 006.5 20h11a1.5 1.5 0 001.5-1.5V15" />
     </Svg>
   ),
+  Minimap: (p: P) => (
+    <Svg {...p}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <rect x="11" y="11" width="7" height="6" rx="1" />
+    </Svg>
+  ),
   Map: (p: P) => (
     <Svg {...p}>
       <path d="M9 5L3.5 7v12L9 17l6 2 5.5-2V5L15 7z" />
