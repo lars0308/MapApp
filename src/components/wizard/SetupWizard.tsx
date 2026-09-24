@@ -73,6 +73,15 @@ interface Draft {
   terrains: TerrainSet[];
 }
 
+/** new answers → sliders and map size start from the profile (seed and tile size stay) */
+function withProfile(d: Draft, patch: Partial<GameProfile>): Draft {
+  const profile = { ...d.profile, ...patch };
+  if (!genreInfo(profile.genre).views.includes(profile.view)) profile.genre = profile.view === 'side_scroller' ? 'platformer' : 'other';
+  const { gen, map } = applyProfile(profile, defaultGenerator(d.gen.seed), DEFAULT_MAP);
+  const allowed = deriveConfig(profile).perspectives;
+  return { ...d, profile, gen, map: { ...d.map, ...map, perspective: allowed.includes(d.map.perspective) ? d.map.perspective : allowed[allowed.length - 1] } };
+}
+
 function freshDraft(): Draft {
   return {
     profile: DEFAULT_PROFILE,
@@ -95,7 +104,12 @@ function WizardDialog() {
   const firstRun = useEditor((s) => s.wizardFirstRun);
   const { closeWizard, toast, setView } = useEditor.getState();
   const [step, setStep] = useState(0);
-  const [draft, setDraft] = useState<Draft>(freshDraft);
+  const [draft, setDraft] = useState<Draft>(() => {
+    // "Neue Karte → Side-Scroller …": start with that view (still changeable in step 1)
+    const d = freshDraft();
+    const view = useEditor.getState().wizardView;
+    return view ? withProfile(d, { view }) : d;
+  });
   const [busy, setBusy] = useState(false);
   const [library, setLibrary] = useState<LibraryTileset[] | null>(null);
   const [upload, setUpload] = useState<Tileset | null>(null);
@@ -116,14 +130,7 @@ function WizardDialog() {
   const setMap = (patch: Partial<MapSettings>) => setDraft((d) => ({ ...d, map: { ...d.map, ...patch } }));
   const setGen = (patch: Partial<GeneratorSettings>) => setDraft((d) => ({ ...d, gen: { ...d.gen, ...patch } }));
   /** new answers → sliders and map size start from the profile (seed and tile size stay) */
-  const setProfile = (patch: Partial<GameProfile>) =>
-    setDraft((d) => {
-      const profile = { ...d.profile, ...patch };
-      if (!genreInfo(profile.genre).views.includes(profile.view)) profile.genre = 'other';
-      const { gen, map } = applyProfile(profile, defaultGenerator(d.gen.seed), DEFAULT_MAP);
-      const allowed = deriveConfig(profile).perspectives;
-      return { ...d, profile, gen, map: { ...d.map, ...map, perspective: allowed.includes(d.map.perspective) ? d.map.perspective : allowed[allowed.length - 1] } };
-    });
+  const setProfile = (patch: Partial<GameProfile>) => setDraft((d) => withProfile(d, patch));
   const allowedPerspectives = deriveConfig(draft.profile).perspectives;
 
   // braces matter: newer Chrome returns a Promise from scrollTo(), React would call it as cleanup
@@ -626,7 +633,7 @@ function prepareBuildKit() {
   const gid = side ? pools.pickRole(new Rng(1), 'ground_top', ['side', 'grass']) : pools.pickPref(new Rng(1), ['floor']);
   const editor = useEditor.getState();
   if (gid) editor.selectTile(gid);
-  editor.setTool('brush');
+  editor.setTool('hand'); // tile ready, drawing starts with the brush (no accidental strokes)
 }
 
 /** Step 1: what kind of game – view, genre, effort. Changes the start values of all later steps. */

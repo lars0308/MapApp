@@ -21,11 +21,22 @@ export const TABS: { id: Tab; label: string; short: string }[] = [
 ];
 export const tabOf = (p: Page): Tab => ((FIGURE_PAGES as string[]).includes(p) ? 'figures' : (p as Tab));
 
+/** pages that first ask what should be made / opened */
+export type Chooser = 'map' | 'figures' | 'animate';
+
 interface AppState {
   page: Page;
   /** builder last used under "Figuren" */
   figure: FigurePage;
+  /** figure kind in "Animieren" */
+  animKind: FigurePage;
+  /** answered "what do you want to …?" in this session (tab clicks show the question until then) */
+  chosen: Record<Chooser, boolean>;
+  setChosen: (c: Chooser, v: boolean) => void;
+  setAnimKind: (k: FigurePage) => void;
+  /** open a page directly (from a button) – counts as a choice */
   goTo: (page: Page) => void;
+  /** header tab: shows the question first when nothing was chosen yet */
   goToTab: (tab: Tab) => void;
 }
 
@@ -48,8 +59,27 @@ export function isPlaceholder(): boolean {
 export const useApp = create<AppState>((set, get) => ({
   page: 'project',
   figure: readFig(),
-  goToTab: (tab) => get().goTo(tab === 'figures' ? get().figure : tab),
+  animKind: 'character',
+  chosen: { map: false, figures: false, animate: false },
+  setChosen: (c, v) => set({ chosen: { ...get().chosen, [c]: v } }),
+  setAnimKind: (animKind) => set({ animKind }),
+  goToTab: (tab) => {
+    // tapping the open tab again goes back to its question (other map / other figure)
+    const c: Chooser | null = tab === 'map' || tab === 'animate' || tab === 'figures' ? tab : null;
+    if (c && tabOf(get().page) === tab && get().chosen[c]) return set({ chosen: { ...get().chosen, [c]: false } });
+    open(tab === 'figures' ? get().figure : tab);
+  },
   goTo: (page) => {
+    const c: Chooser | null = page === 'map' ? 'map' : page === 'animate' ? 'animate' : (FIGURE_PAGES as string[]).includes(page) ? 'figures' : null;
+    if (c && !get().chosen[c]) set({ chosen: { ...get().chosen, [c]: true } });
+    open(page);
+  },
+}));
+
+function open(page: Page) {
+  const get = useApp.getState;
+  const set = useApp.setState;
+  {
     if ((FIGURE_PAGES as string[]).includes(page)) {
       set({ figure: page as FigurePage });
       try {
@@ -58,10 +88,10 @@ export const useApp = create<AppState>((set, get) => ({
         // ignore
       }
     }
+    // map chosen but still the untouched first-start project: show a generated demo map
+    if (page === 'map' && get().chosen.map && isPlaceholder()) void useProject.getState().runGenerate();
     if (page === get().page) return;
     if (page !== 'map' && useEditor.getState().playtest) void import('../playtest/controller').then((m) => m.stopPlaytest());
     set({ page });
-    // "Karte bauen" without a project yet: show a generated demo map instead of an empty editor
-    if (page === 'map' && isPlaceholder()) void useProject.getState().runGenerate();
-  },
-}));
+  }
+}

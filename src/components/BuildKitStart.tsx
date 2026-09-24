@@ -33,7 +33,7 @@ function createStartRoom() {
   useProject.getState().endStroke('Startraum');
   const e = useEditor.getState();
   e.selectTile(gid);
-  e.setTool('brush');
+  e.setTool('hand');
   viewEvents.emit({ type: 'focus', x: x0 - 6, y: y0 - 5, w: w + 12, h: h + 10 });
 }
 

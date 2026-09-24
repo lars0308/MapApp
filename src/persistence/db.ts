@@ -1,3 +1,4 @@
+import { profileLabel } from '../profiles';
 import type { Project, Tileset } from '../types';
 import { migrateProject } from './migrate';
 import { useEditor } from '../store/editorStore';
@@ -19,6 +20,8 @@ export interface ProjectSummary {
   width: number;
   height: number;
   rooms: number;
+  /** "Top-Down · Action-Roguelite" (since v2.6) */
+  label?: string;
 }
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -107,6 +110,7 @@ export async function saveProject(p: Project): Promise<void> {
     width: p.map.width,
     height: p.map.height,
     rooms: p.result?.rooms.length ?? 0,
+    label: profileLabel(p.profile),
   };
   await tx(STORE, 'readwrite', (s) => s.put({ id: p.id, name: p.name, updatedAt: p.updatedAt, summary, project: p } satisfies StoredProject));
   await tx(META, 'readwrite', (s) => s.put(p.id, 'lastProjectId'));

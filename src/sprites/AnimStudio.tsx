@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { compose, toPng, useSprites } from './store';
+import { useSprites } from './store';
 import { animsFor, frameKey, frameSize, framesOf, type AnimDef } from './animation';
 import { ANIM_PRESETS } from './animPresets';
 import { exportFramesZip, exportSheetPng, exportSpriteGodot, type ExportChoice, isPlatformer } from './exportSprite';
 import { FrameEditor } from './FrameEditor';
 import { VIEWS, type CustomAnim, type SpriteKind, type View } from './types';
 import { HelpTip } from '../components/HelpTip';
+import { FigureChooser } from './FigureChooser';
 import { Icon } from '../components/icons';
 import { Button, IconButton, NumberField, Segmented, Slider, Toggle } from '../components/ui';
 import { useEditor } from '../store/editorStore';
@@ -79,76 +80,21 @@ function BuiltinThumb({ kind, anim, view, fps, bg }: { kind: SpriteKind; anim: A
   return <Thumb frames={frames} n={frameSize(doc.size)} fps={fps} bg={bg} />;
 }
 
-/** First step: which saved figure should be animated? */
-function FigurePicker({ kind, setKind, onPick }: { kind: SpriteKind; setKind: (k: SpriteKind) => void; onPick: () => void }) {
-  const gallery = useSprites((s) => s.gallery).filter((g) => g.doc.kind === kind);
-  const current = useSprites((s) => s[kind].doc);
-  const rev = useSprites((s) => s.rev);
-  const loaded = useSprites((s) => s.loaded[kind]);
-  const thumb = useMemo(() => (loaded ? toPng(compose(current), current.size) : ''), [current, rev, loaded]);
-  useEffect(() => {
-    void useSprites.getState().load(kind);
-  }, [kind]);
-  const noun = kind === 'object' ? 'Objekt' : kind === 'creature' ? 'Kreatur' : 'Figur';
-  return (
-    <div className="page-inner anim-picker">
-      <h1 className="page-title">Was möchtest du animieren?</h1>
-      <Segmented
-        label="Art"
-        value={kind}
-        onChange={setKind}
-        options={(['character', 'creature', 'object'] as SpriteKind[]).map((k) => ({ value: k, label: KIND_LABEL[k] }))}
-      />
-      <h2 className="subhead">Gespeicherte {kind === 'object' ? 'Objekte' : kind === 'creature' ? 'Kreaturen' : 'Charaktere'}</h2>
-      {gallery.length ? (
-        <ul className="gallery-grid anim-picker-grid">
-          {gallery.map((g) => (
-            <li key={g.doc.id}>
-              <button
-                type="button"
-                className="gallery-open"
-                onClick={async () => {
-                  await useSprites.getState().openFromGallery(kind, g.doc.id);
-                  onPick();
-                }}
-              >
-                <img src={g.thumb} alt="" />
-                <span>{g.doc.name}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="muted small">
-          Noch nichts gespeichert. Im Baukasten unter <strong>Galerie → Aktuellen speichern</strong> ablegen – dann erscheint es hier.
-        </p>
-      )}
-      <h2 className="subhead">Oder</h2>
-      <div className="anim-picker-more">
-        {loaded && (
-          <button type="button" className="start-continue" onClick={onPick}>
-            {thumb && <img src={thumb} alt="" className="anim-picker-thumb" />}
-            <span>
-              Zuletzt bearbeitet: <strong>{current.name}</strong>
-            </span>
-            <Icon.ChevronRight size={16} />
-          </button>
-        )}
-        <button type="button" className="start-continue" onClick={() => useApp.getState().goTo(kind)}>
-          <Icon.Plus size={18} />
-          <span>{kind === 'object' ? 'Neues Objekt bauen' : `Neue ${noun} bauen`}</span>
-          <Icon.ChevronRight size={16} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function AnimStudio({ desktop }: { desktop: boolean }) {
-  const [kind, setKind] = useState<SpriteKind>('character');
-  const [picked, setPicked] = useState(false);
-  if (!picked) return <FigurePicker kind={kind} setKind={setKind} onPick={() => setPicked(true)} />;
-  return <AnimWorkspace desktop={desktop} kind={kind} onBack={() => setPicked(false)} />;
+  const kind = useApp((s) => s.animKind);
+  const chosen = useApp((s) => s.chosen.animate);
+  const { setAnimKind, setChosen } = useApp.getState();
+  if (!chosen)
+    return (
+      <FigureChooser
+        purpose="animate"
+        onPick={(k) => {
+          setAnimKind(k);
+          setChosen('animate', true);
+        }}
+      />
+    );
+  return <AnimWorkspace desktop={desktop} kind={kind} onBack={() => setChosen('animate', false)} />;
 }
 
 function AnimWorkspace({ desktop, kind, onBack }: { desktop: boolean; kind: SpriteKind; onBack: () => void }) {
@@ -220,14 +166,54 @@ function AnimWorkspace({ desktop, kind, onBack }: { desktop: boolean; kind: Spri
     const t = setInterval(() => setFrame((f) => (f + 1) % Math.max(1, frames.length)), 1000 / fps);
     return () => clearInterval(t);
   }, [playing, fps, frames.length, editing]);
-  const [scale, setScale] = useState(8);
+  const [fit, setFit] = useState(8);
+  // zoom on top of "fit": + − buttons, mouse wheel, two fingers; drag moves the view
+  const [mag, setMag] = useState(1);
+  const zoomBy = (f: number) => setMag((m) => Math.max(1, Math.min(8, m * f)));
+  const scale = Math.max(1, Math.round(fit * mag));
   useEffect(() => {
     const el = stage.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setScale(Math.max(2, Math.floor((Math.min(el.clientWidth, el.clientHeight) - 24) / F))));
+    const ro = new ResizeObserver(() => setFit(Math.max(2, Math.floor((Math.min(el.clientWidth, el.clientHeight) - 24) / F))));
     ro.observe(el);
     return () => ro.disconnect();
   }, [F, editing]);
+  const touches = useRef(new Map<number, { x: number; y: number }>());
+  const gesture = useRef<{ dist: number; mag: number; x: number; y: number; sl: number; st: number } | null>(null);
+  const onStageDown = (e: React.PointerEvent) => {
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const pts = [...touches.current.values()];
+    const el = stage.current!;
+    gesture.current = { dist: pts.length > 1 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0, mag, x: e.clientX, y: e.clientY, sl: el.scrollLeft, st: el.scrollTop };
+  };
+  const onStageMove = (e: React.PointerEvent) => {
+    if (!touches.current.has(e.pointerId) || !gesture.current) return;
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pts = [...touches.current.values()];
+    const g = gesture.current;
+    if (pts.length > 1 && g.dist) setMag(Math.max(1, Math.min(8, (g.mag * Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y)) / g.dist)));
+    else if (pts.length === 1) {
+      const el = stage.current!;
+      el.scrollLeft = g.sl - (e.clientX - g.x);
+      el.scrollTop = g.st - (e.clientY - g.y);
+    }
+  };
+  const onStageUp = (e: React.PointerEvent) => {
+    touches.current.delete(e.pointerId);
+    gesture.current = null;
+  };
+  // keep the figure in the middle when zooming
+  useEffect(() => {
+    // after the canvas got its new size
+    const id = requestAnimationFrame(() => {
+      const el = stage.current;
+      if (!el) return;
+      el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+      el.scrollTop = (el.scrollHeight - el.clientHeight) / 2;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [mag]);
   const f = Math.min(frame, Math.max(0, frames.length - 1));
   const loop = builtin ? builtin.loop : (cAnim?.loop ?? true);
   useEffect(() => {
@@ -425,8 +411,29 @@ function AnimWorkspace({ desktop, kind, onBack }: { desktop: boolean; kind: Spri
             <FrameEditor frame={frames[f]} size={F} prev={f > 0 ? frames[f - 1] : loop ? frames[frames.length - 1] : undefined} title={title} onSave={saveFrame} onCancel={() => setEditing(false)} />
           ) : (
             <>
-              <div className="anim-stage" ref={stage}>
-                <canvas ref={big} aria-label="Vorschau" />
+              <div className="anim-stage-box">
+                <div
+                  className={`anim-stage${mag > 1 ? ' is-zoomed' : ''}`}
+                  ref={stage}
+                  onPointerDown={onStageDown}
+                  onPointerMove={onStageMove}
+                  onPointerUp={onStageUp}
+                  onPointerCancel={onStageUp}
+                  onWheel={(e) => zoomBy(e.deltaY < 0 ? 1.2 : 1 / 1.2)}
+                >
+                  <canvas ref={big} aria-label="Vorschau" />
+                </div>
+                <div className="anim-zoom" role="group" aria-label="Zoom">
+                  <IconButton label="Verkleinern" onClick={() => zoomBy(1 / 1.5)} disabled={mag <= 1}>
+                    <Icon.Minus size={16} />
+                  </IconButton>
+                  <button type="button" className="anim-zoom-value" onClick={() => setMag(1)} title="Einpassen">
+                    {Math.round(mag * 100)} %
+                  </button>
+                  <IconButton label="Vergrößern" onClick={() => zoomBy(1.5)} disabled={mag >= 8}>
+                    <Icon.Plus size={16} />
+                  </IconButton>
+                </div>
               </div>
               <p className="hint anim-hint">
                 {builtin?.hint ?? 'Eigene Animation – Bild für Bild bearbeitbar.'}

@@ -36,13 +36,37 @@ export function applyAutoWalls(changed: number[], paintedLayerId: string) {
     return !!m && (m.role === 'door' || m.category === 'door');
   };
 
+  // structure before this edit (strokeStruct changes r.cells in place)
+  const before = r.cells.slice();
   // 1. structural changes
+  //  - a walkable tile (floor, path, bridge, stairs) painted on any ground / wall layer opens the cell
+  //  - erasing on the floor or path layer closes it again once no walkable tile is left
+  const pathL = layerByRole('paths');
+  const WALKABLE = new Set(['floor', 'floorVariant', 'path', 'bridge', 'stairs', 'transition']);
+  const isWalkable = (g: number) => {
+    const m = metas[g];
+    if (!m) return false;
+    if (m.role) return m.role.startsWith('floor') || m.role.startsWith('bridge') || m.role === 'raised_floor' || m.role === 'transition' || m.role === 'stairs';
+    return !!m.category && WALKABLE.has(m.category);
+  };
+  const onWallLayer = painted.role === 'walls' || painted.role === 'wallsFront';
   let touched = false;
   for (const i of changed) {
     const g = painted.data[i];
-    if (painted.role === 'floor') {
-      if (g && (r.cells[i] === CELL_VOID || r.cells[i] === CELL_WALL)) (store.strokeStruct(i, CELL_CORRIDOR), (touched = true));
-      else if (!g && (r.cells[i] === CELL_ROOM || r.cells[i] === CELL_CORRIDOR || r.cells[i] === CELL_HAZARD)) (store.strokeStruct(i, CELL_VOID), (touched = true));
+    const opens = g && (painted.role === 'floor' || painted.role === 'paths' || painted.role === 'groundDetails' || (onWallLayer && isWalkable(g)));
+    if (opens && (r.cells[i] === CELL_VOID || r.cells[i] === CELL_WALL)) {
+      store.strokeStruct(i, CELL_CORRIDOR);
+      touched = true;
+      // floor painted onto a wall layer moves to the floor layer (the wall there is removed below)
+      if (onWallLayer && floorL) store.strokeSetLayer(floorL.id, [i], g);
+      // a path needs ground below it
+      if (painted.role === 'paths' && floorL && !floorL.data[i]) {
+        const pools = new TilePools(p.tilesets, p.map.perspective);
+        store.strokeSetLayer(floorL.id, [i], pools.pickPref(new Rng(hashSeed(`${r.seed}:${i}`)), ['floor']));
+      }
+    } else if (!g && (painted.role === 'floor' || painted.role === 'paths') && (r.cells[i] === CELL_ROOM || r.cells[i] === CELL_CORRIDOR || r.cells[i] === CELL_HAZARD)) {
+      const rest = painted.role === 'floor' ? pathL?.data[i] : floorL?.data[i];
+      if (!rest) (store.strokeStruct(i, CELL_VOID), (touched = true));
     } else if (g && isDoor(g) && r.cells[i] === CELL_WALL) {
       store.strokeStruct(i, CELL_CORRIDOR);
       touched = true;
@@ -109,7 +133,7 @@ export function applyAutoWalls(changed: number[], paintedLayerId: string) {
     for (let x = x0; x <= x1; x++) {
       const i = y * W + x;
       const rng = new Rng(hashSeed(`${r.seed}:${i}`));
-      const wasWall = r.cells[i] === CELL_WALL;
+      const wasWall = before[i] === CELL_WALL;
       if (cells[i] !== r.cells[i] && (cells[i] === CELL_WALL || r.cells[i] === CELL_WALL || cells[i] === CELL_VOID)) store.strokeStruct(i, cells[i]);
       let back = 0;
       let front = 0;

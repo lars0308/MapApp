@@ -407,7 +407,7 @@ export const useSprites = create<SpriteState>((set, get) => {
       set({ [kind]: { ...k, doc: { ...k.doc, layers } } } as Partial<SpriteState>);
       return copy;
     },
-    tool: 'pen',
+    tool: 'hand',
     color: '#e86f6f',
     mirror: false,
     brush: 1,

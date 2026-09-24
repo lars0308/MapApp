@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { ViewKind } from '../profiles';
 import type { ObjectType, Selection, ToolId } from '../types';
 
 export type MobilePanel = 'generate' | 'terrain' | 'tiles' | 'layers' | 'export' | 'settings' | null;
@@ -43,7 +44,9 @@ interface EditorState {
   wizardOpen: boolean;
   /** opened automatically on first start (closing it creates a demo map) */
   wizardFirstRun: boolean;
-  openWizard: (firstRun?: boolean) => void;
+  /** game view picked before opening the wizard ("Neue Karte → Side-Scroller") */
+  wizardView: ViewKind | null;
+  openWizard: (firstRun?: boolean, view?: ViewKind) => void;
   closeWizard: () => void;
   setTool: (t: ToolId) => void;
   setBrushSize: (n: number) => void;
@@ -65,7 +68,7 @@ interface EditorState {
 let toastId = 1;
 
 export const useEditor = create<EditorState>((set, get) => ({
-  tool: 'brush',
+  tool: 'hand',
   brushSize: 1,
   selectedGid: 0,
   markedGids: [],
@@ -91,7 +94,8 @@ export const useEditor = create<EditorState>((set, get) => ({
   setPlaytest: (playtest) => set({ playtest, mobilePanel: null, selection: null }),
   wizardOpen: false,
   wizardFirstRun: false,
-  openWizard: (firstRun = false) => set({ wizardOpen: true, wizardFirstRun: firstRun, mobilePanel: null }),
+  wizardView: null,
+  openWizard: (firstRun = false, view) => set({ wizardOpen: true, wizardFirstRun: firstRun, wizardView: view ?? null, mobilePanel: null }),
   closeWizard: () => set({ wizardOpen: false, wizardFirstRun: false }),
   setTool: (tool) => set({ tool, selection: tool === 'select' || tool === 'move' ? get().selection : null }),
   setBrushSize: (brushSize) => set({ brushSize }),

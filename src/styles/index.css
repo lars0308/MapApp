@@ -4368,11 +4368,9 @@ body.is-resizing-y * {
   font-size: 10.5px;
   line-height: 1.1;
 }
-.sprite-studio.is-mobile .studio-bar > .segmented:first-child {
-  width: 100%;
-}
-.sprite-studio.is-mobile .studio-bar > .segmented:first-child button {
-  flex: 1;
+.studio-choose {
+  height: 36px;
+  padding: 0 10px 0 6px;
 }
 .sprite-studio.is-mobile .sprite-work {
   display: flex;
@@ -4775,13 +4773,29 @@ body.is-resizing-y * {
   padding: 12px;
   gap: 10px;
 }
+.anim-stage-box {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 200px;
+  display: flex;
+}
 .anim-stage {
   flex: 1;
+  min-width: 0;
+  max-width: 100%;
   min-height: 200px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  overflow: auto;
+  touch-action: none;
+  border-radius: 12px;
+}
+.anim-stage.is-zoomed {
+  cursor: grab;
 }
 .anim-stage canvas {
+  margin: auto;
+  flex: none;
   border-radius: 12px;
   image-rendering: pixelated;
   box-shadow: 0 0 0 1px var(--line-2);
@@ -4850,8 +4864,13 @@ body.is-resizing-y * {
 .anim-studio.is-mobile .anim-stage-wrap {
   order: 1;
 }
-.anim-studio.is-mobile .anim-stage {
+.anim-studio.is-mobile .anim-stage-box {
   height: min(calc(100vw - 24px), 44vh);
+  flex: none;
+}
+.anim-studio.is-mobile .anim-stage {
+  height: 100%;
+  width: 100%;
   flex: none;
 }
 .anim-studio.is-mobile .anim-list {
@@ -4999,6 +5018,7 @@ body.is-resizing-y * {
 }
 .frame-editor-tools {
   display: flex;
+  flex-wrap: wrap;
   gap: 2px;
 }
 .frame-editor-swatches {
@@ -5231,4 +5251,90 @@ body.is-resizing-y * {
   padding: 10px 12px;
   border-radius: 10px;
   background: var(--bg-2);
+}
+
+/* "what do you want to make?" pages (map / figures / animate) */
+.chooser .page-title {
+  margin-bottom: 14px;
+}
+.chooser-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.chooser-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 118px;
+  text-align: left;
+}
+.chooser-card strong {
+  font-size: 16px;
+}
+.chooser-card small {
+  color: var(--text-2);
+  line-height: 1.35;
+}
+.chooser-icon {
+  font-size: 26px;
+  line-height: 1;
+  margin-bottom: 4px;
+  letter-spacing: -2px;
+  color: var(--accent);
+}
+.chooser-card.is-soon {
+  opacity: 0.5;
+}
+.chooser-current {
+  margin-bottom: 14px;
+}
+.chooser-current small,
+.anim-picker-more .start-continue small {
+  display: block;
+  color: var(--text-2);
+  font-weight: 400;
+}
+.chooser-back {
+  margin: 0 0 8px -8px;
+}
+@media (max-width: 520px) {
+  .chooser-grid {
+    grid-template-columns: 1fr;
+  }
+  .chooser-card {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    column-gap: 10px;
+    row-gap: 2px;
+  }
+  .chooser-icon {
+    grid-row: span 2;
+    align-self: center;
+    font-size: 24px;
+  }
+}
+
+.anim-zoom {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: rgba(19, 19, 24, 0.85);
+  border: 1px solid var(--line-2);
+}
+.anim-zoom-value {
+  min-width: 52px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-2);
+  background: none;
+  border: 0;
 }

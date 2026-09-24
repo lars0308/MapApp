@@ -5,8 +5,9 @@ import { PALETTE_PRESETS, hexToRgb } from './palette';
 import { Icon } from '../components/icons';
 import { Button, IconButton } from '../components/ui';
 
-type Tool = 'pen' | 'eraser' | 'fill' | 'pipette' | 'move';
+type Tool = 'pen' | 'eraser' | 'fill' | 'pipette' | 'move' | 'hand';
 const TOOLS: { id: Tool; label: string; icon: (p: { size?: number }) => React.ReactElement }[] = [
+  { id: 'hand', label: 'Ansicht verschieben', icon: Icon.Hand },
   { id: 'pen', label: 'Stift', icon: Icon.Pencil },
   { id: 'eraser', label: 'Radierer', icon: Icon.Eraser },
   { id: 'fill', label: 'Füllen', icon: Icon.Fill },
@@ -21,6 +22,11 @@ const TOOLS: { id: Tool; label: string; icon: (p: { size?: number }) => React.Re
 export function FrameEditor({ frame, size, prev, title, onSave, onCancel }: { frame: Uint8ClampedArray; size: number; prev?: Uint8ClampedArray; title: string; onSave: (d: Uint8ClampedArray) => void; onCancel: () => void }) {
   const [data] = useState(() => new Uint8ClampedArray(frame));
   const [tool, setTool] = useState<Tool>('pen');
+  // magnification on top of "fit" + panning (two fingers / wheel / + −)
+  const mag = useRef(1);
+  const pan = useRef({ x: 0, y: 0 });
+  const touches = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ dist: number; mag: number; cx: number; cy: number; pan: { x: number; y: number } } | null>(null);
   const [rev, setRev] = useState(0);
   const [onion, setOnion] = useState(!!prev);
   const undo = useRef<Uint8ClampedArray[]>([]);
@@ -45,9 +51,10 @@ export function FrameEditor({ frame, size, prev, title, onSave, onCancel }: { fr
     c.height = H * dpr;
     c.style.width = `${W}px`;
     c.style.height = `${H}px`;
-    const zoom = Math.max(2, Math.floor((Math.min(W, H) - 12) / size));
-    const ox = Math.floor((W - zoom * size) / 2);
-    const oy = Math.floor((H - zoom * size) / 2);
+    const fit = Math.max(2, Math.floor((Math.min(W, H) - 12) / size));
+    const zoom = Math.max(1, Math.round(fit * mag.current));
+    const ox = Math.floor((W - zoom * size) / 2 + pan.current.x);
+    const oy = Math.floor((H - zoom * size) / 2 + pan.current.y);
     view.current = { zoom, ox, oy };
     const g = c.getContext('2d')!;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -100,7 +107,29 @@ export function FrameEditor({ frame, size, prev, title, onSave, onCancel }: { fr
     if (p.x < 0 || p.y < 0 || p.x >= size || p.y >= size) return;
     data.set(tool === 'eraser' ? [0, 0, 0, 0] : [...hexToRgb(color), 255], (p.y * size + p.x) * 4);
   };
+  const setMag = (m: number) => {
+    mag.current = Math.max(1, Math.min(8, m));
+    if (mag.current === 1) pan.current = { x: 0, y: 0 };
+    draw();
+  };
   const down = (e: React.PointerEvent) => {
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.current.size === 2) {
+      // second finger: pinch zoom instead of drawing (undo the started stroke)
+      if (drag.current && !drag.current.move) {
+        const u = undo.current.pop();
+        if (u) data.set(u);
+      }
+      drag.current = null;
+      const [a, b] = [...touches.current.values()];
+      pinch.current = { dist: Math.hypot(a.x - b.x, a.y - b.y), mag: mag.current, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, pan: { ...pan.current } };
+      return;
+    }
+    if (tool === 'hand') {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      drag.current = { last: { x: e.clientX, y: e.clientY }, start: { x: e.clientX, y: e.clientY } };
+      return;
+    }
     const p = cell(e);
     if (tool === 'pipette') {
       const i = (p.y * size + p.x) * 4;
@@ -119,8 +148,23 @@ export function FrameEditor({ frame, size, prev, title, onSave, onCancel }: { fr
     setRev(rev + 1);
   };
   const move = (e: React.PointerEvent) => {
+    if (touches.current.has(e.pointerId)) touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pz = pinch.current;
+    if (pz && touches.current.size >= 2) {
+      const [a, b] = [...touches.current.values()];
+      mag.current = Math.max(1, Math.min(8, (pz.mag * Math.hypot(a.x - b.x, a.y - b.y)) / Math.max(1, pz.dist)));
+      pan.current = { x: pz.pan.x + (a.x + b.x) / 2 - pz.cx, y: pz.pan.y + (a.y + b.y) / 2 - pz.cy };
+      draw();
+      return;
+    }
     const d = drag.current;
     if (!d) return;
+    if (tool === 'hand') {
+      pan.current = { x: pan.current.x + e.clientX - d.last.x, y: pan.current.y + e.clientY - d.last.y };
+      d.last = { x: e.clientX, y: e.clientY };
+      draw();
+      return;
+    }
     const p = cell(e);
     if (d.move) {
       moveOff.current = { x: p.x - d.start.x, y: p.y - d.start.y };
@@ -132,7 +176,17 @@ export function FrameEditor({ frame, size, prev, title, onSave, onCancel }: { fr
     d.last = p;
     draw();
   };
-  const up = () => {
+  const up = (e?: React.PointerEvent) => {
+    if (e) touches.current.delete(e.pointerId);
+    if (pinch.current) {
+      if (touches.current.size < 2) pinch.current = null;
+      drag.current = null;
+      return;
+    }
+    if (tool === 'hand') {
+      drag.current = null;
+      return;
+    }
     if (drag.current?.move && moveOff.current) data.set(shifted(data, size, moveOff.current.x, moveOff.current.y));
     moveOff.current = null;
     drag.current = null;
@@ -165,6 +219,15 @@ export function FrameEditor({ frame, size, prev, title, onSave, onCancel }: { fr
               <Icon.Layers size={17} />
             </IconButton>
           )}
+          <IconButton label="Verkleinern" onClick={() => setMag(mag.current / 1.5)}>
+            <Icon.Minus size={17} />
+          </IconButton>
+          <IconButton label="Vergrößern" onClick={() => setMag(mag.current * 1.5)}>
+            <Icon.Plus size={17} />
+          </IconButton>
+          <IconButton label="Einpassen" onClick={() => setMag(1)}>
+            <Icon.Fit size={17} />
+          </IconButton>
         </div>
       </div>
       <div className="frame-editor-swatches">
@@ -176,7 +239,16 @@ export function FrameEditor({ frame, size, prev, title, onSave, onCancel }: { fr
         ))}
       </div>
       <div className="frame-editor-stage" ref={wrap}>
-        <canvas ref={canvas} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} aria-label="Bild bearbeiten" />
+        <canvas
+          ref={canvas}
+          onPointerDown={down}
+          onPointerMove={move}
+          onPointerUp={up}
+          onPointerCancel={up}
+          onWheel={(e) => setMag(mag.current * (e.deltaY < 0 ? 1.2 : 1 / 1.2))}
+          style={{ touchAction: 'none', cursor: tool === 'hand' ? 'grab' : 'crosshair' }}
+          aria-label="Bild bearbeiten"
+        />
       </div>
       <div className="button-row frame-editor-foot">
         <Button variant="ghost" onClick={onCancel}>

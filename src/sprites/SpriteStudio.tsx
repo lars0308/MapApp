@@ -225,16 +225,10 @@ function StudioBar({ kind, onSavePart }: { kind: SpriteKind; onSavePart: () => v
 
   return (
     <div className="studio-bar">
-      <Segmented
-        label="Was bauen?"
-        value={kind}
-        onChange={(k) => useApp.getState().goTo(k)}
-        options={[
-          { value: 'character', label: 'Charakter' },
-          { value: 'creature', label: 'Kreatur' },
-          { value: 'object', label: 'Objekt' },
-        ]}
-      />
+      <button type="button" className="btn btn-ghost studio-choose" onClick={() => useApp.getState().setChosen('figures', false)} title="Andere Figur oder Art wählen">
+        <Icon.ChevronRight size={16} style={{ transform: 'rotate(180deg)' }} />
+        <span>Auswahl</span>
+      </button>
       <input className="input studio-name" value={doc.name} aria-label="Name" onChange={(e) => renameDoc(kind, e.target.value.slice(0, 40))} />
       <Segmented
         label="Ansicht"

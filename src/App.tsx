@@ -11,6 +11,8 @@ import { lastProjectId, loadProject } from './persistence/db';
 import { startAutosave } from './persistence/autosave';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useApp } from './store/appStore';
+import { MapChooser } from './components/MapChooser';
+import { FigureChooser } from './sprites/FigureChooser';
 import { StartPage } from './components/StartPage';
 import { SettingsPage } from './components/SettingsPage';
 import { PageShell } from './components/PageShell';
@@ -41,6 +43,7 @@ export function App() {
   const [ready, setReady] = useState(false);
   const wizardOpen = useEditor((s) => s.wizardOpen);
   const page = useApp((s) => s.page);
+  const chosen = useApp((s) => s.chosen);
   useShortcuts();
 
   useEffect(() => {
@@ -71,14 +74,19 @@ export function App() {
 
   return (
     <div className={`app on-${page}${ready ? ' is-ready' : ''}${wizardOpen ? ' has-wizard' : ''}`}>
-      {page === 'map' ? (
+      {page === 'map' && chosen.map ? (
         <ErrorBoundary area="Editor">{desktop ? <DesktopLayout /> : <MobileLayout />}</ErrorBoundary>
+      ) : page === 'map' ? (
+        <PageShell desktop={desktop}>
+          <MapChooser />
+        </PageShell>
       ) : (
         <PageShell desktop={desktop}>
           <ErrorBoundary area={page === 'project' ? 'Projekt' : page === 'settings' ? 'Einstellungen' : page === 'character' ? 'Charakter bauen' : page === 'creature' ? 'Kreatur bauen' : page === 'animate' ? 'Animieren' : 'Objekt bauen'} key={page}>
             {page === 'project' && <StartPage />}
             {page === 'settings' && <SettingsPage desktop={desktop} />}
-            {(page === 'character' || page === 'object' || page === 'creature') && <SpriteStudio kind={page} desktop={desktop} />}
+            {(page === 'character' || page === 'object' || page === 'creature') &&
+              (chosen.figures ? <SpriteStudio kind={page} desktop={desktop} /> : <FigureChooser purpose="build" onPick={(k) => useApp.getState().goTo(k)} />)}
             {page === 'animate' && <AnimStudio desktop={desktop} />}
           </ErrorBoundary>
         </PageShell>
