@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { profileFromPerspective, type GameProfile } from '../profiles';
 import { CELL_VOID } from '../types';
-import type { GeneratorSettings, Layer, LayerRole, MapObject, MapSettings, Project, ProjectMode, TerrainSet, TileMeta, Tileset } from '../types';
+import type { GeneratorSettings, Layer, LayerRole, MapObject, MapSettings, Project, ProjectMode, TerrainSet, TileMeta, Tileset, CustomObject } from '../types';
 import { DEFAULT_MAP, PRESETS, defaultGenerator, defaultTerrainSets } from '../generator/presets';
 import { randomSeed } from '../generator/rng';
 import { emptyResult, generate } from '../generator';
@@ -119,6 +119,10 @@ interface ProjectState {
   mergeTileMetas: (tilesetId: string, tiles: Record<number, TileMeta>) => void;
 
   addObject: (o: Omit<MapObject, 'id'>) => void;
+  /** add or update an own object (figure from the builder) */
+  addCustomObject: (o: CustomObject) => void;
+  /** remove an own object and everything placed of it */
+  removeCustomObject: (id: string) => void;
   removeObject: (id: string) => void;
   moveObject: (id: string, x: number, y: number) => void;
   setTerrains: (t: TerrainSet[]) => void;
@@ -394,6 +398,16 @@ export const useProject = create<ProjectState>((set, get) => {
 
     addObject: (o) =>
       docChange('Objekt setzen', (p) => ({ ...p, objects: [...p.objects, { ...o, id: uid('obj') }] })),
+    addCustomObject: (o) => {
+      const p = get().project;
+      const list = p.customObjects ?? [];
+      touch({ ...p, customObjects: list.some((x) => x.id === o.id) ? list.map((x) => (x.id === o.id ? o : x)) : [...list, o] });
+    },
+    removeCustomObject: (id) => {
+      const p = get().project;
+      touch({ ...p, customObjects: (p.customObjects ?? []).filter((x) => x.id !== id), objects: p.objects.filter((o) => o.type !== id) });
+      mapEvents.emit({ type: 'all' });
+    },
     removeObject: (id) => docChange('Objekt löschen', (p) => ({ ...p, objects: p.objects.filter((o) => o.id !== id) })),
     moveObject: (id, x, y) =>
       docChange('Objekt verschieben', (p) => ({ ...p, objects: p.objects.map((o) => (o.id === id ? { ...o, x, y } : o)) })),

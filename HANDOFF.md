@@ -1,6 +1,6 @@
 # Übergabe – MapForge (Stand 2026-09-24, Version 3.1)
 
-Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (Version 3.2 im README).
+Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (Version 3.3 im README).
 Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI auf Deutsch, UI selbsterklärend, mobil zuerst, keine Fake-Features.
 
 ## Stand (fertig, gepusht)
@@ -20,8 +20,10 @@ Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI 
 - Befehle: `src/api/spec.json` (Beschreibung + JSON-Schema, gilt für MCP und App), Umsetzung `src/api/commands.ts` (`runCommand`), WebSocket-Brücke `src/api/bridge.ts`, UI `src/api/AiSection.tsx` (Einstellungen, KI-Badge).
 - MCP-Server `mcp/server.mjs` (stdio-MCP, HTTP `/command` `/spec`, WebSocket, liefert `dist/` aus, startet notfalls unsichtbaren Browser via playwright-core). Neuer Befehl = Eintrag in spec.json + Handler in commands.ts.
 
+## Eigene Objekte (Version 3.3)
+- `project.customObjects` (CustomObject: png w×h Tiles à 32 px), Registry + dynamischer Atlas in `src/objects/defs.ts` (`objectDef(type)` statt `OBJECT_DEFS[type]` benutzen!, `setCustomObjects` wird in main.tsx bei Projektänderung aufgerufen), Erzeugung `src/objects/fromFigure.ts`, UI: Figuren → Export, Tiles → Objekte.
+
 ## Danach offen
-4. Eigene Figuren/Objekte aus dem Baukasten als Objekte auf die Karte (+ Godot-Export).
 5. Gegner/Beute automatisch nach Raumtyp/Distanz platzieren; Gegner auch im App-Testspiel.
 6. Weitere Biome (Höhlen per Cellular Automata, Außenbereiche, Dörfer).
 7. Echtes isometrisches Rautenraster + Höhenebenen.

@@ -9,7 +9,7 @@ import { computeBlocked } from './collision';
 import { applyAutoWalls } from './autoWalls';
 import { pasteClip, stampOrigin } from './clipboard';
 import { tileOf, transformOf, withTransform } from '../tilesets/gid';
-import { OBJECT_DEFS } from '../objects/defs';
+import { objectDef } from '../objects/defs';
 import type { MapObject, Project } from '../types';
 import { TilePools, tilesetSupports } from '../tilesets/tilePools';
 import { Rng } from '../generator/rng';
@@ -18,7 +18,7 @@ import { Rng } from '../generator/rng';
 export function objectAt(objects: MapObject[], x: number, y: number): MapObject | null {
   let best: MapObject | null = null;
   for (const o of objects) {
-    const d = OBJECT_DEFS[o.type];
+    const d = objectDef(o.type);
     if (!d) continue;
     if (x >= o.x && x < o.x + d.w && y <= o.y && y > o.y - d.h && (!best || o.y >= best.y)) best = o;
   }
@@ -298,8 +298,8 @@ export function MapCanvas() {
 
       const objects = store().project.objects;
       if (tool === 'brush' && selectedObject) {
-        const def = OBJECT_DEFS[selectedObject];
-        if (R().inBounds(cell.x, cell.y)) store().addObject({ type: selectedObject, x: cell.x - Math.floor((def.w - 1) / 2), y: cell.y });
+        const def = objectDef(selectedObject);
+        if (def && R().inBounds(cell.x, cell.y)) store().addObject({ type: selectedObject, x: cell.x - Math.floor((def.w - 1) / 2), y: cell.y });
         mode = 'none';
         return;
       }

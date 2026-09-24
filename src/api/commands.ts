@@ -13,7 +13,7 @@ import { copyArea, pasteClip, transformClip } from '../editor/clipboard';
 import { floodCells } from '../editor/tools';
 import { tilesetSupports } from '../tilesets/tilePools';
 import { FLIP_H, rotateCW, withTransform } from '../tilesets/gid';
-import { OBJECT_DEFS, OBJECT_TYPES } from '../objects/defs';
+import { OBJECT_DEFS, OBJECT_TYPES, customObjectDefs, objectDef } from '../objects/defs';
 import { buildGodotData } from '../export/godotJson';
 import { buildGodotPackage } from '../export/actions';
 import { MapRenderer } from '../renderer/MapRenderer';
@@ -23,6 +23,7 @@ import { RAMP_PRESETS, CHANNELS, type Channel, type Ramp } from '../sprites/pale
 import { animsFor, framesOf, frameSize } from '../sprites/animation';
 import { buildSpriteGodot } from '../sprites/exportSprite';
 import { setPlayerSprite } from '../playtest/playerSprite';
+import { figureToObject } from '../objects/fromFigure';
 import { VIEWS, VIEWS4, type SpriteKind, type View } from '../sprites/types';
 import type { GeneratorSettings, Layer, ObjectType, Perspective, Project } from '../types';
 
@@ -336,12 +337,12 @@ const H: Record<string, Handler> = {
   },
 
   list_objects: () => ({
-    data: { objects: P().objects, types: OBJECT_TYPES.map((t) => ({ type: t, label: OBJECT_DEFS[t].label, w: OBJECT_DEFS[t].w, h: OBJECT_DEFS[t].h })) },
+    data: { objects: P().objects, types: [...OBJECT_TYPES.map((t) => ({ type: t, label: OBJECT_DEFS[t].label, w: OBJECT_DEFS[t].w, h: OBJECT_DEFS[t].h })), ...customObjectDefs().map(({ def }) => ({ type: def.type, label: def.label, w: def.w, h: def.h, own: true }))] },
   }),
 
   place_object: (a) => {
     const type = str(a.type, 'type') as ObjectType;
-    const d = OBJECT_DEFS[type] ?? fail(`Objekt-Typ "${type}" gibt es nicht (${OBJECT_TYPES.join(', ')})`);
+    const d = objectDef(type) ?? fail(`Objekt-Typ "${type}" gibt es nicht – list_objects zeigt alle`);
     const x = int(a.x, 'x');
     const y = int(a.y, 'y');
     const p = P();
@@ -515,6 +516,14 @@ const H: Record<string, Handler> = {
     if (kind === 'object') fail('Nur Charakter oder Kreatur');
     const doc = await figureReady(kind);
     return { data: { ok: setPlayerSprite(doc) } };
+  },
+
+  figure_to_map: async (a) => {
+    const kind = kindOf(a.kind);
+    const doc = await figureReady(kind);
+    const o = figureToObject(doc, a.collision !== false) ?? fail('Die Figur ist leer');
+    useProject.getState().addCustomObject(o!);
+    return { data: { type: o!.id, label: o!.label, w: o!.w, h: o!.h, hint: 'place_object mit diesem type setzen' } };
   },
 
   show: (a) => {

@@ -1,4 +1,5 @@
-import type { ObjectType } from '../types';
+import type { BuiltinObjectType, CustomObject, ObjectType } from '../types';
+import { mapEvents } from '../store/events';
 import { Rng } from '../generator/rng';
 
 // Built-in sprite objects. Sprites are drawn procedurally at 16 px per tile.
@@ -23,7 +24,7 @@ export interface ObjectDef {
   godotType: string;
 }
 
-export const OBJECT_DEFS: Record<ObjectType, ObjectDef> = {
+export const OBJECT_DEFS: Record<BuiltinObjectType, ObjectDef> = {
   tree: { type: 'tree', label: 'Baum', w: 2, h: 3, sx: 0, sy: 0, collision: [[0, 0], [1, 0]], overheadRows: 0, ySort: true, godotType: 'tree' },
   pillar: { type: 'pillar', label: 'Säule', w: 1, h: 2, sx: 2, sy: 0, collision: [[0, 0]], overheadRows: 0, ySort: true, godotType: 'pillar' },
   rock: { type: 'rock', label: 'Großer Fels', w: 2, h: 2, sx: 3, sy: 0, collision: [[0, 0], [1, 0]], overheadRows: 0, ySort: true, godotType: 'rock' },
@@ -32,17 +33,128 @@ export const OBJECT_DEFS: Record<ObjectType, ObjectDef> = {
   merchant: { type: 'merchant', label: 'Händler', w: 1, h: 2, sx: 8, sy: 0, collision: [[0, 0]], overheadRows: 0, ySort: true, godotType: 'npc' },
 };
 
-export const OBJECT_TYPES = Object.keys(OBJECT_DEFS) as ObjectType[];
+export const OBJECT_TYPES = Object.keys(OBJECT_DEFS) as BuiltinObjectType[];
+
+// ---------------------------------------------------------------- own objects (figure builder)
+
+/** atlas pixels per tile (built-in sprites are drawn at 16 px and doubled) */
+const A = 32;
+const custom = new Map<string, { def: ObjectDef; obj: CustomObject; img: HTMLImageElement | null }>();
+let customKey = '';
+const listeners = new Set<() => void>();
+let version = 0;
+
+/** definition of any object type (built-in or own) */
+export function objectDef(type: ObjectType): ObjectDef | undefined {
+  return (OBJECT_DEFS as Record<string, ObjectDef>)[type] ?? custom.get(type)?.def;
+}
+
+/** own objects of the current project (for palettes / the AI) */
+export function customObjectDefs(): { def: ObjectDef; obj: CustomObject }[] {
+  return [...custom.values()];
+}
+
+/** atlas changed (own objects loaded) – thumbnails redraw */
+export function onAtlasChange(f: () => void) {
+  listeners.add(f);
+  return () => {
+    listeners.delete(f);
+  };
+}
+export const atlasVersion = () => version;
+
+const changed = () => {
+  cached = null;
+  version++;
+  listeners.forEach((f) => f());
+  mapEvents.emit({ type: 'all' });
+};
+
+/** the project's own objects: packed below the built-in sprites of the atlas */
+export function setCustomObjects(list: CustomObject[] | undefined) {
+  const key = (list ?? []).map((o) => `${o.id}:${o.w}x${o.h}:${o.collision}:${o.png.length}`).join('|');
+  if (key === customKey) return;
+  customKey = key;
+  const old = custom;
+  const next = new Map<string, { def: ObjectDef; obj: CustomObject; img: HTMLImageElement | null }>();
+  // shelf packing: rows of COLS tiles below the built-in rows
+  let cx = 0;
+  let cy = ROWS;
+  let rowH = 0;
+  for (const o of list ?? []) {
+    if (cx + o.w > COLS && cx > 0) {
+      cx = 0;
+      cy += rowH;
+      rowH = 0;
+    }
+    const def: ObjectDef = {
+      type: o.id,
+      label: o.label,
+      w: o.w,
+      h: o.h,
+      sx: cx,
+      sy: cy,
+      collision: o.collision ? Array.from({ length: o.w }, (_, i) => [i, 0] as [number, number]) : [],
+      overheadRows: 0,
+      ySort: true,
+      godotType: o.kind === 'character' ? 'npc' : o.kind === 'creature' ? 'enemy' : 'prop',
+    };
+    const prev = old.get(o.id);
+    let img = prev && prev.obj.png === o.png ? prev.img : null;
+    if (!img) {
+      const im = new Image();
+      im.onload = () => {
+        const e = custom.get(o.id);
+        if (e && e.obj.png === o.png) (e.img = im), changed();
+      };
+      im.src = o.png;
+      if (im.complete && im.naturalWidth) img = im;
+    }
+    next.set(o.id, { def, obj: o, img });
+    cx += o.w;
+    rowH = Math.max(rowH, o.h);
+  }
+  custom.clear();
+  for (const [k, v] of next) custom.set(k, v);
+  changed();
+}
+
+/** atlas size in tiles (grows with own objects) */
+function atlasTiles(): { cols: number; rows: number } {
+  let cols = COLS;
+  let rows = ROWS;
+  for (const { def } of custom.values()) {
+    cols = Math.max(cols, def.sx + def.w);
+    rows = Math.max(rows, def.sy + def.h);
+  }
+  return { cols, rows };
+}
 
 const T = 16;
 const COLS = 9;
 const ROWS = 3;
 
 let cached: { canvas: HTMLCanvasElement; dataUrl: string } | null = null;
+let builtin: HTMLCanvasElement | null = null;
 
-/** Sprite atlas of all objects (generated once). */
+/** Sprite atlas of all objects: built-in sprites (doubled) + own objects, 32 px per tile. */
 export function objectAtlas(): { canvas: HTMLCanvasElement; dataUrl: string } {
   if (cached) return cached;
+  builtin ??= drawBuiltin();
+  const { cols, rows } = atlasTiles();
+  const canvas = document.createElement('canvas');
+  canvas.width = cols * A;
+  canvas.height = rows * A;
+  const g = canvas.getContext('2d')!;
+  g.imageSmoothingEnabled = false;
+  g.drawImage(builtin, 0, 0, COLS * T, ROWS * T, 0, 0, COLS * A, ROWS * A);
+  for (const { def, img } of custom.values()) if (img) g.drawImage(img, def.sx * A, def.sy * A, def.w * A, def.h * A);
+  cached = { canvas, dataUrl: canvas.toDataURL('image/png') };
+  return cached;
+}
+
+/** the built-in sprites, drawn procedurally at 16 px per tile */
+function drawBuiltin(): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = COLS * T;
   canvas.height = ROWS * T;
@@ -134,8 +246,7 @@ export function objectAtlas(): { canvas: HTMLCanvasElement; dataUrl: string } {
     rect(ox + 9, oy + 10, 1, 1, '#2a1f2e');
     rect(ox + 11, oy + 18, 3, 6, '#b0874a');
   }
-  cached = { canvas, dataUrl: canvas.toDataURL('image/png') };
-  return cached;
+  return canvas;
 }
 
-export const OBJECT_ATLAS_TILE = T;
+export const OBJECT_ATLAS_TILE = A;

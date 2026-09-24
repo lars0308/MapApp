@@ -7,6 +7,9 @@ import { Button, Segmented } from '../components/ui';
 import { Icon } from '../components/icons';
 import { useEditor } from '../store/editorStore';
 import { clearPlayerSprite, onPlayerSprite, playerSpriteName, setPlayerSprite } from '../playtest/playerSprite';
+import { figureToObject } from '../objects/fromFigure';
+import { useProject } from '../store/projectStore';
+import { useApp } from '../store/appStore';
 
 // Builder tab "Export": the figure with its standard animations (stand, walk, attack, hit,
 // fall over …) straight into Godot or as a spritesheet – and as the player figure in the test.
@@ -118,6 +121,27 @@ export function ExportPanel({ kind }: { kind: SpriteKind }) {
             : 'das Objekt spielt seine Animation.'}{' '}
         Die Animationen entstehen automatisch aus den Teilen – gut für Prototypen und Gegner; für ein fertiges Spiel das Spritesheet von Hand nachzeichnen.
       </p>
+
+      <h4 className="subhead">Auf die Karte</h4>
+      <p className="muted small">
+        Als Objekt in die aktuelle Karte „{useProject.getState().project.name}“ – steht dann unter <b>Tiles → Objekte</b> und lässt sich wie ein Baum oder eine Truhe setzen (Y-Sortierung, Kollision, Godot-Export).
+      </p>
+      <div className="button-row">
+        <Button
+          icon={<Icon.Map size={16} />}
+          onClick={() => {
+            const o = figureToObject(doc, true);
+            if (!o) return toast('Die Figur ist leer', 'error');
+            const again = (useProject.getState().project.customObjects ?? []).some((x) => x.id === o.id);
+            useProject.getState().addCustomObject(o);
+            useEditor.getState().selectObject(o.id);
+            useApp.getState().goTo('map');
+            toast(again ? `„${o.label}“ auf der Karte aktualisiert – antippen zum Setzen` : `„${o.label}“ ist jetzt ein Objekt – auf die Karte tippen zum Setzen`, 'success');
+          }}
+        >
+          Als Objekt auf die Karte
+        </Button>
+      </div>
 
       {kind !== 'object' && (
         <>

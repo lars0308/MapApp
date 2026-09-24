@@ -324,7 +324,23 @@ export interface TerrainSet {
   active: boolean;
 }
 
-export type ObjectType = 'tree' | 'pillar' | 'rock' | 'arch' | 'chest' | 'merchant';
+export type BuiltinObjectType = 'tree' | 'pillar' | 'rock' | 'arch' | 'chest' | 'merchant';
+/** a built-in object or the id of an own object (CustomObject) */
+export type ObjectType = string;
+
+/** Own object from the figure builder (character, creature, object) – a sprite on the map. */
+export interface CustomObject {
+  id: string;
+  label: string;
+  /** PNG data URL, exactly w × h tiles at 32 px per tile, standing on the bottom edge */
+  png: string;
+  w: number;
+  h: number;
+  /** blocks its bottom row (walls for the player) */
+  collision: boolean;
+  /** what it was built as: character → NPC, creature → enemy, object → prop */
+  kind: 'character' | 'creature' | 'object';
+}
 
 /** Free-standing sprite object (y-sorted by its base row). */
 export interface MapObject {
@@ -469,6 +485,8 @@ export interface Project {
   result: GenerationResult | null;
   terrains: TerrainSet[];
   objects: MapObject[];
+  /** own objects from the figure builder (see CustomObject) */
+  customObjects?: CustomObject[];
 }
 
 export type ToolId = 'brush' | 'eraser' | 'fill' | 'rect' | 'pipette' | 'select' | 'move' | 'stamp' | 'hand';

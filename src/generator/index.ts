@@ -39,7 +39,7 @@ import { NO_ROLE, frontTilePrefs, resolveWalls, roleAt, wallNeighbourMask } from
 import { PERSPECTIVE_INFO, requiredRooms } from './perspective';
 import { createTerrainState, placeTerrain, placeTransitions } from './terrain';
 import { placeObjects, type ObjectContext } from './objectsGen';
-import { OBJECT_DEFS } from '../objects/defs';
+import { objectDef } from '../objects/defs';
 import { isWalkable } from './nav';
 import { generateSide } from './side';
 import { generateHex } from './hexgen';
@@ -408,7 +408,7 @@ export function generate(input: GenerateInput): GenerateOutput {
       block(i);
     }
   }
-  for (const o of objects) for (const [dx, dy] of OBJECT_DEFS[o.type].collision) block((o.y + dy) * W + o.x + dx);
+  for (const o of objects) for (const [dx, dy] of objectDef(o.type)?.collision ?? []) block((o.y + dy) * W + o.x + dx);
 
   if (decoL && s.decoDensity > 0 && pools.has('deco')) {
     const p = (s.decoDensity / 100) * 0.14;

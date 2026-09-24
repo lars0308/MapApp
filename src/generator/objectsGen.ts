@@ -1,4 +1,4 @@
-import { CELL_ROOM, T_NONE, type GeneratorSettings, type MapObject, type ObjectType } from '../types';
+import { CELL_ROOM, T_NONE, type GeneratorSettings, type MapObject, type BuiltinObjectType } from '../types';
 import { OBJECT_DEFS } from '../objects/defs';
 import type { Rng } from './rng';
 import type { Grid } from './corridors';
@@ -17,7 +17,7 @@ export interface ObjectContext {
   occupied: Uint8Array;
 }
 
-export function canPlace(c: ObjectContext, type: ObjectType, x: number, y: number): boolean {
+export function canPlace(c: ObjectContext, type: BuiltinObjectType, x: number, y: number): boolean {
   const def = OBJECT_DEFS[type];
   const { g } = c;
   const top = y - def.h + 1;
@@ -38,7 +38,7 @@ export function canPlace(c: ObjectContext, type: ObjectType, x: number, y: numbe
   return true;
 }
 
-export function occupy(c: ObjectContext, type: ObjectType, x: number, y: number) {
+export function occupy(c: ObjectContext, type: BuiltinObjectType, x: number, y: number) {
   const def = OBJECT_DEFS[type];
   for (let yy = y - def.h + 1; yy <= y + 1; yy++) for (let xx = x - 1; xx <= x + def.w; xx++) {
     if (xx >= 0 && yy >= 0 && xx < c.g.W && yy < c.g.H) c.occupied[yy * c.g.W + xx] = 1;
@@ -53,7 +53,7 @@ export function placeObjects(
   rng: Rng,
 ): MapObject[] {
   const out: MapObject[] = [];
-  const add = (type: ObjectType, x: number, y: number): boolean => {
+  const add = (type: BuiltinObjectType, x: number, y: number): boolean => {
     if (!canPlace(c, type, x, y)) return false;
     occupy(c, type, x, y);
     out.push({ id: `${type}_${out.length}`, type, x, y });

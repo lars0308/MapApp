@@ -1,9 +1,9 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import type { Perspective, TileCategory, TileMeta, TileRole, Tileset } from '../types';
 import { PERSPECTIVES, TILE_ROLES } from '../types';
-import { OBJECT_DEFS, OBJECT_TYPES } from '../objects/defs';
+import { OBJECT_DEFS, OBJECT_TYPES, atlasVersion, customObjectDefs, onAtlasChange } from '../objects/defs';
 import { ObjectThumb } from '../objects/ObjectThumb';
 import { tileBlocks } from '../editor/collision';
 import { PERSPECTIVE_INFO } from '../generator/perspective';
@@ -499,6 +499,9 @@ function ObjectPalette() {
   const selected = useEditor((s) => s.selectedObject);
   const selectObject = useEditor((s) => s.selectObject);
   const objects = useProject((s) => s.project.objects);
+  useProject((s) => s.project.customObjects);
+  useSyncExternalStore(onAtlasChange, atlasVersion);
+  const own = customObjectDefs();
   return (
     <div className="palette">
       <p className="hint">Antippen = als Pinsel wählen und auf die Map tippen. Radierer entfernt, „Verschieben“ zieht Objekte. Objekte werden nach ihrem Fußpunkt Y-sortiert.</p>
@@ -517,6 +520,27 @@ function ObjectPalette() {
           );
         })}
       </div>
+      <h4 className="subhead">Eigene Objekte</h4>
+      {own.length ? (
+        <div className="object-grid">
+          {own.map(({ def, obj }) => (
+            <div key={def.type} className="own-object">
+              <button type="button" className={`object-cell${selected === def.type ? ' is-selected' : ''}`} aria-pressed={selected === def.type} onClick={() => selectObject(selected === def.type ? null : def.type)}>
+                <ObjectThumb type={def.type} size={56} />
+                <span>{def.label}</span>
+                <small className="muted">
+                  {def.w}×{def.h} · {obj.collision ? 'Kollision' : 'frei'}
+                </small>
+              </button>
+              <button type="button" className="own-object-del" title="Aus der Karte entfernen (auch alle gesetzten)" onClick={() => useProject.getState().removeCustomObject(def.type)}>
+                <Icon.Trash size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="muted small">Noch keine. Eine Figur, Kreatur oder ein Objekt aus dem Baukasten kommt über <b>Figuren → Export → Als Objekt auf die Karte</b> hierher.</p>
+      )}
       <p className="muted small">{objects.length} Objekte auf der Map</p>
     </div>
   );

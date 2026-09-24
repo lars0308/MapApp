@@ -1,9 +1,12 @@
 import type { ObjectType } from '../types';
-import { OBJECT_ATLAS_TILE, OBJECT_DEFS, objectAtlas } from './defs';
+import { useSyncExternalStore } from 'react';
+import { OBJECT_ATLAS_TILE, atlasVersion, objectAtlas, objectDef, onAtlasChange } from './defs';
 
 /** Scaled sprite preview of an object (fits into a square). */
 export function ObjectThumb({ type, size = 40 }: { type: ObjectType; size?: number }) {
-  const d = OBJECT_DEFS[type];
+  useSyncExternalStore(onAtlasChange, atlasVersion);
+  const d = objectDef(type);
+  if (!d) return <span className="object-thumb" style={{ width: size, height: size }} />;
   const atlas = objectAtlas();
   const scale = size / (Math.max(d.w, d.h) * OBJECT_ATLAS_TILE);
   const w = d.w * OBJECT_ATLAS_TILE * scale;

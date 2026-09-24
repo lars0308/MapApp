@@ -321,7 +321,7 @@ Wichtige Entscheidungen:
 - Klippen und Plateaus sind Bildschirm-Höhe (eine Stufe), keine echten Höhenebenen; die Höhe steht in `navigation.heights`.
 - Die Wandrollen sind regelbasiert; eigene Tilesets brauchen Tiles mit passender Rolle (fehlende Rollen fallen auf verwandte Rollen bzw. Kategorien zurück). Kein Export als Godot-Terrain-Set.
 - Das Godot-Script ist gegen die Godot-4.3-API geschrieben und wird bei Änderungen in einem echten Godot 4.3 (headless) geprüft, aber nicht per CI.
-- Objekte haben feste Sprites aus dem mitgelieferten Objekt-Atlas; eigene Objekt-Sprites sind noch nicht möglich.
+- Eigene Objekte sind unbewegte Sprites (Vorderansicht); Gegner-Verhalten gibt es nur im Figuren-Export, nicht für Objekte auf der Karte.
 - Der Playtest ist bewusst einfach (keine Physik-Engine, keine Gegner, keine Höhenwechsel-Animation).
 - Spezialräume sind im Datensatz und im Room Graph markiert, haben aber noch keine Spielmechanik.
 - Tilesets müssen quadratische Tiles ohne Abstand/Rand haben.
@@ -333,7 +333,6 @@ Wichtige Entscheidungen:
 
 - Export der Wandrollen als Godot-Terrain-Set (Peering Bits)
 - Echtes isometrisches Raster für 45°, mehrere Höhenebenen
-- Eigene Objekt-Sprites aus Tilesets
 - Direkter `.tscn`/`.tres`-Export (TileSet-Ressource + Szene)
 - Generator im Web Worker, Fortschrittsanzeige für sehr große Maps
 - Weitere Biome (Höhlen per Cellular Automata, Außenbereiche, Dörfer)
@@ -343,6 +342,12 @@ Wichtige Entscheidungen:
 ---
 
 ## Änderungen
+
+**Version 3.3 – Eigene Figuren und Objekte auf der Karte**
+
+- Figuren-Baukasten → **Export → Als Objekt auf die Karte**: Charakter, Kreatur oder Objekt wird ein eigenes Karten-Objekt (Vorderansicht, 1 Figur-Pixel = 1 Pixel bei 32 px pro Tile, steht auf seiner Fußzeile). Die App springt zur Karte, das Objekt ist schon als Pinsel gewählt.
+- Unter **Tiles → Objekte → Eigene Objekte** wie Baum oder Truhe setzen, verschieben, radieren; Y-Sortierung und Kollision (untere Reihe) wie bei den eingebauten Objekten. Nochmal exportieren aktualisiert das Objekt, der Papierkorb entfernt es samt allen gesetzten.
+- Godot: die eigenen Objekte stehen in `objects.png` (jetzt 32 px pro Tile) und werden als Sprite + Kollision gebaut (Typ `npc`, `enemy` oder `prop`) – in Godot 4.3 geprüft. KI-Befehl `figure_to_map`.
 
 **Version 3.2 – Reiter „Animieren“ entfernt, Export im Figuren-Baukasten**
 

@@ -5512,3 +5512,27 @@ body.is-resizing-y * {
 .figure-export .subhead {
   margin: 0;
 }
+
+.own-object {
+  position: relative;
+  display: flex;
+}
+.own-object .object-cell {
+  flex: 1;
+}
+.own-object-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(19, 19, 24, 0.8);
+  color: var(--text-2);
+}
+.own-object-del:hover {
+  color: var(--danger, #e86f6f);
+}

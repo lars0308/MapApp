@@ -1,6 +1,6 @@
 import type { LayerRole, Project, TileCategory, TileMeta, TileRole } from '../types';
 import { tileOf } from '../tilesets/gid';
-import { OBJECT_DEFS } from '../objects/defs';
+import { objectDef } from '../objects/defs';
 
 // Walkability from the *current* map content (incl. manual edits).
 // Used by the playtest, the collision overlay and the Godot navigation export.
@@ -100,7 +100,7 @@ export function computeBlocked(p: Project, opts: { voidBlocks?: boolean } = {}):
     out[i] = (!has && voidBlocks) || (has && (marked || (block && !bridge))) ? 1 : 0;
   }
   for (const o of p.objects) {
-    const def = OBJECT_DEFS[o.type];
+    const def = objectDef(o.type);
     if (!def) continue;
     for (const [dx, dy] of def.collision) {
       const x = o.x + dx;

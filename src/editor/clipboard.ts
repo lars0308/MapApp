@@ -1,6 +1,6 @@
 import { useEditor } from '../store/editorStore';
 import { useProject } from '../store/projectStore';
-import { OBJECT_DEFS } from '../objects/defs';
+import { objectDef } from '../objects/defs';
 import type { ObjectType, Project, Selection } from '../types';
 import { uid } from '../utils/id';
 import { mirrorH, rotateCW, transformOf, withTransform } from '../tilesets/gid';
@@ -95,7 +95,7 @@ export function pasteClip(clip: Clip, x0: number, y0: number): number {
     for (const o of clip.objects) {
       const x = x0 + o.dx;
       const y = y0 + o.dy;
-      const d = OBJECT_DEFS[o.type];
+      const d = objectDef(o.type);
       if (!d || x < 0 || y < 0 || x + d.w > W || y >= H) continue;
       objects.push({ id: uid('obj'), type: o.type, x, y });
       changed++;

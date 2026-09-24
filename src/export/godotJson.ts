@@ -7,7 +7,7 @@ import { GODOT_LAYER_NAME } from '../layers/defaults';
 import { computeBlocked, metaTable, tileBlocks } from '../editor/collision';
 import { GRAVITY, LIFT_PAUSE, LIFT_SPEED, buildSideMap, jumpSpeed } from '../playtest/sidePhysics';
 import { HEX_COST, HEX_TERRAIN_TAG } from '../generator/hexgen';
-import { OBJECT_ATLAS_TILE, OBJECT_DEFS, objectAtlas } from '../objects/defs';
+import { OBJECT_ATLAS_TILE, objectAtlas, objectDef } from '../objects/defs';
 
 // Map data for Godot 4 (TileMapLayer based, editable after import).
 // - every tileset image is re-sampled to the map tile size → TileSet.tile_size == map.tileSize
@@ -192,8 +192,9 @@ export async function buildGodotData(p: Project, opts: { embedImages: boolean; i
     return { id: l.id, name: godotName, label: l.name, role: l.role, order, zIndex: order, visible: l.visible, locked: l.locked, ySort: l.ySort, color: l.color, tiles };
   });
 
-  const objects = p.objects.map((o) => {
-    const d = OBJECT_DEFS[o.type];
+  const objects = p.objects.flatMap((o) => {
+    const d = objectDef(o.type);
+    if (!d) return [];
     return {
       id: o.id,
       type: d.godotType,

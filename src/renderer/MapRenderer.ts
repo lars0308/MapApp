@@ -1,5 +1,5 @@
 import type { Layer, MapObject, Selection, Tileset } from '../types';
-import { OBJECT_DEFS, OBJECT_ATLAS_TILE, objectAtlas } from '../objects/defs';
+import { OBJECT_ATLAS_TILE, objectAtlas, objectDef } from '../objects/defs';
 import { drawCharacter, type CharacterState } from './character';
 import { GidTable, drawGid } from './tileAtlas';
 import { tileOf } from '../tilesets/gid';
@@ -389,7 +389,7 @@ export class MapRenderer {
     const atlas = this.objects.length ? objectAtlas().canvas : null;
     const A = OBJECT_ATLAS_TILE;
     for (const o of this.objects) {
-      const def = OBJECT_DEFS[o.type];
+      const def = objectDef(o.type);
       if (!def) continue;
       const top = o.y - def.h + 1;
       if (o.x + def.w < x0 || o.x > x1 || o.y + 1 < y0 || top > y1) continue;
@@ -485,7 +485,8 @@ export class MapRenderer {
       ctx.lineWidth = 2;
       ctx.beginPath();
       for (const o of this.objects) {
-        const def = OBJECT_DEFS[o.type];
+        const def = objectDef(o.type);
+        if (!def) continue;
         const py = sy(o.y + 1) - 1;
         ctx.moveTo(sx(o.x) + 2, py);
         ctx.lineTo(sx(o.x + def.w) - 2, py);
