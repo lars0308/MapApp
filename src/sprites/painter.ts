@@ -121,6 +121,22 @@ export class Painter {
     this.fixed = fx;
     return this;
   }
+  /** scale everything around (cx, cy) – foreshortening (e.g. a blade pointing at the viewer) */
+  scale(cx: number, cy: number, sx: number, sy: number) {
+    const g = new Uint8Array(S * S);
+    const fx = new Uint8Array(S * S);
+    for (let y = 0; y < S; y++)
+      for (let x = 0; x < S; x++) {
+        const px = Math.floor(cx + (x + 0.5 - cx) / sx);
+        const py = Math.floor(cy + (y + 0.5 - cy) / sy);
+        if (!this.in(px, py)) continue;
+        g[y * S + x] = this.g[py * S + px];
+        fx[y * S + x] = this.fixed[py * S + px];
+      }
+    this.g = g;
+    this.fixed = fx;
+    return this;
+  }
   /** remove pixels where the test is true */
   clearWhere(test: (x: number, y: number) => boolean) {
     for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (test(x, y)) this.g[y * S + x] = 0;

@@ -346,6 +346,12 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 2.8.1 – Waffe immer in der rechten Hand, zeigt nach vorne**
+
+- Die Figur hält Schwert, Axt, Hammer & Co. immer in **ihrer rechten Hand**: von vorne sieht man die Waffe links im Bild, von der Seite in der vorderen Hand, von hinten rechts – nicht mehr gespiegelt.
+- **Klingen zeigen in Blickrichtung**: von der Seite waagerecht nach vorne, von vorne verkürzt auf den Betrachter zu, von hinten nach Norden – die Waffe ist dann weitgehend vom Körper verdeckt, die flache Seite der Klinge sieht man nicht. Stab, Fackel und Bogen bleiben aufrecht.
+- Angriffe und alle anderen Animationen folgen dem: der Schlag von hinten geht über den Kopf nach vorne (Norden), von vorne zum Betrachter hin.
+
 **Version 2.8 – Modus „Hexagonal“ (Strategie-Weltkarten)**
 
 - Im Setup und unter *Karte → Neue Karte* jetzt verfügbar: **Hexagonal** (Genre *Strategie / 4X*, auch Taktik). Eigener Ablauf mit Schritt **Welt**.

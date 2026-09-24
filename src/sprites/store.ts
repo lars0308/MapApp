@@ -148,7 +148,8 @@ export function layerPixels(doc: SpriteDoc, layer: SpriteLayer, view: View): Uin
 export function viewLayers(doc: SpriteDoc, view: View): SpriteLayer[] {
   const layers = doc.layers.map((l) => ({ ...l, data: layerPixels(doc, l, view) }));
   if (view !== 'back') return layers;
-  return [...layers.filter((l) => l.slot !== 'back'), ...layers.filter((l) => l.slot === 'back')];
+  // from behind: the weapon (held forward) is hidden by the body, wings / capes lie on top
+  return [...layers.filter((l) => l.slot === 'weapon'), ...layers.filter((l) => l.slot !== 'back' && l.slot !== 'weapon'), ...layers.filter((l) => l.slot === 'back')];
 }
 
 export function composeView(doc: SpriteDoc, view: View): Uint8ClampedArray {

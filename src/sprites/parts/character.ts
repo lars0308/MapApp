@@ -85,8 +85,9 @@ const part = (slot: string, id: string, label: string, paint: Paint, opts: { out
       // held in the fist: lean out of the hand, then leave the fist free so the hand
       // (body / gloves) lies over the grip
       const h = weaponHand(b);
-      const rest = weaponRest(`c.weapon.${id}`, b.view);
-      if (rest) p.rotate(h.cx, h.hy, rest);
+      const pose = weaponPose(`c.weapon.${id}`, b.view);
+      if (pose.sx !== 1 || pose.sy !== 1) p.scale(h.cx, h.hy, pose.sx, pose.sy);
+      if (pose.rest) p.rotate(h.cx, h.hy, pose.rest);
       p.finish(opts);
       return p.clearWhere((x, y) => x >= h.x0 && x <= h.x1 && y >= h.hy - 1 && y <= h.hy);
     }
@@ -469,23 +470,51 @@ const HATS: DemoPart[] = [
  * the arm. cx / hy = its centre in pixel-corner coordinates – the grip of a weapon runs through it.
  */
 export function weaponHand(b: Body) {
-  const a = b.view === 'back' ? b.aL : b.aR;
+  // the weapon is in the figure's right hand: seen from the front that is the left of the
+  // picture, seen from behind the right, from the side the near hand
+  const a = b.view === 'front' || !b.view ? b.aL : b.aR;
   return { cx: a[0] + 1, hy: b.ay[1], x0: a[0], x1: a[1] };
 }
 
-/** how far a weapon leans out of the hand when standing (degrees, clockwise; 0 = straight up) */
-const WEAPON_REST: Record<string, number> = { sword: 30, axe: 30, hammer: 30, spear: 18, staff: 12, torch: 15, bow: 0 };
+/** weapons that point where the figure looks (blades); the others are held upright */
+const FORWARD = new Set(['sword', 'axe', 'hammer', 'spear']);
+/** upright weapons: slight lean out of the hand (degrees, clockwise; 0 = straight up) */
+const UPRIGHT_LEAN: Record<string, number> = { staff: 12, torch: 15, bow: 0 };
 
-/** rest angle of a weapon part in a view (mirrored from behind, a bit more forward from the side) */
-export function weaponRest(partId: string | null | undefined, view: View = 'front'): number {
-  const r = WEAPON_REST[partId?.startsWith('c.weapon.') ? partId.slice(9) : ''] ?? 0;
-  return view === 'back' ? -r : view === 'side' && r ? r + 10 : r;
+export interface WeaponPose {
+  /** blade direction, degrees clockwise (0 = up) */
+  rest: number;
+  /** foreshortening across / along the blade */
+  sx: number;
+  sy: number;
 }
 
-/** weapon hand / other hand – swapped when seen from behind */
+/**
+ * How a weapon is held in a view. Blades point forward – towards the viewer from the front
+ * (down, shortened), forward from the side, away from the viewer from behind (up, seen
+ * edge-on and shortened, behind the body).
+ */
+export function weaponPose(partId: string | null | undefined, view: View = 'front'): WeaponPose {
+  const id = partId?.startsWith('c.weapon.') ? partId.slice(9) : '';
+  if (FORWARD.has(id)) {
+    if (view === 'side') return { rest: 75, sx: 1, sy: 1 };
+    if (view === 'back') return { rest: 0, sx: 0.5, sy: 0.55 };
+    return { rest: 195, sx: 1, sy: 0.6 };
+  }
+  // upright weapons lean outwards: to the left in the front picture, to the right from behind
+  const lean = UPRIGHT_LEAN[id] ?? 0;
+  return { rest: view === 'back' ? lean : view === 'side' ? (lean ? lean + 10 : 0) : -lean, sx: 1, sy: 1 };
+}
+
+/** blade direction of a weapon part at rest (animation poses count from upright) */
+export function weaponRest(partId: string | null | undefined, view: View = 'front'): number {
+  return weaponPose(partId, view).rest;
+}
+
+/** weapon hand / other hand (shield) */
 const hand = (b: Body) => {
   const gx = weaponHand(b).cx - 1;
-  return b.view === 'back' ? { gx, hy: b.ay[1], ox: b.aR[1] + 2 } : { gx, hy: b.ay[1], ox: b.aL[0] - 1 };
+  return b.view === 'front' || !b.view ? { gx, hy: b.ay[1], ox: b.aR[1] + 2 } : { gx, hy: b.ay[1], ox: b.aL[0] - 1 };
 };
 
 const WEAPONS: DemoPart[] = [
