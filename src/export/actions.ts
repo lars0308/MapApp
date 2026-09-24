@@ -27,6 +27,12 @@ export async function exportPng(p: Project, o: PngOptions) {
 }
 
 export async function exportGodotPackage(p: Project, includeShadows = true) {
+  const { blob, name } = await buildGodotPackage(p, includeShadows);
+  downloadBlob(blob, name);
+}
+
+/** the Godot package as a zip (map.json, loader, tilesets, player figure, Map.tscn) */
+export async function buildGodotPackage(p: Project, includeShadows = true): Promise<{ blob: Blob; name: string }> {
   const data = await buildGodotData(p, { embedImages: false, includeShadows });
   const folder = safeFileName(p.name);
   const entries: ZipEntry[] = [
@@ -93,7 +99,7 @@ ${player ? '[ext_resource type="PackedScene" path="player/player.tscn" id="2_pla
 script = ExtResource("1_loader")
 ${player ? 'player_scene = ExtResource("2_player")\n' : ''}`,
   });
-  downloadBlob(createZip(entries), `${folder}-godot.zip`);
+  return { blob: createZip(entries), name: `${folder}-godot.zip` };
 }
 
 export function exportGodotScript() {

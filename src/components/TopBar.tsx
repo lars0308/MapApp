@@ -9,6 +9,7 @@ import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { startPlaytest, stopPlaytest } from '../playtest/controller';
 import { getRenderer } from '../editor/rendererRef';
+import { AiBadge } from '../api/AiSection';
 
 const PAGE_ICON: Record<Tab, (p: { size?: number }) => React.ReactElement> = {
   project: Icon.Folder,
@@ -91,6 +92,7 @@ export function TopBar({ mapActions }: { mapActions?: React.ReactNode }) {
       <div className="topbar-brand">
         <Logo />
         <SaveState />
+        <AiBadge />
       </div>
       <PageTabs />
       <div className="topbar-right">
@@ -108,6 +110,7 @@ export function MobileTopBar() {
   return (
     <header className="m-top m-top-pages">
       <LogoMark size={24} />
+      <AiBadge />
       <PageTabs compact />
       <PlayButton />
     </header>

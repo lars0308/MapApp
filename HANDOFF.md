@@ -1,6 +1,6 @@
-# Übergabe – MapForge (Stand 2026-09-24, Version 3.0)
+# Übergabe – MapForge (Stand 2026-09-24, Version 3.1)
 
-Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (Version 3.0 im README).
+Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (Version 3.1 im README).
 Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI auf Deutsch, UI selbsterklärend, mobil zuerst, keine Fake-Features.
 
 ## Stand (fertig, gepusht)
@@ -15,6 +15,10 @@ Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI 
 - Kopieren/Ausschneiden/Stempel: `src/editor/clipboard.ts` (Clip, copyArea, pasteClip via `editDoc`, transformClip), Werkzeug `stamp`, Vorschau `overlay.stamp` im Renderer.
 - Tile drehen/spiegeln: Bits in der Zellenzahl (`src/tilesets/gid.ts`: FLIP_H 0x10000000, FLIP_V 0x20000000, TRANSPOSE 0x40000000). Überall, wo ein gid inhaltlich gelesen wird, `tileOf(v)` benutzen! Editor-State `tileTurn`. Godot-Export: `alternative` im Tile-JSON.
 - Minimap `src/editor/Minimap.tsx` (`renderer.cameraListeners`, `centerOn`), Layer-Deckkraft `layer.opacity` (nur Editor).
+
+## KI-Schnittstelle (Version 3.1)
+- Befehle: `src/api/spec.json` (Beschreibung + JSON-Schema, gilt für MCP und App), Umsetzung `src/api/commands.ts` (`runCommand`), WebSocket-Brücke `src/api/bridge.ts`, UI `src/api/AiSection.tsx` (Einstellungen, KI-Badge).
+- MCP-Server `mcp/server.mjs` (stdio-MCP, HTTP `/command` `/spec`, WebSocket, liefert `dist/` aus, startet notfalls unsichtbaren Browser via playwright-core). Neuer Befehl = Eintrag in spec.json + Handler in commands.ts.
 
 ## Danach offen
 4. Eigene Figuren/Objekte aus dem Baukasten als Objekte auf die Karte (+ Godot-Export).

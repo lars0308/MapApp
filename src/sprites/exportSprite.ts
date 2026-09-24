@@ -582,6 +582,12 @@ ${list}
 export const isPlatformer = (doc: SpriteDoc, c: ExportChoice) => doc.kind === 'character' && c.views.length === 1 && c.views[0] === 'side';
 
 export function exportSpriteGodot(doc: SpriteDoc, c0: ExportChoice) {
+  const { blob, name } = buildSpriteGodot(doc, c0);
+  downloadBlob(blob, name);
+}
+
+/** Godot package of a figure as zip (sheet, SpriteFrames, scene, script, README) */
+export function buildSpriteGodot(doc: SpriteDoc, c0: ExportChoice): { blob: Blob; name: string } {
   const base = safeFileName(doc.name) || 'sprite';
   const platformer = isPlatformer(doc, c0);
   const { canvas, meta } = sheet(doc, c0.anims, c0.fps, c0.views, c0.custom);
@@ -590,7 +596,7 @@ export function exportSpriteGodot(doc: SpriteDoc, c0: ExportChoice) {
     { path: `${base}/README.md`, data: readme(doc, base, meta, platformer) },
     { path: `${base}/${base}_still.png`, data: dataUrlToBytes(toPng(compose(doc), doc.size)) },
   ];
-  downloadBlob(createZip(entries), `${base}-godot.zip`);
+  return { blob: createZip(entries), name: `${base}-godot.zip` };
 }
 
 /** frames of a sheet as separate PNGs (for engines / tools that want single images) */

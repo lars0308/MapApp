@@ -16,6 +16,7 @@ import { autoAssign } from './tilesets/autoAssign';
 import * as learning from './tilesets/learning';
 import { detectTileSize } from './tilesets/slicing';
 import { ErrorBoundary, rememberError, takeLastError } from './components/ErrorBoundary';
+import { startAiBridge } from './api/bridge';
 
 // small debugging handle (used by automated browser tests)
 (window as unknown as Record<string, unknown>).__MAPFORGE__ = { project: useProject, editor: useEditor, view: viewEvents, playtest, computeBlocked, metaTable, renderer: getRenderer, autoAssign, learning, detectTileSize, sprites: useSprites, spriteParts: DEMO_PARTS, composeView, app: useApp, anim: { animsFor, buildSheet }, sidePhysics: { buildSideMap, stepSide, newBody, jumpSpeed, liftRow } };
@@ -34,6 +35,9 @@ if (last) {
   console.warn('MapForge: letzter Fehler', last);
   setTimeout(() => useEditor.getState().toast(`Letzter Fehler (${last.area}, ${new Date(last.at).toLocaleTimeString()}): ${last.message}`, 'error'), 1500);
 }
+
+// AI connection (MCP server on this computer) – only active when switched on
+startAiBridge();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

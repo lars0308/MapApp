@@ -344,6 +344,11 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.1 – KI-Schnittstelle (MCP)**
+
+- Eine KI (Claude, Cursor, eigene Programme) kann MapForge bedienen: Karten erzeugen, generieren, malen, füllen, kopieren, Objekte setzen, Layer ändern, rückgängig machen, **Bilder der Karte ansehen**, Godot-Paket / JSON exportieren, Figuren aus Teilen bauen, färben, ansehen (alle Ansichten, Animationen) und als Godot-Paket exportieren – 36 Befehle.
+- **MCP-Server** in `mcp/` (`node mcp/server.mjs`): die KI arbeitet in deinem offenen MapForge-Tab (**Einstellungen → KI-Verbindung**), du siehst live zu; ohne Tab startet der Server MapForge unsichtbar selbst. Auch per HTTP (`POST /command`) und in der Browser-Konsole (`mapforge.run(…)`). Anleitung: `mcp/README.md`.
+
 **Version 3.0 – Kopieren & Stempel, Drehen & Spiegeln, Übersichtskarte**
 
 - **Kopieren / Ausschneiden / Stempel:** Mit *Auswahl* einen Bereich markieren → in der Leiste *Kopieren*, *Ausschneiden* oder gleich **Stempel**. Der Stempel nimmt alle Layer, Objekte und die Struktur darunter mit (Auto-Wände arbeiten danach weiter). Die Kopie hängt halb durchsichtig unter Finger / Maus, loslassen setzt sie ein; leere Felder der Kopie lassen stehen, was darunter ist. Ein Stempel = ein Rückgängig-Schritt. Tastatur: Strg+C, Strg+X, Strg+V (Stempel), Entf löscht die Auswahl auf allen Layern, S = Stempel.

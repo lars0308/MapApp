@@ -655,7 +655,7 @@ function Summary({ draft, library, onName, onFixRooms }: { draft: Draft; library
 }
 
 /** Manual mode: floor layer active, brush with a floor tile of the chosen tiles. */
-function prepareBuildKit() {
+export function prepareBuildKit() {
   const p = useProject.getState().project;
   const side = p.map.perspective === 'side_view';
   const hex = p.map.perspective === 'hex';

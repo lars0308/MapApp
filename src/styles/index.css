@@ -5187,6 +5187,59 @@ body.is-resizing-y * {
   font-size: 13px;
   color: var(--ok);
 }
+.ai-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.ai-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.ai-details {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.ai-details summary {
+  cursor: pointer;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.ai-details ol {
+  padding-left: 18px;
+  line-height: 1.5;
+}
+.ai-details pre {
+  overflow-x: auto;
+  max-width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+.ai-details code {
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.ai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--accent-line);
+  border-radius: 11px;
+  background: var(--accent-soft);
+  color: var(--accent-hi);
+  font-size: 11px;
+  font-weight: 700;
+  flex: none;
+}
 .backup-state.is-warn {
   color: #f0b36b;
 }

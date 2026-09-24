@@ -1,0 +1,232 @@
+{
+  "name": "mapforge",
+  "version": "1.0",
+  "about": "MapForge: pixel-art map generator, tile editor and figure builder with Godot 4 export. Coordinates are tile cells (x to the right, y down, 0-based). A cell value is a tile gid (0 = empty); gids come from list_tiles. Typical flow: status → new_map (or generate) → render to look at it → paint / place_object / copy_paste to edit → render again → export_godot. Figures: figure_parts → figure_set_part → figure_render → figure_export_godot.",
+  "commands": [
+    {
+      "name": "status",
+      "description": "Current project: size, view, seed, layers (with tile counts), objects, rooms, undo state, current page.",
+      "input": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "new_map",
+      "description": "Create a new map project and generate it (like the setup wizard). The current project is saved first.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "view": { "type": "string", "enum": ["top_down", "isometric", "side_scroller", "hexagonal"], "description": "Kind of game view" },
+          "perspective": { "type": "string", "enum": ["top_down", "low_top_down", "isometric_45", "side_view", "hex"], "description": "Optional exact perspective (top_down view: top_down or low_top_down)" },
+          "genre": { "type": "string", "enum": ["action_roguelite", "dungeon_crawler", "rpg", "tactics", "puzzle", "platformer", "strategy", "other"] },
+          "effort": { "type": "string", "enum": ["small", "medium", "large"], "description": "Map size / detail" },
+          "width": { "type": "integer", "minimum": 16, "maximum": 256 },
+          "height": { "type": "integer", "minimum": 16, "maximum": 256 },
+          "seed": { "type": "string" },
+          "mode": { "type": "string", "enum": ["generate", "manual"], "description": "manual = empty map to paint by hand" },
+          "name": { "type": "string" }
+        },
+        "required": ["view"]
+      }
+    },
+    {
+      "name": "generate",
+      "description": "Generate the map again with the current settings (same seed = same map, new_seed = a new variant).",
+      "input": { "type": "object", "properties": { "seed": { "type": "string" }, "new_seed": { "type": "boolean" } } }
+    },
+    {
+      "name": "get_generator",
+      "description": "Generator settings of the project (rooms, corridors, terrain, objects, side-scroller / hex options).",
+      "input": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "set_generator",
+      "description": "Change generator settings (deep merge of `patch`, same shape as get_generator). regenerate=true generates right away.",
+      "input": { "type": "object", "properties": { "patch": { "type": "object" }, "regenerate": { "type": "boolean" } }, "required": ["patch"] }
+    },
+    {
+      "name": "list_tiles",
+      "description": "Tiles usable in this map with gid, role, category and tags. Filter by role / category / tag (substring match).",
+      "input": { "type": "object", "properties": { "role": { "type": "string" }, "category": { "type": "string" }, "tag": { "type": "string" }, "limit": { "type": "integer" } } }
+    },
+    {
+      "name": "list_layers",
+      "description": "Layers from bottom to top with id, name, role, visibility, lock, opacity, tile count.",
+      "input": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "get_map",
+      "description": "Cell values of an area (max 64 × 64) per layer as rows of numbers (gid, 0 = empty; values ≥ 268435456 carry rotate/mirror bits). Also the blocked (collision) grid as '#' / '.'.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "x": { "type": "integer" }, "y": { "type": "integer" }, "w": { "type": "integer" }, "h": { "type": "integer" },
+          "layers": { "type": "array", "items": { "type": "string" }, "description": "Layer names, ids or roles (default: all with content)" }
+        }
+      }
+    },
+    {
+      "name": "paint",
+      "description": "Paint a tile into a layer at cells and / or a rectangle – one undo step. Auto-walls re-tile walls around painted floor / paths (default on). rotate / mirror turn the tile.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "layer": { "type": "string", "description": "Layer name, id or role (default: active layer)" },
+          "gid": { "type": "integer", "description": "Tile gid from list_tiles, 0 = erase" },
+          "cells": { "type": "array", "items": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 }, "description": "[[x, y], …]" },
+          "rect": { "type": "object", "properties": { "x": { "type": "integer" }, "y": { "type": "integer" }, "w": { "type": "integer" }, "h": { "type": "integer" } } },
+          "rotate": { "type": "integer", "enum": [0, 90, 180, 270] },
+          "mirror": { "type": "boolean" },
+          "auto_walls": { "type": "boolean" }
+        },
+        "required": ["gid"]
+      }
+    },
+    {
+      "name": "fill",
+      "description": "Flood fill from (x, y) in a layer with a tile (like the fill bucket).",
+      "input": { "type": "object", "properties": { "layer": { "type": "string" }, "x": { "type": "integer" }, "y": { "type": "integer" }, "gid": { "type": "integer" } }, "required": ["x", "y", "gid"] }
+    },
+    {
+      "name": "clear_area",
+      "description": "Clear a rectangle on all unlocked layers including objects (one undo step).",
+      "input": { "type": "object", "properties": { "x": { "type": "integer" }, "y": { "type": "integer" }, "w": { "type": "integer" }, "h": { "type": "integer" } }, "required": ["x", "y", "w", "h"] }
+    },
+    {
+      "name": "copy_paste",
+      "description": "Copy a rectangle (all layers, objects, structure) and stamp it at to_x / to_y (top-left). Empty cells keep what is below. Optional rotate (90 steps) / mirror.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "x": { "type": "integer" }, "y": { "type": "integer" }, "w": { "type": "integer" }, "h": { "type": "integer" },
+          "to_x": { "type": "integer" }, "to_y": { "type": "integer" },
+          "rotate": { "type": "integer", "enum": [0, 90, 180, 270] },
+          "mirror": { "type": "boolean" }
+        },
+        "required": ["x", "y", "w", "h", "to_x", "to_y"]
+      }
+    },
+    {
+      "name": "list_objects",
+      "description": "Objects on the map (id, type, x = left cell, y = base row) and the object types that can be placed.",
+      "input": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "place_object",
+      "description": "Place an object (tree, pillar, rock, arch, chest, merchant). x = left cell of its footprint, y = the row it stands on.",
+      "input": { "type": "object", "properties": { "type": { "type": "string" }, "x": { "type": "integer" }, "y": { "type": "integer" } }, "required": ["type", "x", "y"] }
+    },
+    {
+      "name": "remove_object",
+      "description": "Remove an object by id (see list_objects).",
+      "input": { "type": "object", "properties": { "id": { "type": "string" } }, "required": ["id"] }
+    },
+    {
+      "name": "set_layer",
+      "description": "Change a layer: visible, locked, opacity (0.1–1, editor only), name, or make it the active layer.",
+      "input": { "type": "object", "properties": { "layer": { "type": "string" }, "visible": { "type": "boolean" }, "locked": { "type": "boolean" }, "opacity": { "type": "number" }, "name": { "type": "string" }, "active": { "type": "boolean" } }, "required": ["layer"] }
+    },
+    {
+      "name": "undo",
+      "description": "Undo the last change(s).",
+      "input": { "type": "object", "properties": { "steps": { "type": "integer", "minimum": 1 } } }
+    },
+    {
+      "name": "redo",
+      "description": "Redo undone change(s).",
+      "input": { "type": "object", "properties": { "steps": { "type": "integer", "minimum": 1 } } }
+    },
+    {
+      "name": "render",
+      "description": "Picture of the map (or an area) as PNG, like in the editor incl. objects. Use it to look at your work. tile_px = pixels per tile (default: fits 1024 px).",
+      "input": { "type": "object", "properties": { "x": { "type": "integer" }, "y": { "type": "integer" }, "w": { "type": "integer" }, "h": { "type": "integer" }, "tile_px": { "type": "integer", "minimum": 2, "maximum": 64 }, "grid": { "type": "boolean" }, "collision": { "type": "boolean", "description": "tint blocked cells red" } } },
+      "returns": "image"
+    },
+    {
+      "name": "export_godot",
+      "description": "Godot 4 package of the map as a ZIP (map.json, loader script, tilesets, player figure, Map.tscn) – returned base64 (the MCP server saves it to `path`).",
+      "input": { "type": "object", "properties": { "path": { "type": "string", "description": "file to save to (MCP server)" }, "shadows": { "type": "boolean" } } },
+      "returns": "file"
+    },
+    {
+      "name": "export_json",
+      "description": "The map as MapForge/Godot JSON (tiles per layer, collision rects, rooms, spawn points, objects) without images.",
+      "input": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "save",
+      "description": "Save the project in the browser now (it also autosaves).",
+      "input": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "list_projects",
+      "description": "Saved map projects in this browser.",
+      "input": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "open_project",
+      "description": "Open a saved project by id (see list_projects).",
+      "input": { "type": "object", "properties": { "id": { "type": "string" } }, "required": ["id"] }
+    },
+    {
+      "name": "figure_status",
+      "description": "The figure in the builder (character, creature or object): name, size, layers with slot and part, colours.",
+      "input": { "type": "object", "properties": { "kind": { "type": "string", "enum": ["character", "creature", "object"] } }, "required": ["kind"] }
+    },
+    {
+      "name": "figure_parts",
+      "description": "Building parts for a figure kind, grouped by slot (body, hair, top, weapon …) with id and label; also the colour channels and their presets.",
+      "input": { "type": "object", "properties": { "kind": { "type": "string", "enum": ["character", "creature", "object"] }, "slot": { "type": "string" } }, "required": ["kind"] }
+    },
+    {
+      "name": "figure_set_part",
+      "description": "Put a part on the figure (replaces the part in its slot, or adds for multi slots). Parts fit the body automatically.",
+      "input": { "type": "object", "properties": { "kind": { "type": "string", "enum": ["character", "creature", "object"] }, "part": { "type": "string", "description": "part id from figure_parts" } }, "required": ["kind", "part"] }
+    },
+    {
+      "name": "figure_remove_slot",
+      "description": "Remove the layer(s) of a slot from the figure.",
+      "input": { "type": "object", "properties": { "kind": { "type": "string", "enum": ["character", "creature", "object"] }, "slot": { "type": "string" } }, "required": ["kind", "slot"] }
+    },
+    {
+      "name": "figure_color",
+      "description": "Set a colour channel (skin, hair, primary, secondary, metal, wood, stone, leaf) – either a preset index or 3 hex colours [light, base, dark].",
+      "input": { "type": "object", "properties": { "kind": { "type": "string", "enum": ["character", "creature", "object"] }, "channel": { "type": "string" }, "preset": { "type": "integer" }, "colors": { "type": "array", "items": { "type": "string" }, "minItems": 3, "maxItems": 3 } }, "required": ["kind", "channel"] }
+    },
+    {
+      "name": "figure_new",
+      "description": "Start a new figure (random parts or empty).",
+      "input": { "type": "object", "properties": { "kind": { "type": "string", "enum": ["character", "creature", "object"] }, "empty": { "type": "boolean" }, "name": { "type": "string" }, "size": { "type": "integer", "enum": [16, 32, 48, 64] } }, "required": ["kind"] }
+    },
+    {
+      "name": "figure_random",
+      "description": "Roll random parts and colours for the figure.",
+      "input": { "type": "object", "properties": { "kind": { "type": "string", "enum": ["character", "creature", "object"] } }, "required": ["kind"] }
+    },
+    {
+      "name": "figure_render",
+      "description": "Picture of the figure as PNG – one view or all views side by side; optionally an animation as a strip of frames.",
+      "input": { "type": "object", "properties": { "kind": { "type": "string", "enum": ["character", "creature", "object"] }, "view": { "type": "string", "enum": ["front", "fside", "side", "bside", "back", "all"] }, "animation": { "type": "string", "description": "animation id, e.g. walk, attack (see figure_parts → animations)" }, "scale": { "type": "integer", "minimum": 1, "maximum": 16 } }, "required": ["kind"] },
+      "returns": "image"
+    },
+    {
+      "name": "figure_save",
+      "description": "Save the figure to the gallery.",
+      "input": { "type": "object", "properties": { "kind": { "type": "string", "enum": ["character", "creature", "object"] } }, "required": ["kind"] }
+    },
+    {
+      "name": "figure_export_godot",
+      "description": "Godot package of the figure with animations as ZIP (base64; the MCP server saves it to `path`). directions: 2 (platformer), 4 or 8.",
+      "input": { "type": "object", "properties": { "kind": { "type": "string", "enum": ["character", "creature", "object"] }, "animations": { "type": "array", "items": { "type": "string" } }, "directions": { "type": "integer", "enum": [2, 4, 8] }, "path": { "type": "string" } }, "required": ["kind"] },
+      "returns": "file"
+    },
+    {
+      "name": "figure_use_as_player",
+      "description": "Use the character / creature as the player figure in the playtest and in the map's Godot export.",
+      "input": { "type": "object", "properties": { "kind": { "type": "string", "enum": ["character", "creature"] } }, "required": ["kind"] }
+    },
+    {
+      "name": "show",
+      "description": "Switch the visible page of the app (map, figures, animate, project) so the user sees what you do.",
+      "input": { "type": "object", "properties": { "page": { "type": "string", "enum": ["map", "character", "creature", "object", "animate", "project"] } }, "required": ["page"] }
+    }
+  ]
+}
