@@ -342,6 +342,27 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.16 – Einfacher bedienen**
+
+- **Generieren** baut bei jedem Klick eine neue Karte (neuer Seed). „Gleiche Karte“ baut den gleichen Seed mit geänderten Einstellungen neu.
+- **Linkes Panel „Aufbau“** (am Handy unten „Aufbau“), zusammengefasst:
+  - Karte: Größe Klein, Mittel, Groß oder Riesig, dazu Ansicht und Schatten.
+  - Aufbau: Räume, Höhle, Außen oder Dorf, dazu ein Stil.
+  - Räume & Wege: Anzahl, Raumgröße, Gangbreite, Verwinkelung, Vernetzung.
+  - Spezialräume, Gelände (vorher eigener Tab „Terrain“), Gegner & Ausstattung.
+  - Feinheiten sind unter „Feineinstellungen“ eingeklappt.
+  - Im Baukasten-Modus steht nur die Karte da, weil die Generator-Regler dort nichts bewirken.
+- **Tile-Zuordnung**: Beim Antippen eines Tiles gibt es ein deutsches Auswahlraster, z. B. „Boden“, „Wand oben“, „Ecke ┌“, „Tür“. Ein Tipp setzt alles. Kategorie, genaue Rolle, Kollision, Häufigkeit und Tags liegen unter „Feineinstellungen“.
+- **Tileset hinzufügen** öffnet einen Dialog mit allem: PNG, Tilegröße, Ansicht, Raum bauen, Tiles zuordnen, speichern. Das Tileset landet im Projekt und zusätzlich in der Bibliothek. Vorhandene Tilesets lassen sich über **„Alles bearbeiten“** im selben Dialog ändern.
+- **Neues Projekt** in höchstens 6 statt bis zu 11 Schritten:
+  - Spiel (inklusive Automatisch oder Selbst bauen)
+  - Ansicht (nur wenn es eine Auswahl gibt)
+  - Tiles
+  - Karte (Größe und Aufbau, bei Side-Scroller das Level, bei Hex die Welt)
+  - Inhalt (Spezialräume, Gegner, Gelände)
+  - Fertig
+  - Geprüft: Alle Angaben landen im Projekt.
+
 **Version 3.15 – Raum-Baukasten mit Drehen, Auto-Wände im Baukasten aus**
 
 - **Raum aus dem Tileset bauen → Baukasten (Teile ziehen)** für Tilesets mit losen Einzelteilen:

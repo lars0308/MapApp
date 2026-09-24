@@ -23,41 +23,46 @@ import { listLibraryTilesets, type LibraryTileset } from '../../persistence/db';
 import { TilePools } from '../../tilesets/tilePools';
 import { Rng } from '../../generator/rng';
 
-type StepId = 'game' | 'mode' | 'perspective' | 'tiles' | 'map' | 'level' | 'world' | 'rooms' | 'paths' | 'specials' | 'terrain' | 'equip' | 'summary';
+type StepId = 'game' | 'perspective' | 'tiles' | 'map' | 'content' | 'summary';
 
 const STEP_LABEL: Record<StepId, string> = {
   game: 'Spiel',
-  mode: 'Modus',
-  perspective: 'Perspektive',
+  perspective: 'Ansicht',
   tiles: 'Tiles',
-  map: 'Map',
-  level: 'Level',
-  world: 'Welt',
-  rooms: 'Räume',
-  paths: 'Wege',
-  specials: 'Spezialräume',
-  terrain: 'Gelände',
-  equip: 'Ausstattung',
-  summary: 'Zusammenfassung',
+  map: 'Karte',
+  content: 'Inhalt',
+  summary: 'Fertig',
 };
 
-/** automatic: tiles → generator settings → map; manual: tiles → finish → build kit (editor) */
-const FLOW: Record<ProjectMode, StepId[]> = {
-  generate: ['game', 'mode', 'perspective', 'tiles', 'map', 'rooms', 'paths', 'specials', 'terrain', 'equip', 'summary'],
-  manual: ['game', 'mode', 'perspective', 'tiles', 'map', 'summary'],
-};
+/**
+ * Few steps: game (+ mode) → view (only if there is a choice) → tiles → map (size + layout; side
+ * view: level, hex: world) → content (special rooms, terrain, enemies; top-down only) → finish.
+ * Manual building needs no generator settings.
+ */
+function flowFor(mode: ProjectMode, kind: 'rooms' | 'side' | 'hex', choosePerspective: boolean): StepId[] {
+  const steps: StepId[] = ['game', ...(choosePerspective ? (['perspective'] as StepId[]) : []), 'tiles', 'map'];
+  if (mode === 'generate' && kind === 'rooms') steps.push('content');
+  steps.push('summary');
+  return steps;
+}
 
-/** side-scroller: one perspective, the level settings replace rooms / paths / terrain */
-const SIDE_FLOW: Record<ProjectMode, StepId[]> = {
-  generate: ['game', 'mode', 'tiles', 'map', 'level', 'summary'],
-  manual: ['game', 'mode', 'tiles', 'map', 'summary'],
-};
-
-/** hex world: the world settings replace rooms / paths / terrain */
-const HEX_FLOW: Record<ProjectMode, StepId[]> = {
-  generate: ['game', 'mode', 'tiles', 'map', 'world', 'summary'],
-  manual: ['game', 'mode', 'tiles', 'map', 'summary'],
-};
+const ROOM_SIZES = [
+  { id: 'small', label: 'Klein', v: { roomMinW: 4, roomMaxW: 7, roomMinH: 4, roomMaxH: 7 } },
+  { id: 'medium', label: 'Mittel', v: { roomMinW: 6, roomMaxW: 12, roomMinH: 6, roomMaxH: 10 } },
+  { id: 'large', label: 'Groß', v: { roomMinW: 10, roomMaxW: 18, roomMinH: 8, roomMaxH: 14 } },
+];
+const MAP_SIZES = [
+  { label: 'Klein', n: 40 },
+  { label: 'Mittel', n: 64 },
+  { label: 'Groß', n: 96 },
+  { label: 'Riesig', n: 160 },
+];
+const LAYOUTS: { id: 'rooms' | 'cave' | 'outdoor' | 'village'; label: string; text: string }[] = [
+  { id: 'rooms', label: 'Räume', text: 'Gebaute Räume und Gänge' },
+  { id: 'cave', label: 'Höhle', text: 'Natürliche Kammern' },
+  { id: 'outdoor', label: 'Außen', text: 'Lichtungen im Wald' },
+  { id: 'village', label: 'Dorf', text: 'Häuser und Brunnen' },
+];
 
 const SPECIAL_HINT: Record<SpecialRoomType, string> = {
   start: 'Startpunkt des Spielers',
@@ -124,7 +129,7 @@ function WizardDialog() {
   const bodyRef = useRef<HTMLDivElement>(null);
   const sideView = draft.map.perspective === 'side_view';
   const hexView = draft.map.perspective === 'hex';
-  const steps = (sideView ? SIDE_FLOW : hexView ? HEX_FLOW : FLOW)[draft.mode];
+  const steps = flowFor(draft.mode, sideView ? 'side' : hexView ? 'hex' : 'rooms', deriveConfig(draft.profile).perspectives.length > 1);
   const id = steps[Math.min(step, steps.length - 1)];
 
   const reloadLibrary = async () => {
@@ -253,55 +258,7 @@ function WizardDialog() {
         </ol>
 
         <div className="wizard-body" ref={bodyRef}>
-          {id === 'game' && <GameStep draft={draft} onChange={setProfile} />}
-
-          {id === 'mode' && (
-            <StepSection title="Wie möchtest du deine Map bauen?">
-              <div className="choice-grid" role="radiogroup" aria-label="Modus">
-                {(
-                  [
-                    ['generate', 'Automatisch generieren', 'Räume, Wege, Gelände und Ausstattung werden aus deinen Einstellungen erzeugt – danach frei bearbeitbar.', <Icon.Spark size={22} key="i" />],
-                    ['manual', 'Manuell bauen', 'Leere Map als Baukasten: Räume und Wege selbst mit dem Boden-Pinsel anlegen, Wände entstehen automatisch.', <Icon.Brush size={22} key="i" />],
-                  ] as const
-                ).map(([m, title, text, icon]) => (
-                  <button
-                    key={m}
-                    type="button"
-                    role="radio"
-                    aria-checked={draft.mode === m}
-                    className={`choice-card${draft.mode === m ? ' is-selected' : ''}`}
-                    onClick={() => setDraft((d) => ({ ...d, mode: m }))}
-                  >
-                    <span className="choice-icon">{icon}</span>
-                    <span className="choice-text">
-                      <strong>{title}</strong>
-                      <small>{text}</small>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </StepSection>
-          )}
-
-          {id === 'level' && (
-            <StepSection title="Wie soll dein Level aussehen?">
-              <p className="hint side-intro">Das Level läuft von links (Start) nach rechts (Ziel). Es wird nur so gebaut, dass alles mit der eingestellten Sprunghöhe und -weite schaffbar ist.</p>
-              <SideFields
-                side={resolveSide(gen.side)}
-                onChange={(patch) => setGen({ side: { ...resolveSide(gen.side), ...patch } })}
-                boss={gen.specials.boss}
-                onBoss={(boss) => setGen({ specials: { ...gen.specials, boss } })}
-                deco={gen.decoDensity}
-                onDeco={(v) => setGen({ decoDensity: v })}
-              />
-            </StepSection>
-          )}
-
-          {id === 'world' && (
-            <StepSection title="Wie soll deine Welt aussehen?">
-              <HexFields hex={resolveHex(gen.hex)} onChange={(patch) => setGen({ hex: { ...resolveHex(gen.hex), ...patch } })} />
-            </StepSection>
-          )}
+          {id === 'game' && <GameStep draft={draft} onChange={setProfile} onMode={(mode) => setDraft((d) => ({ ...d, mode }))} />}
 
           {id === 'perspective' && (
             <StepSection title="Wie soll deine Map dargestellt werden?">
@@ -340,185 +297,201 @@ function WizardDialog() {
           )}
 
           {id === 'map' && (
-            <StepSection title="Wie groß soll die Map werden?">
-              <div className="grid-2">
-                <NumberField label="Breite" value={map.width} min={16} max={256} suffix="Tiles" onChange={(v) => setMap({ width: v })} />
-                <NumberField label="Höhe" value={map.height} min={16} max={256} suffix="Tiles" onChange={(v) => setMap({ height: v })} />
-              </div>
-              <div className="field">
-                <label>Tilegröße</label>
-                <Segmented
-                  label="Tilegröße"
-                  value={COMMON_TILE_SIZES.includes(map.tileSize) ? String(map.tileSize) : 'custom'}
-                  options={[...COMMON_TILE_SIZES.map((s) => ({ value: String(s), label: `${s} px` })), { value: 'custom', label: 'Frei' }]}
-                  onChange={(v) => setMap({ tileSize: v === 'custom' ? (COMMON_TILE_SIZES.includes(map.tileSize) ? 24 : map.tileSize) : Number(v) })}
-                />
-              </div>
-              {!COMMON_TILE_SIZES.includes(map.tileSize) && (
-                <NumberField label="Freie Tilegröße" value={map.tileSize} min={4} max={256} suffix="px" onChange={(v) => setMap({ tileSize: v })} />
+            <StepSection title={draft.mode === 'manual' ? 'Wie groß soll die Karte werden?' : sideView ? 'Wie soll dein Level aussehen?' : hexView ? 'Wie soll deine Welt aussehen?' : 'Wie soll die Karte aufgebaut sein?'}>
+              {!sideView && (
+                <div className="field">
+                  <label>Größe</label>
+                  <div className="chips">
+                    {MAP_SIZES.map((z) => (
+                      <Chip key={z.n} active={map.width === z.n && map.height === z.n} onClick={() => setMap({ width: z.n, height: z.n })}>
+                        {z.label} ({z.n} × {z.n})
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
               )}
-              <div className="derived big">
-                <span>
-                  {map.width} × {map.height} Tiles · {map.tileSize} px
-                </span>
-                <strong>
-                  = {map.width * map.tileSize} × {map.height * map.tileSize} Pixel
-                </strong>
-              </div>
-              <div className="field">
-                <label htmlFor="wiz-seed">Seed</label>
-                <div className="seed-row">
-                  <input id="wiz-seed" className="input mono" value={gen.seed} onChange={(e) => setGen({ seed: e.target.value.slice(0, 40) })} />
-                  <IconButton label="Zufälliger Seed" onClick={() => setGen({ seed: randomSeed() })}>
-                    <Icon.Dice size={18} />
-                  </IconButton>
+              <details className="more" open={sideView}>
+                <summary>Genaue Größe, Tilegröße, Seed</summary>
+                <div className="grid-2">
+                  <NumberField label="Breite" value={map.width} min={16} max={256} suffix="Tiles" onChange={(v) => setMap({ width: v })} />
+                  <NumberField label="Höhe" value={map.height} min={16} max={256} suffix="Tiles" onChange={(v) => setMap({ height: v })} />
                 </div>
-              </div>
-            </StepSection>
-          )}
+                <div className="field">
+                  <label>Tilegröße</label>
+                  <Segmented
+                    label="Tilegröße"
+                    value={COMMON_TILE_SIZES.includes(map.tileSize) ? String(map.tileSize) : 'custom'}
+                    options={[...COMMON_TILE_SIZES.map((sz) => ({ value: String(sz), label: `${sz} px` })), { value: 'custom', label: 'Frei' }]}
+                    onChange={(v) => setMap({ tileSize: v === 'custom' ? (COMMON_TILE_SIZES.includes(map.tileSize) ? 24 : map.tileSize) : Number(v) })}
+                  />
+                </div>
+                {!COMMON_TILE_SIZES.includes(map.tileSize) && <NumberField label="Freie Tilegröße" value={map.tileSize} min={4} max={256} suffix="px" onChange={(v) => setMap({ tileSize: v })} />}
+                <div className="derived">
+                  <span>
+                    {map.width} × {map.height} Tiles · {map.tileSize} px
+                  </span>
+                  <strong>
+                    = {map.width * map.tileSize} × {map.height * map.tileSize} Pixel
+                  </strong>
+                </div>
+                {draft.mode === 'generate' && (
+                  <div className="field">
+                    <label htmlFor="wiz-seed">Seed</label>
+                    <div className="seed-row">
+                      <input id="wiz-seed" className="input mono" value={gen.seed} onChange={(e) => setGen({ seed: e.target.value.slice(0, 40) })} />
+                      <IconButton label="Zufälliger Seed" onClick={() => setGen({ seed: randomSeed() })}>
+                        <Icon.Dice size={18} />
+                      </IconButton>
+                    </div>
+                  </div>
+                )}
+              </details>
 
-          {id === 'rooms' && (
-            <StepSection title="Räume">
-              <Segmented
-                label="Aufbau"
-                value={gen.layout ?? 'rooms'}
-                onChange={(v) => setGen({ layout: v })}
-                options={[
-                  { value: 'rooms', label: 'Gebaute Räume' },
-                  { value: 'cave', label: 'Natürliche Höhle' },
-                  { value: 'outdoor', label: 'Außenbereich' },
-                  { value: 'village', label: 'Dorf' },
-                ]}
-              />
-              {gen.layout && gen.layout !== 'rooms' && <Slider label="Zerklüftung" value={gen.caveRoughness ?? 60} unit="%" onChange={(v) => setGen({ caveRoughness: v })} />}
-              <Slider label="Anzahl Räume" value={gen.roomCount} min={2} max={60} onChange={(v) => setGen({ roomCount: v })} />
-              <div className="grid-2">
-                <NumberField label="Min. Breite" value={gen.roomMinW} min={3} max={gen.roomMaxW} onChange={(v) => setGen({ roomMinW: v })} />
-                <NumberField label="Max. Breite" value={gen.roomMaxW} min={gen.roomMinW} max={60} onChange={(v) => setGen({ roomMaxW: v })} />
-                <NumberField label="Min. Höhe" value={gen.roomMinH} min={3} max={gen.roomMaxH} onChange={(v) => setGen({ roomMinH: v })} />
-                <NumberField label="Max. Höhe" value={gen.roomMaxH} min={gen.roomMinH} max={60} onChange={(v) => setGen({ roomMaxH: v })} />
-              </div>
-              <Slider label="Mindestabstand" value={gen.roomSpacing} min={1} max={12} unit="Tiles" onChange={(v) => setGen({ roomSpacing: v })} />
-              <div className="field">
-                <label>Raumformen</label>
-                <div className="chips">
-                  {SHAPES.map((sh) => (
-                    <Chip
-                      key={sh.id}
-                      active={gen.shapes[sh.id]}
-                      onClick={() => {
-                        const next = { ...gen.shapes, [sh.id]: !gen.shapes[sh.id] } as Record<RoomShape, boolean>;
-                        if (Object.values(next).some(Boolean)) setGen({ shapes: next });
-                      }}
-                    >
-                      {sh.label}
-                    </Chip>
-                  ))}
-                </div>
-              </div>
-              {gen.shapes.irregular && (
-                <Slider label="Unregelmäßigkeit" value={gen.irregularity} unit="%" hint={['Leicht zerklüftet', 'Stark zerklüftet']} onChange={(v) => setGen({ irregularity: v })} />
+              {draft.mode === 'generate' && sideView && (
+                <>
+                  <p className="hint side-intro">Das Level läuft von links (Start) nach rechts (Ziel). Es wird nur so gebaut, dass alles mit der eingestellten Sprunghöhe und -weite schaffbar ist.</p>
+                  <SideFields
+                    side={resolveSide(gen.side)}
+                    onChange={(patch) => setGen({ side: { ...resolveSide(gen.side), ...patch } })}
+                    boss={gen.specials.boss}
+                    onBoss={(boss) => setGen({ specials: { ...gen.specials, boss } })}
+                    deco={gen.decoDensity}
+                    onDeco={(v) => setGen({ decoDensity: v })}
+                  />
+                </>
               )}
-              <p className="hint">Rechteck, L, T, Kreuz und Halle werden exakt gebaut; gewählte Formen kommen gleich häufig vor. Die Unregelmäßigkeit gilt nur für „Unregelmäßig“.</p>
-            </StepSection>
-          )}
+              {draft.mode === 'generate' && hexView && <HexFields hex={resolveHex(gen.hex)} onChange={(patch) => setGen({ hex: { ...resolveHex(gen.hex), ...patch } })} />}
 
-          {id === 'paths' && (
-            <StepSection title="Wege & Gänge">
-              <div className="grid-3">
-                <NumberField
-                  label="Gangbreite"
-                  value={gen.corridorWidth}
-                  min={1}
-                  max={6}
-                  onChange={(v) => setGen({ corridorWidth: v, corridorMinWidth: Math.min(gen.corridorMinWidth, v), corridorMaxWidth: Math.max(gen.corridorMaxWidth, v) })}
-                />
-                <NumberField label="Min." value={gen.corridorMinWidth} min={1} max={gen.corridorMaxWidth} onChange={(v) => setGen({ corridorMinWidth: v })} />
-                <NumberField label="Max." value={gen.corridorMaxWidth} min={gen.corridorMinWidth} max={6} onChange={(v) => setGen({ corridorMaxWidth: v })} />
-              </div>
-              <div className="chips">
-                {CORRIDOR_OPTS.map((o) => (
-                  <Chip key={o.id} active={gen.corridor[o.id]} onClick={() => setGen({ corridor: { ...gen.corridor, [o.id]: !gen.corridor[o.id] } })}>
-                    {o.label}
-                  </Chip>
-                ))}
-              </div>
-              <Slider label="Verwinkelung" value={gen.twistiness} unit="%" hint={['Direkt', 'Verwinkelt']} onChange={(v) => setGen({ twistiness: v })} />
-              {/* stored as directness (100 = direct); shown as "Direkt ↔ Umwege" */}
-              <Slider label="Direktheit" value={100 - gen.directness} unit="%" hint={['Direkt', 'Umwege']} onChange={(v) => setGen({ directness: 100 - v })} />
-              <Slider label="Vernetzung" value={gen.connectivity} unit="%" hint={['Linear', 'Vernetzt']} onChange={(v) => setGen({ connectivity: v })} />
-            </StepSection>
-          )}
-
-          {id === 'specials' && (
-            <StepSection title="Welche Spezialräume soll es geben?">
-              <div className="special-grid">
-                {SPECIALS.map((sp) => {
-                  const on = gen.specials[sp.id];
-                  return (
-                    <button
-                      key={sp.id}
-                      type="button"
-                      className={`special-card${on ? ' is-on' : ''}`}
-                      aria-pressed={on}
-                      onClick={() => setGen({ specials: { ...gen.specials, [sp.id]: !on } })}
-                    >
-                      <span className="chip-dot" style={{ background: sp.color }} />
-                      <span className="special-text">
-                        <strong>{sp.label}</strong>
-                        <small>{SPECIAL_HINT[sp.id]}</small>
-                      </span>
-                      <span className="special-check">{on && <Icon.Check size={16} />}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <RoomCountGuard specials={gen.specials} roomCount={gen.roomCount} onFix={(n) => setGen({ roomCount: n })} />
-            </StepSection>
-          )}
-
-          {id === 'terrain' && (
-            <StepSection title="Gelände">
-              <div className="field">
-                <label>Terrain-Sets für Räume</label>
-                <div className="chips">
-                  {draft.terrains.map((t) => (
-                    <Chip
-                      key={t.id}
-                      color={t.color}
-                      active={t.active}
-                      onClick={() => {
-                        const next = draft.terrains.map((x) => (x.id === t.id ? { ...x, active: !x.active } : x));
-                        if (next.some((x) => x.active)) setDraft((d) => ({ ...d, terrains: next }));
+              {draft.mode === 'generate' && !sideView && !hexView && (
+                <>
+                  <div className="field">
+                    <label>Aufbau</label>
+                    <div className="layout-cards" role="radiogroup" aria-label="Aufbau">
+                      {LAYOUTS.map((l) => (
+                        <button key={l.id} type="button" role="radio" aria-checked={(gen.layout ?? 'rooms') === l.id} className={`layout-card${(gen.layout ?? 'rooms') === l.id ? ' is-active' : ''}`} onClick={() => setGen({ layout: l.id })}>
+                          <strong>{l.label}</strong>
+                          <small>{l.text}</small>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {gen.layout && gen.layout !== 'rooms' && <Slider label="Zerklüftung" value={gen.caveRoughness ?? (gen.layout === 'cave' ? 60 : 45)} unit="%" hint={['Glatt', 'Zerklüftet']} onChange={(v) => setGen({ caveRoughness: v })} />}
+                  <Slider label="Anzahl Räume" value={gen.roomCount} min={2} max={60} onChange={(v) => setGen({ roomCount: v })} />
+                  <div className="field">
+                    <label>Raumgröße</label>
+                    <Segmented
+                      label="Raumgröße"
+                      value={ROOM_SIZES.find((r) => r.v.roomMinW === gen.roomMinW && r.v.roomMaxW === gen.roomMaxW && r.v.roomMinH === gen.roomMinH && r.v.roomMaxH === gen.roomMaxH)?.id ?? 'custom'}
+                      options={[
+                        ...ROOM_SIZES.map((r) => ({ value: r.id, label: r.label })),
+                        ...(ROOM_SIZES.some((r) => r.v.roomMinW === gen.roomMinW && r.v.roomMaxW === gen.roomMaxW && r.v.roomMinH === gen.roomMinH && r.v.roomMaxH === gen.roomMaxH) ? [] : [{ value: 'custom', label: 'Eigene' }]),
+                      ]}
+                      onChange={(v) => {
+                        const r = ROOM_SIZES.find((x) => x.id === v);
+                        if (r) setGen(r.v);
                       }}
-                    >
-                      {t.name}
-                    </Chip>
-                  ))}
-                </div>
-              </div>
-              <TerrainFields value={gen.terrain} onChange={(terrain) => setGen({ terrain })} />
+                    />
+                  </div>
+                  <Slider label="Gangbreite" value={gen.corridorWidth} min={1} max={6} unit="Tiles" onChange={(v) => setGen({ corridorWidth: v, corridorMinWidth: Math.min(gen.corridorMinWidth, v), corridorMaxWidth: Math.max(gen.corridorMaxWidth, v) })} />
+                  <Slider label="Verwinkelung" value={gen.twistiness} unit="%" hint={['Gerade', 'Verwinkelt']} onChange={(v) => setGen({ twistiness: v })} />
+                  <Slider label="Vernetzung" value={gen.connectivity} unit="%" hint={['Ein Weg', 'Viele Rundwege']} onChange={(v) => setGen({ connectivity: v })} />
+                  <details className="more">
+                    <summary>Feineinstellungen: Maße, Formen, Gänge</summary>
+                    <div className="grid-2">
+                      <NumberField label="Min. Breite" value={gen.roomMinW} min={3} max={gen.roomMaxW} onChange={(v) => setGen({ roomMinW: v })} />
+                      <NumberField label="Max. Breite" value={gen.roomMaxW} min={gen.roomMinW} max={60} onChange={(v) => setGen({ roomMaxW: v })} />
+                      <NumberField label="Min. Höhe" value={gen.roomMinH} min={3} max={gen.roomMaxH} onChange={(v) => setGen({ roomMinH: v })} />
+                      <NumberField label="Max. Höhe" value={gen.roomMaxH} min={gen.roomMinH} max={60} onChange={(v) => setGen({ roomMaxH: v })} />
+                    </div>
+                    <Slider label="Mindestabstand" value={gen.roomSpacing} min={1} max={12} unit="Tiles" onChange={(v) => setGen({ roomSpacing: v })} />
+                    <div className="field">
+                      <label>Raumformen</label>
+                      <div className="chips">
+                        {SHAPES.map((sh) => (
+                          <Chip
+                            key={sh.id}
+                            active={gen.shapes[sh.id]}
+                            onClick={() => {
+                              const next = { ...gen.shapes, [sh.id]: !gen.shapes[sh.id] } as Record<RoomShape, boolean>;
+                              if (Object.values(next).some(Boolean)) setGen({ shapes: next });
+                            }}
+                          >
+                            {sh.label}
+                          </Chip>
+                        ))}
+                      </div>
+                    </div>
+                    {gen.shapes.irregular && <Slider label="Unregelmäßigkeit" value={gen.irregularity} unit="%" hint={['Leicht zerklüftet', 'Stark zerklüftet']} onChange={(v) => setGen({ irregularity: v })} />}
+                    <Slider label="Umwege" value={100 - gen.directness} unit="%" hint={['Direkt', 'Umwege']} onChange={(v) => setGen({ directness: 100 - v })} />
+                    <div className="chips">
+                      {CORRIDOR_OPTS.map((o) => (
+                        <Chip key={o.id} active={gen.corridor[o.id]} onClick={() => setGen({ corridor: { ...gen.corridor, [o.id]: !gen.corridor[o.id] } })}>
+                          {o.label}
+                        </Chip>
+                      ))}
+                    </div>
+                  </details>
+                </>
+              )}
+              {draft.mode === 'manual' && <p className="hint">Du baust die Karte selbst: Boden malen legt Räume und Wege an. Im Baukasten schaltest du „Auto-Wände“ bei Bedarf ein.</p>}
             </StepSection>
           )}
 
-          {id === 'equip' && (
-            <StepSection
-              title="Ausstattung"
-              aside={
-                <Button variant="ghost" onClick={() => setStep(steps.indexOf('summary'))}>
-                  Später konfigurieren
-                </Button>
-              }
-            >
-              <Slider label="Boden-Varianten" value={gen.floorVariation} unit="%" onChange={(v) => setGen({ floorVariation: v })} />
-              <Slider label="Deko" value={gen.decoDensity} unit="%" onChange={(v) => setGen({ decoDensity: v })} />
-              <Slider label="Kleine Hindernisse" value={gen.obstacleDensity} unit="%" onChange={(v) => setGen({ obstacleDensity: v })} />
-              <Slider label="Bäume" value={gen.objects.trees} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, trees: v } })} />
-              <Slider label="Große Felsen" value={gen.objects.rocks} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, rocks: v } })} />
-              <Slider label="Torbögen" value={gen.objects.arches} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, arches: v } })} />
-              <Toggle label="Säulen in großen Hallen" checked={gen.objects.pillars} onChange={(pillars) => setGen({ objects: { ...gen.objects, pillars } })} />
+          {id === 'content' && (
+            <StepSection title="Was soll in der Karte sein?">
+              <div className="field">
+                <label>Spezialräume</label>
+                <div className="special-grid">
+                  {SPECIALS.map((sp) => {
+                    const on = gen.specials[sp.id];
+                    return (
+                      <button key={sp.id} type="button" className={`special-card${on ? ' is-on' : ''}`} aria-pressed={on} onClick={() => setGen({ specials: { ...gen.specials, [sp.id]: !on } })}>
+                        <span className="chip-dot" style={{ background: sp.color }} />
+                        <span className="special-text">
+                          <strong>{sp.label}</strong>
+                          <small>{SPECIAL_HINT[sp.id]}</small>
+                        </span>
+                        <span className="special-check">{on && <Icon.Check size={16} />}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <RoomCountGuard specials={gen.specials} roomCount={gen.roomCount} onFix={(n) => setGen({ roomCount: n })} />
+              </div>
               <Slider label="Gegner" value={gen.population?.enemies ?? 0} unit="%" onChange={(v) => setGen({ population: { loot: gen.population?.loot ?? 0, enemies: v } })} />
               <Slider label="Beute (Truhen)" value={gen.population?.loot ?? 0} unit="%" onChange={(v) => setGen({ population: { enemies: gen.population?.enemies ?? 0, loot: v } })} />
+              <Slider label="Deko" value={gen.decoDensity} unit="%" onChange={(v) => setGen({ decoDensity: v })} />
+              <details className="more">
+                <summary>Gelände: Wasser, Lava, Abgründe, Klippen, Brücken</summary>
+                <TerrainFields value={gen.terrain} onChange={(terrain) => setGen({ terrain })} />
+                <div className="field">
+                  <label>Boden-Materialien</label>
+                  <div className="chips">
+                    {draft.terrains.map((t) => (
+                      <Chip
+                        key={t.id}
+                        color={t.color}
+                        active={t.active}
+                        onClick={() => {
+                          const next = draft.terrains.map((x) => (x.id === t.id ? { ...x, active: !x.active } : x));
+                          if (next.some((x) => x.active)) setDraft((d) => ({ ...d, terrains: next }));
+                        }}
+                      >
+                        {t.name}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+              </details>
+              <details className="more">
+                <summary>Objekte und Boden-Varianten</summary>
+                <Slider label="Boden-Varianten" value={gen.floorVariation} unit="%" onChange={(v) => setGen({ floorVariation: v })} />
+                <Slider label="Kleine Hindernisse" value={gen.obstacleDensity} unit="%" onChange={(v) => setGen({ obstacleDensity: v })} />
+                <Slider label="Bäume" value={gen.objects.trees} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, trees: v } })} />
+                <Slider label="Große Felsen" value={gen.objects.rocks} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, rocks: v } })} />
+                <Slider label="Torbögen" value={gen.objects.arches} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, arches: v } })} />
+                <Toggle label="Säulen in großen Hallen" checked={gen.objects.pillars} onChange={(pillars) => setGen({ objects: { ...gen.objects, pillars } })} />
+              </details>
             </StepSection>
           )}
 
@@ -683,7 +656,7 @@ export function prepareBuildKit() {
 }
 
 /** Step 1: what kind of game – view, genre, effort. Changes the start values of all later steps. */
-function GameStep({ draft, onChange }: { draft: Draft; onChange: (p: Partial<GameProfile>) => void }) {
+function GameStep({ draft, onChange, onMode }: { draft: Draft; onChange: (p: Partial<GameProfile>) => void; onMode: (m: ProjectMode) => void }) {
   const { profile, gen, map } = draft;
   const genres = GENRES.filter((g) => g.views.includes(profile.view));
   const specials = SPECIALS.filter((s) => gen.specials[s.id]).map((s) => s.label);
@@ -746,9 +719,27 @@ function GameStep({ draft, onChange }: { draft: Draft; onChange: (p: Partial<Gam
           ))}
         </div>
       </div>
+      <div className="field">
+        <label>Wie möchtest du bauen?</label>
+        <div className="choice-grid game-effort" role="radiogroup" aria-label="Modus">
+          {(
+            [
+              ['generate', 'Automatisch generieren', 'Die Karte wird nach deinen Einstellungen erzeugt – danach frei bearbeitbar.'],
+              ['manual', 'Selbst bauen (Baukasten)', 'Leere Karte: Räume und Wege selbst malen.'],
+            ] as const
+          ).map(([m, title, text]) => (
+            <button key={m} type="button" role="radio" aria-checked={draft.mode === m} className={`choice-card${draft.mode === m ? ' is-selected' : ''}`} onClick={() => onMode(m)}>
+              <span className="choice-text">
+                <strong>{title}</strong>
+                <small>{text}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
       <p className="note game-summary">
         Voreingestellt: <strong>{map.width} × {map.height} Tiles</strong> · <strong>{gen.roomCount} Räume</strong> ({gen.roomMinW}–{gen.roomMaxW} Tiles breit) · Deko {gen.decoDensity} % ·
-        Spezialräume: {specials.join(', ') || 'keine'}. Alle Regler lassen sich in den nächsten Schritten ändern.
+        Spezialräume: {specials.join(', ') || 'keine'}. Alles lässt sich im nächsten Schritt oder später links unter „Aufbau“ ändern.
       </p>
     </StepSection>
   );
