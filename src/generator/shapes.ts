@@ -100,6 +100,28 @@ function erodeEdges(m: Mask, rng: Rng, irr: number): void {
   }
 }
 
+/**
+ * Close 1-cell notches and slots (empty cells with 3+ floor neighbours): the outline keeps its
+ * organic shape but no longer needs a wall corner at every single tile.
+ */
+function fillNotches(m: Mask): void {
+  const { w, h, data } = m;
+  for (let pass = 0; pass < 3; pass++) {
+    const add: number[] = [];
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (data[i]) continue;
+        const n = (x > 0 && data[i - 1] ? 1 : 0) + (x < w - 1 && data[i + 1] ? 1 : 0) + (y > 0 && data[i - w] ? 1 : 0) + (y < h - 1 && data[i + w] ? 1 : 0);
+        // 1-wide gap between floor on both sides (horizontal or vertical) counts as a notch too
+        const slot = (x > 0 && x < w - 1 && data[i - 1] && data[i + 1]) || (y > 0 && y < h - 1 && data[i - w] && data[i + w]);
+        if (n >= 3 || slot) add.push(i);
+      }
+    if (!add.length) break;
+    for (const i of add) data[i] = 1;
+  }
+}
+
 /** Remove cells with fewer than 2 orthogonal neighbours (spikes) and keep the largest region. */
 function cleanup(m: Mask): void {
   const { w, h, data } = m;
@@ -164,6 +186,7 @@ export function createMask(shape: RoomShape, w: number, h: number, rng: Rng, irr
     case 'irregular':
       m = irregularMask(w, h, rng, irregularity);
       erodeEdges(m, rng, Math.max(0.35, irregularity));
+      fillNotches(m);
       break;
     default:
       m = rectMask(w, h);

@@ -268,6 +268,14 @@ export class TilePools {
     });
   }
 
+  /** like pickPref, several preferred tags (each narrows the choice when tiles have it) */
+  pickPrefs(rng: Rng, cats: TileCategory[], prefer: string[], avoid?: string[]): number {
+    return this.lookup(cats[0], (t) => {
+      const cat = t.resolve(cats);
+      return cat ? pickFrom(rng, t.pools.get(cat)!, prefer, avoid) : 0;
+    });
+  }
+
   /**
    * Pick a tile for an auto-tile role. Role tiles win; otherwise the fallback
    * roles and categories of ROLE_FALLBACK are tried (so plain category tilesets work).

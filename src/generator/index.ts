@@ -32,7 +32,7 @@ import {
 import { Rng, weightedIndex } from './rng';
 import { placeRooms } from './rooms';
 import { buildGraph } from './graph';
-import { carveBranches, carveCorridors, computeNearRoom, type Grid } from './corridors';
+import { carveBranches, carveCorridors, computeNearRoom, makeNoise, type Grid } from './corridors';
 import { assignSpecialRooms } from './specials';
 import { TilePools } from '../tilesets/tilePools';
 import { NO_ROLE, frontTilePrefs, resolveWalls, roleAt, wallNeighbourMask } from './autotile';
@@ -157,7 +157,9 @@ export function generate(input: GenerateInput): GenerateOutput {
 
   // terrain: crossings with bridges, plateaus with cliffs, pools (validated)
   const ts = createTerrainState(W, H);
-  const terrainResult = placeTerrain(grid, ts, placed, corridors, s.terrain, perspective, startRoom, rTerrain);
+  // outdoors there are no bottomless pits – a black hole in a meadow looks broken
+  const terrainSettings = outdoor ? { ...s.terrain, abyss: { ...s.terrain.abyss, enabled: false } } : s.terrain;
+  const terrainResult = placeTerrain(grid, ts, placed, corridors, terrainSettings, perspective, startRoom, rTerrain);
   if (s.terrain.transitions.enabled) placeTransitions(grid, ts, roomTerrain, corridorTerrain, s.terrain.transitions.amount, rTerrain);
   warnings.push(...ts.warnings);
 
@@ -330,14 +332,21 @@ export function generate(input: GenerateInput): GenerateOutput {
     return terrainTag(rid >= 0 ? roomTerrain[rid] : corridorTerrain);
   };
   const walk = (i: number) => grid.cells[i] !== CELL_VOID && grid.cells[i] !== CELL_WALL;
+  const nearWall = (i: number) => !walk(i - W) || !walk(i + W) || !walk(i - 1) || !walk(i + 1);
+  // wear and moss grow in patches (smooth noise), moss creeps out of the walls – no salt-and-pepper tiles
+  const wear = makeNoise(W, H, root.fork(151), 5);
+  const moss = makeNoise(W, H, root.fork(163), 4);
+  const mossAt = (i: number) => moss[i] + (nearWall(i) ? 0.14 : 0) > 0.8 - variation * 0.35;
   const floorTile = (i: number) => {
     // outdoor: light meadow in the clearings, darker ground under the trees
     if (outdoor) return pools.pickRole(rTiles, 'floor_center', forest[i] ? ['grass', 'dark'] : ['grass'], forest[i] ? undefined : ['dark']);
-    if (pools.has('floorVariant') && rTiles.chance(variation)) return pools.pick(rTiles, ['floorVariant', 'floor']);
+    if (pools.has('floorVariant') && variation > 0 && mossAt(i)) return pools.pick(rTiles, ['floorVariant', 'floor']);
     // edge-aware floor when the tileset provides edge roles
     const edge: TileRole | null = !walk(i - W) ? 'floor_edge_top' : !walk(i + W) ? 'floor_edge_bottom' : !walk(i - 1) ? 'floor_edge_left' : !walk(i + 1) ? 'floor_edge_right' : null;
     if (edge && pools.hasRole(edge)) return pools.pickRole(rTiles, edge, [tagAt(i)]);
-    return pools.pickPref(rTiles, ['floor'], tagAt(i));
+    // worn patches: cracked and dark slabs together; elsewhere clean floor with a rare crack
+    if (wear[i] > 0.64 - variation * 0.1) return pools.pickPrefs(rTiles, ['floor'], [tagAt(i), rTiles.chance(0.6) ? 'broken' : 'dark']);
+    return pools.pickPrefs(rTiles, ['floor'], [tagAt(i)], rTiles.chance(0.06) ? ['dark'] : ['dark', 'broken']);
   };
   const liquidTile = (i: number, type: number) => {
     if (type === T_ABYSS && pools.hasRole('abyss_edge')) {
@@ -363,8 +372,8 @@ export function generate(input: GenerateInput): GenerateOutput {
     if (t === T_BRIDGE) {
       const b = ts.bridges.get(i)!;
       if (pathL) pathL[i] = pools.pickRole(rTiles, b.role, [b.orient]);
-    } else if (c === CELL_CORRIDOR && pathL && t !== T_WATER && t !== T_LAVA && t !== T_ABYSS)
-      // outdoor: dirt paths; dungeons: no dirt
+    } else if (c === CELL_CORRIDOR && pathL && !cave && t !== T_WATER && t !== T_LAVA && t !== T_ABYSS)
+      // outdoor: dirt paths; dungeons: no dirt; caves: natural floor, no laid paths
       pathL[i] = outdoor ? pools.pickPref(rTiles, ['path'], 'dirt') : pools.pickPref(rTiles, ['path'], undefined, ['dirt']);
     if (t === T_TRANSITION && detailL && pools.hasRole('transition')) detailL[i] = pools.pickRole(rTiles, 'transition');
     const sh = walls.shadows[i];
@@ -478,7 +487,19 @@ export function generate(input: GenerateInput): GenerateOutput {
       if ((c !== CELL_ROOM && c !== CELL_CORRIDOR) || doorSet.has(i) || obstacles.has(i) || octx.occupied[i]) continue;
       if (ts.terrain[i] !== T_NONE && ts.terrain[i] !== T_PLATEAU) continue;
       // outdoor: only deco meant for outside (tag grass), no bones in the meadow
-      if (rDeco.chance(c === CELL_ROOM ? p : p * 0.35)) decoL[i] = outdoor ? pools.pickTagged(rDeco, 'deco', 'grass') : pools.pick(rDeco, ['deco']);
+      if (outdoor) {
+        if (rDeco.chance(c === CELL_ROOM ? p : p * 0.35)) decoL[i] = pools.pickTagged(rDeco, 'deco', 'grass');
+        continue;
+      }
+      // dungeons: deco gathers along the walls and in corners, room centres and corridors stay mostly free
+      const near = nearWall(i);
+      const corner = near && (!walk(i - W) || !walk(i + W)) && (!walk(i - 1) || !walk(i + 1));
+      const chance = c === CELL_CORRIDOR ? p * 0.25 : corner ? p * 2.6 : near ? p * 1.6 : p * 0.35;
+      if (!rDeco.chance(chance)) continue;
+      // no clutter: never right next to other deco
+      if (decoL[i - 1] || decoL[i - W] || decoL[i - W - 1] || decoL[i - W + 1]) continue;
+      // candles / lights only against a wall, moss where the floor is mossy
+      decoL[i] = pools.pickPref(rDeco, ['deco'], mossAt(i) ? 'moss' : undefined, near ? undefined : ['light']);
     }
   }
 

@@ -336,6 +336,14 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.20 – Schönere Karten**
+
+- **Boden wirkt natürlich:** Abgenutzte und dunkle Platten liegen in zusammenhängenden Flecken statt als einzelne Zufallsfliesen. Moos wächst an den Wänden entlang. Der Regler „Bodenvariation“ steuert, wie viel davon vorkommt.
+- **Deko steht, wo sie hingehört:** Sie sammelt sich an Wänden und in Ecken. Kerzen stehen nur an der Wand, Moos-Deko auf moosigem Boden. Deko klebt nicht mehr direkt aneinander, Raummitten und Gänge bleiben frei.
+- **Glattere Räume:** Unregelmäßige Räume haben keine einzelnen Kerben mehr, die an jeder Kachel eine eigene Wandecke brauchten.
+- **Höhlen** haben keine verlegten Wege mehr, sondern durchgehend natürlichen Boden.
+- **Außen und Dorf** erzeugen keine bodenlosen Abgründe mehr.
+
 **Version 3.19 – Isometrisch als echtes Rautenraster**
 
 - Neue Ansicht **„Isometrisch (Raute)“**: Böden liegen als Rauten, Wände stehen als Blöcke mit heller und dunkler Seite, Plateaus sind erhöht. Sie ist jetzt die Standard-Ansicht für die Spielart „Isometrisch“ und funktioniert mit normalen Top-Down-Tiles.
