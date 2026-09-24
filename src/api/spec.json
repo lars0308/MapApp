@@ -225,8 +225,8 @@
     },
     {
       "name": "show",
-      "description": "Switch the visible page of the app (map, figures, animate, project) so the user sees what you do.",
-      "input": { "type": "object", "properties": { "page": { "type": "string", "enum": ["map", "character", "creature", "object", "animate", "project"] } }, "required": ["page"] }
+      "description": "Switch the visible page of the app (map, figures, project) so the user sees what you do.",
+      "input": { "type": "object", "properties": { "page": { "type": "string", "enum": ["map", "character", "creature", "object", "project"] } }, "required": ["page"] }
     }
   ]
 }

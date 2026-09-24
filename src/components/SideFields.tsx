@@ -50,7 +50,7 @@ export function SideFields({
           <NumberField label="Sprunghöhe" value={side.jumpHeight} min={1} max={6} suffix="Tiles" onChange={(v) => onChange({ jumpHeight: v })} />
           <NumberField label="Sprungweite" value={side.jumpWidth} min={2} max={8} suffix="Tiles" onChange={(v) => onChange({ jumpWidth: v })} />
         </div>
-        <p className="hint">So hoch und weit kommt deine Figur. 3 / 4 passt zur Platformer-Figur aus „Animieren“.</p>
+        <p className="hint">So hoch und weit kommt deine Figur. 3 / 4 passt zur Platformer-Figur aus dem Figuren-Export.</p>
       </Section>
 
       <Section title="Gelände">

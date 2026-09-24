@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ExportPanel } from './ExportPanel';
 import { HelpTip } from '../components/HelpTip';
 import { useApp } from '../store/appStore';
 import { SIZES, SLOTS, compose, composeView, deserialize, serialize, toPng, useSprites, type SpriteTool } from './store';
@@ -58,13 +59,14 @@ const TOOLS: { id: SpriteTool; label: string; short: string; key: string; icon: 
   { id: 'hand', label: 'Ansicht verschieben (Leertaste)', key: 'H', short: 'Ansicht', icon: Icon.Hand },
 ];
 
-type Tab = 'parts' | 'layers' | 'colors' | 'palette' | 'gallery';
+type Tab = 'parts' | 'layers' | 'colors' | 'palette' | 'gallery' | 'export';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'parts', label: 'Teile' },
   { id: 'layers', label: 'Ebenen' },
   { id: 'colors', label: 'Farben' },
   { id: 'palette', label: 'Palette' },
   { id: 'gallery', label: 'Galerie' },
+  { id: 'export', label: 'Export' },
 ];
 
 /** "Charakter bauen" / "Objekt bauen": plug-and-play parts + free pixel drawing. */
@@ -139,6 +141,7 @@ export function SpriteStudio({ kind, desktop }: { kind: SpriteKind; desktop: boo
         {tab === 'colors' && <ColorsPanel kind={kind} />}
         {tab === 'palette' && <PalettePanel kind={kind} />}
         {tab === 'gallery' && <GalleryPanel kind={kind} />}
+        {tab === 'export' && <ExportPanel kind={kind} />}
       </div>
     </>
   );
@@ -151,7 +154,7 @@ export function SpriteStudio({ kind, desktop }: { kind: SpriteKind; desktop: boo
         steps={[
           <>Unten{desktop ? ' bzw. rechts' : ''} unter <strong>Teile</strong> eine Gruppe wählen (z. B. Haare) und ein Teil <strong>antippen</strong> – es sitzt sofort richtig.</>,
           <>Farben ändern im Tab <strong>Farben</strong>, selbst malen mit dem <strong>Stift</strong>. <strong>Zufall</strong> würfelt eine neue {kind === 'object' ? 'Variante' : 'Figur'}.</>,
-          <>Fertig? Tab <strong>Galerie → Aktuellen speichern</strong>, dann oben <strong>Animieren</strong>.</>,
+          <>Fertig? Tab <strong>Galerie → Aktuellen speichern</strong>. Unter <strong>Export</strong> geht sie mit Animationen nach Godot oder wird deine Spielfigur.</>,
         ]}
       />
       <div className="sprite-work">

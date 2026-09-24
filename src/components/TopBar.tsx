@@ -15,7 +15,6 @@ const PAGE_ICON: Record<Tab, (p: { size?: number }) => React.ReactElement> = {
   project: Icon.Folder,
   map: Icon.Map,
   figures: Icon.Person,
-  animate: Icon.Film,
   settings: Icon.Gear,
 };
 

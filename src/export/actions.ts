@@ -47,7 +47,7 @@ export async function buildGodotPackage(p: Project, includeShadows = true): Prom
     const png = await scaledTilesetPng(ts, p.map.tileSize);
     entries.push({ path: `${folder}/tilesets/${tilesetImageName(ts)}`, data: new Uint8Array(await png.arrayBuffer()) });
   }
-  // ready scene + player figure: the own one from "Animieren", else the figure from the builder
+  // ready scene + player figure: the own one ("Als Spielfigur verwenden"), else the figure from the builder
   const side = p.map.perspective === 'side_view';
   // hex maps are strategy maps: camera instead of a walking figure
   let player = p.map.perspective === 'hex' ? null : playerSpriteData();

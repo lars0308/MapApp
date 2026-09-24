@@ -11,7 +11,7 @@ const KINDS: { id: SpriteKind; label: string; many: string; text: string; icon: 
 ];
 
 /**
- * First question of "Figuren" and "Animieren": what kind, then which one
+ * First question of "Figuren": what kind, then which one
  * (saved, last edited or a new one).
  */
 export function FigureChooser({ purpose, onPick }: { purpose: 'build' | 'animate'; onPick: (kind: SpriteKind) => void }) {

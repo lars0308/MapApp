@@ -5481,3 +5481,34 @@ body.is-resizing-y * {
   background: none;
   border: 0;
 }
+
+/* figure builder → Export */
+.figure-export {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.export-preview-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.export-preview {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  image-rendering: pixelated;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+}
+.export-anim-list .chips {
+  gap: 6px;
+}
+.export-anim-list p {
+  margin: 0 0 6px;
+}
+.figure-export .hint,
+.figure-export .subhead {
+  margin: 0;
+}

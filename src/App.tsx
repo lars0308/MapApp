@@ -17,7 +17,6 @@ import { StartPage } from './components/StartPage';
 import { SettingsPage } from './components/SettingsPage';
 import { PageShell } from './components/PageShell';
 import { SpriteStudio } from './sprites/SpriteStudio';
-import { AnimStudio } from './sprites/AnimStudio';
 
 /** Wide screens (desktop, tablet landscape) get the three-column editor. */
 export const DESKTOP_QUERY = '(min-width: 1000px) and (min-height: 560px)';
@@ -82,12 +81,11 @@ export function App() {
         </PageShell>
       ) : (
         <PageShell desktop={desktop}>
-          <ErrorBoundary area={page === 'project' ? 'Projekt' : page === 'settings' ? 'Einstellungen' : page === 'character' ? 'Charakter bauen' : page === 'creature' ? 'Kreatur bauen' : page === 'animate' ? 'Animieren' : 'Objekt bauen'} key={page}>
+          <ErrorBoundary area={page === 'project' ? 'Projekt' : page === 'settings' ? 'Einstellungen' : page === 'character' ? 'Charakter bauen' : page === 'creature' ? 'Kreatur bauen' : 'Objekt bauen'} key={page}>
             {page === 'project' && <StartPage />}
             {page === 'settings' && <SettingsPage desktop={desktop} />}
             {(page === 'character' || page === 'object' || page === 'creature') &&
               (chosen.figures ? <SpriteStudio kind={page} desktop={desktop} /> : <FigureChooser purpose="build" onPick={(k) => useApp.getState().goTo(k)} />)}
-            {page === 'animate' && <AnimStudio desktop={desktop} />}
           </ErrorBoundary>
         </PageShell>
       )}

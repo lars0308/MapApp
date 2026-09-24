@@ -344,6 +344,11 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.2 – Reiter „Animieren“ entfernt, Export im Figuren-Baukasten**
+
+- Der Reiter *Animieren* (Bild-für-Bild-Bearbeitung, eigene Animationen, Spritesheet-Import, Standards) ist weg – die App konzentriert sich auf Karten.
+- Im Figuren-Baukasten gibt es dafür den Tab **Export**: kleine Vorschau der automatischen Animationen (Stehen, Laufen, Angriff, Treffer, Umfallen …), Richtungen 4 / 8 / 2 (Platformer), **Godot-Paket** und **Spritesheet PNG**, **Als Spielfigur verwenden** (Testspiel und Karten-Export).
+
 **Version 3.1 – KI-Schnittstelle (MCP)**
 
 - Eine KI (Claude, Cursor, eigene Programme) kann MapForge bedienen: Karten erzeugen, generieren, malen, füllen, kopieren, Objekte setzen, Layer ändern, rückgängig machen, **Bilder der Karte ansehen**, Godot-Paket / JSON exportieren, Figuren aus Teilen bauen, färben, ansehen (alle Ansichten, Animationen) und als Godot-Paket exportieren – 36 Befehle.
