@@ -351,6 +351,7 @@ Wichtige Entscheidungen:
 - **Karte**, **Figuren** und **Animieren** fragen zuerst, was gemacht werden soll: Karte → aktuelle weiterbearbeiten, gespeicherte öffnen oder *neue Karte* nach Art (Top-Down, Isometrisch, 2D Side-Scroller – der Assistent startet mit dieser Art). Figuren / Animieren → erst *Charakter, Kreatur oder Objekt*, dann welche(s): zuletzt bearbeitet, gespeichert oder neu (mit Baukasten-Teilen / leer). Den Reiter nochmal antippen oder „Auswahl“ führt zurück zur Frage.
 - **Hand als Standardwerkzeug** in Karte und Figuren – kein versehentliches Malen mehr beim Verschieben. Tile oder Farbe wählen schaltet auf den Stift.
 - **Wege malen öffnet Wände richtig:** Wege (Layer „Wege“) oder Boden-Tiles auf einem Wand-Layer machen die Zelle begehbar; Wände, Ecken und die **Kollision** werden drumherum neu berechnet (vorher blieb die Kollisionsbox stehen).
+- **Vorne malen → auch Seite & Hinten** (Schalter in der Leiste, Standard an): was in der Vorderansicht gemalt wird, landet auch in der Rückansicht (gespiegelt) und der Seitenansicht (zur Mitte gestaucht) – auf der jeweils eigenen Ansicht des Teils. Gesichter bleiben vorne. Rückgängig macht alles zusammen rückgängig.
 - **Zoom beim Animieren:** Vorschau mit + / − / Einpassen, Mausrad und zwei Fingern, verschieben durch Ziehen; im Bild-Editor ebenso plus Hand-Werkzeug.
 
 **Version 2.5 – Modus „2D Side-Scroller“**

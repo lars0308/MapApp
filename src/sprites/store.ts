@@ -155,6 +155,21 @@ export function composeView(doc: SpriteDoc, view: View): Uint8ClampedArray {
   return view === 'front' ? compose(doc) : compose({ ...doc, layers: viewLayers(doc, view) });
 }
 
+export interface ViewBase {
+  layerId: string;
+  front: Uint8ClampedArray;
+  side: Uint8ClampedArray;
+  back: Uint8ClampedArray;
+}
+
+function readAllViews(): boolean {
+  try {
+    return localStorage.getItem('mapforge.sprite.allViews') !== '0';
+  } catch {
+    return true;
+  }
+}
+
 const cloneViews = (v: SpriteLayer['views']) => (v ? Object.fromEntries(Object.entries(v).map(([k, d]) => [k, new Uint8ClampedArray(d!)])) : undefined);
 const cloneLayers = (layers: SpriteLayer[]) => layers.map((l) => ({ ...l, data: new Uint8ClampedArray(l.data), views: cloneViews(l.views) }));
 
@@ -294,6 +309,13 @@ interface SpriteState {
   /** view shown / edited in the builder */
   view: View;
   setViewDir: (v: View) => void;
+  /** drawing in the front view is copied to the side (squeezed) and back view (mirrored) */
+  allViews: boolean;
+  setAllViews: (v: boolean) => void;
+  /** pixels of a layer in every view before a stroke (for allViews) */
+  viewBase: (kind: SpriteKind, layerId: string) => ViewBase | null;
+  /** copy what a front stroke changed into the side / back view */
+  propagateFront: (kind: SpriteKind, base: ViewBase) => void;
   /** pixels to paint on for a layer in the current view (own side/back copy is created on demand) */
   editPixels: (kind: SpriteKind, layerId: string) => Uint8ClampedArray | null;
   loaded: Record<SpriteKind, boolean>;
@@ -395,6 +417,57 @@ export const useSprites = create<SpriteState>((set, get) => {
     loaded: { character: false, object: false, creature: false },
     view: 'front',
     setViewDir: (view) => set({ view, rev: get().rev + 1 }),
+    allViews: readAllViews(),
+    setAllViews: (allViews) => {
+      set({ allViews });
+      try {
+        localStorage.setItem('mapforge.sprite.allViews', allViews ? '1' : '0');
+      } catch {
+        // ignore
+      }
+    },
+    viewBase: (kind, layerId) => {
+      const doc = get()[kind].doc;
+      const layer = doc.layers.find((l) => l.id === layerId);
+      if (!layer) return null;
+      const base = (v: 'side' | 'back') => {
+        const own = layer.views?.[v];
+        if (own) return new Uint8ClampedArray(own);
+        // a part is re-painted for the view (even when its front was drawn on)
+        const part = partById(layer.partId);
+        if (part) return paintPart(part, fitContext(doc, v), doc.ramps, doc.size);
+        return new Uint8ClampedArray(layer.data);
+      };
+      return { layerId, front: new Uint8ClampedArray(layer.data), side: base('side'), back: base('back') };
+    },
+    propagateFront: (kind, base) => {
+      const k = get()[kind];
+      const layer = k.doc.layers.find((l) => l.id === base.layerId);
+      if (!layer) return;
+      const n = k.doc.size;
+      const now = layer.data;
+      const changed: number[] = [];
+      for (let i = 0; i < now.length; i += 4) if (now[i] !== base.front[i] || now[i + 1] !== base.front[i + 1] || now[i + 2] !== base.front[i + 2] || now[i + 3] !== base.front[i + 3]) changed.push(i >> 2);
+      if (!changed.length) return;
+      // faces stay in front (no eyes on the back of the head)
+      const face = layer.slot === 'face';
+      const squeeze = kind === 'object' ? 1 : 0.55;
+      const cx = n / 2;
+      const views: Partial<Record<'side' | 'back', Uint8ClampedArray>> = { ...layer.views };
+      for (const v of ['side', 'back'] as const) {
+        if (face) continue;
+        const out = new Uint8ClampedArray(base[v]);
+        for (const p of changed) {
+          const x = p % n;
+          const y = (p / n) | 0;
+          const tx = v === 'back' ? n - 1 - x : Math.floor(cx + (x + 0.5 - cx) * squeeze);
+          if (tx < 0 || tx >= n) continue;
+          out.set(now.subarray(p * 4, p * 4 + 4), (y * n + tx) * 4);
+        }
+        views[v] = out;
+      }
+      setDoc(kind, { layers: k.doc.layers.map((l) => (l.id === layer.id ? { ...l, views } : l)) });
+    },
     editPixels: (kind, layerId) => {
       const k = get()[kind];
       const layer = k.doc.layers.find((l) => l.id === layerId);

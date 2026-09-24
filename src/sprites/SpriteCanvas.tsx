@@ -1,3 +1,4 @@
+import type { ViewBase } from './store';
 import { useEffect, useRef } from 'react';
 import { compose, composeView, useSprites, viewLayers } from './store';
 import { hexToRgb, shiftColor } from './palette';
@@ -240,6 +241,13 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
   const pointers = useRef(new Map<number, Pt>());
   const pinch = useRef<{ dist: number; mid: Pt; zoom: number; pan: Pt } | null>(null);
   const drag = useRef<{ start: Pt; last: Pt; layer: string; tool: string; screen: Pt; pan: Pt } | null>(null);
+  // front view + "Auf alle Ansichten": layer pixels of all views before the stroke
+  const viewBase = useRef<ViewBase | null>(null);
+  const finishViews = () => {
+    const b = viewBase.current;
+    viewBase.current = null;
+    if (b) useSprites.getState().propagateFront(kind, b);
+  };
 
   const onDown = (e: React.PointerEvent) => {
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -248,6 +256,7 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
       // second finger: stop drawing, start pinch (undo the few pixels the first finger drew)
       if (drag.current && BRUSH_TOOLS.includes(drag.current.tool)) st.undo(kind);
       drag.current = null;
+      viewBase.current = null;
       const [a, b] = [...pointers.current.values()];
       pinch.current = { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, zoom: st.zoom, pan: st.pan };
       return;
@@ -272,6 +281,7 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     if (!tgt) return;
     const { layer, data } = tgt;
     st.checkpoint(kind);
+    viewBase.current = st.view === 'front' && st.allViews ? st.viewBase(kind, layer.id) : null;
     const inside = p.x >= 0 && p.y >= 0 && p.x < n && p.y < n;
     if (tool === 'fill') {
       if (inside) {
@@ -280,10 +290,12 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
         if (st.mirror) flood(data, n, { x: n - 1 - p.x, y: p.y }, rgba);
         st.touch(kind, layer.id);
       }
+      finishViews();
       return;
     }
     if (tool === 'replace') {
       if (inside && replaceColor(data, (p.y * n + p.x) * 4, [...hexToRgb(st.color), 255])) st.touch(kind, layer.id);
+      finishViews();
       return;
     }
     touched.current = new Set();
@@ -360,6 +372,7 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
       }
     }
     preview.current = null;
+    finishViews();
     draw();
   };
 

@@ -177,6 +177,7 @@ function StudioBar({ kind, onSavePart }: { kind: SpriteKind; onSavePart: () => v
   const canRedo = useSprites((s) => s[kind].redo.length > 0);
   const { undo, redo, randomize, renameDoc, setSize, reset } = useSprites.getState();
   const view = useSprites((s) => s.view);
+  const allViews = useSprites((s) => s.allViews);
   const [newOpen, setNewOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [ioOpen, setIoOpen] = useState(false);
@@ -236,6 +237,12 @@ function StudioBar({ kind, onSavePart }: { kind: SpriteKind; onSavePart: () => v
         onChange={(v) => useSprites.getState().setViewDir(v)}
         options={VIEWS.map((v) => ({ value: v.id, label: v.label }))}
       />
+      {view === 'front' && (
+        <label className="slot-lock studio-allviews" title="Was du vorne malst, erscheint auch in der Seiten- und Rückansicht (hinten gespiegelt, von der Seite schmaler). Gesichter bleiben vorne.">
+          <input type="checkbox" checked={allViews} onChange={(e) => useSprites.getState().setAllViews(e.target.checked)} />
+          Auch Seite & Hinten
+        </label>
+      )}
       <select className="input studio-size" value={doc.size} aria-label="Größe in Pixeln" onChange={(e) => setSize(kind, Number(e.target.value))} title="Größe in Pixeln (Baukasten-Teile sind für 32 px gezeichnet)">
         {SIZES.map((s) => (
           <option key={s} value={s}>
