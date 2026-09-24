@@ -336,6 +336,15 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.29 – Ausstattung für Dorf und Dungeon**
+
+- **Neues Tileset „Demo Ausstattung“**, automatisch in neuen und bestehenden Projekten:
+  - Dungeon: Fass, Kiste, Feuerschale, Tisch, Sack
+  - Dorf: Weizen- und Kohlfelder, Heuballen, Blumenbeet, Zäune, Wegweiser
+- **Dörfer bekommen Felder:** Neben oder vor jedem Haus entsteht ein eingezäuntes Feld (4×3 oder 3×2), an der Ecke ein Heuballen oder Blumenbeet. Zäune blockieren.
+- **Dungeons:** Fässer, Kisten und Feuerschalen stehen bei der Deko an den Wänden. Dorf-Deko und Zäune tauchen dort nicht auf.
+- **Schmale Wasserstreifen** werden als durchgehendes Bächlein gezeichnet statt als Reihe einzelner Pfützen.
+
 **Version 3.28 – Seitenansicht: Themen und Hintergrund mit Tiefe**
 
 - **Umgebung der Seitenansicht:** Wald, Höhle, **Burg**, **Schnee** und **Wüste** (Aufbau → Level → Umgebung). Jedes Thema hat eigenen Boden mit allen Kanten, Deko und Hintergrund:

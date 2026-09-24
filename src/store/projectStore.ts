@@ -12,6 +12,7 @@ import { createDemoSideTileset } from '../tilesets/demoSide';
 import { createDemoHexTileset } from '../tilesets/demoHex';
 import { createDemoNatureTileset } from '../tilesets/demoNature';
 import { createDemoSideThemesTileset } from '../tilesets/demoSideThemes';
+import { createDemoPropsTileset } from '../tilesets/demoProps';
 import { applyTileMeta, findEmptyTiles, needsRepack, repackGrid } from '../tilesets/slicing';
 import { loadImage } from '../utils/image';
 import { libraryToProjectTilesets, withTerrainsFor } from '../tilesets/library';
@@ -50,6 +51,8 @@ export function createProject(
   auto.push({ ...createDemoNatureTileset(hexTs.firstGid + hexTs.columns * hexTs.rows), active: demoActive });
   const natureTs = auto[auto.length - 1];
   auto.push({ ...createDemoSideThemesTileset(natureTs.firstGid + natureTs.columns * natureTs.rows), active: demoActive });
+  const themesTs = auto[auto.length - 1];
+  auto.push({ ...createDemoPropsTileset(themesTs.firstGid + themesTs.columns * themesTs.rows), active: demoActive });
   const last = auto[auto.length - 1];
   const own = libraryToProjectTilesets(opts.library ?? [], last.firstGid + last.columns * last.rows);
   const side = map.perspective === 'side_view';

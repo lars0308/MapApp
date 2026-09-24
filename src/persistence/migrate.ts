@@ -7,6 +7,7 @@ import { DEMO_SIDE_ID, createDemoSideTileset } from '../tilesets/demoSide';
 import { DEMO_HEX_ID, createDemoHexTileset } from '../tilesets/demoHex';
 import { DEMO_NATURE_ID, createDemoNatureTileset } from '../tilesets/demoNature';
 import { DEMO_SIDE_THEMES_ID, createDemoSideThemesTileset } from '../tilesets/demoSideThemes';
+import { DEMO_PROPS_ID, createDemoPropsTileset } from '../tilesets/demoProps';
 
 type LegacyGenerator = GeneratorSettings & { hazards?: number; lava?: boolean; water?: boolean; abyss?: boolean };
 
@@ -84,6 +85,12 @@ export function migrateProject(p: Project): Project {
     const themes = createDemoSideThemesTileset(nextGid);
     tilesets = [...tilesets, themes];
     nextGid = themes.firstGid + themes.columns * themes.rows;
+  }
+  // props: barrels, crates, fields, fences (v3.29)
+  if (!tilesets.some((t) => t.id === DEMO_PROPS_ID)) {
+    const props = createDemoPropsTileset(nextGid);
+    tilesets = [...tilesets, props];
+    nextGid = props.firstGid + props.columns * props.rows;
   }
 
   // layers: y-sort flag + missing default roles at their default position

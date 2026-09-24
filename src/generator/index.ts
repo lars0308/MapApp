@@ -239,6 +239,8 @@ export function generate(input: GenerateInput): GenerateOutput {
   if (outdoor) for (let i = 0; i < W * H; i++) if (forest[i]) octx.occupied[i] = 1;
   // village: houses at the clearings, a well in the start clearing
   const houses: MapObject[] = s.layout === 'village' || (outdoor && s.houses) ? placeHouses(octx, forest, placed, specials, W, root.fork(131)) : [];
+  // village life: a fenced field next to each house (tiles painted further down)
+  const fields = houses.length ? planFields(octx, forest, houses, W, root.fork(191)) : [];
   const objects = [...houses, ...placeObjects(octx, placed, (id) => specials.get(id) ?? 'normal', s, rObjects)];
 
   // small obstacles (single tiles) in room interiors
@@ -422,8 +424,9 @@ export function generate(input: GenerateInput): GenerateOutput {
     const c = grid.cells[i];
     if (c === CELL_VOID || c === CELL_WALL) continue;
     const t = ts.terrain[i];
-    // tiny ponds (no vertex between water cells): a round puddle, or the full water tile
-    const shore = softShores && waterCell(i) ? vertexMask(i % W, (i / W) | 0, waterCell, true) || (hasPuddle ? 0 : 15) : -1;
+    // 1-wide water (a streamlet): corners shared by two water cells count, so it runs on as a band;
+    // a single water cell becomes a round puddle (or the full water tile)
+    const shore = softShores && waterCell(i) ? vertexMask(i % W, (i / W) | 0, waterCell, true) || vertexMask(i % W, (i / W) | 0, waterCell, false, 2) || (hasPuddle ? 0 : 15) : -1;
     if (floorL && shore >= 0) {
       // meadow below, water with beach and foam on top
       floorL[i] = floorTile(i);
@@ -524,11 +527,26 @@ export function generate(input: GenerateInput): GenerateOutput {
   if (objL) {
     for (const i of doorSet) objL[i] = pools.pickRole(rTiles, 'door', [doorOrient.get(i) ?? 'h']);
     for (const i of obstacles) {
-      objL[i] = pools.pick(rTiles, ['obstacle']);
+      // fences belong to the village fields, not scattered in rooms
+      objL[i] = pools.pickPref(rTiles, ['obstacle'], undefined, ['village']);
       block(i);
     }
   }
   for (const o of objects) for (const [dx, dy] of objectDef(o.type)?.collision ?? []) block((o.y + dy) * W + o.x + dx);
+  const hasField = pools.pickTagged(rTiles, 'deco', 'field') !== 0;
+  for (const f of fields) {
+    if (!hasField) break;
+    const crop = rTiles.chance(0.3) ? 'cabbage' : 'wheat';
+    if (decoL) for (const i of f.crops) decoL[i] = pools.pickPrefs(rTiles, ['deco'], ['village', 'field', crop]);
+    if (objL)
+      for (const i of f.fence) {
+        const gid = pools.pickPrefs(rTiles, ['obstacle'], ['village', 'fence', 'h']);
+        if (!gid) break;
+        objL[i] = gid;
+        block(i);
+      }
+    if (decoL && f.hay >= 0) decoL[f.hay] = pools.pickPrefs(rTiles, ['deco'], ['village', rTiles.chance(0.5) ? 'hay' : 'flowers']);
+  }
   if (outdoor) {
     // forest: impassable, densely covered with trees (a little jitter so it looks grown)
     const rForest = root.fork(137);
@@ -560,7 +578,7 @@ export function generate(input: GenerateInput): GenerateOutput {
       // outdoor: only deco meant for outside (tag grass), no bones in the meadow
       if (!look.smartDeco) {
         // classic: evenly spread
-        if (rDeco.chance(c === CELL_ROOM ? p : p * 0.35)) decoL[i] = outdoor ? pools.pickTagged(rDeco, 'deco', 'grass') : pools.pickPref(rDeco, ['deco'], undefined, ['grass']);
+        if (rDeco.chance(c === CELL_ROOM ? p : p * 0.35)) decoL[i] = outdoor ? pools.pickTagged(rDeco, 'deco', 'grass') : pools.pickPref(rDeco, ['deco'], undefined, ['grass', 'village']);
         continue;
       }
       if (outdoor) {
@@ -589,7 +607,7 @@ export function generate(input: GenerateInput): GenerateOutput {
       // no clutter: never right next to other deco
       if (decoL[i - 1] || decoL[i - W] || decoL[i - W - 1] || decoL[i - W + 1]) continue;
       // candles / lights only against a wall, moss where the floor is mossy
-      decoL[i] = pools.pickPref(rDeco, ['deco'], mossAt(i) ? 'moss' : undefined, near ? ['grass'] : ['light', 'grass']);
+      decoL[i] = pools.pickPref(rDeco, ['deco'], mossAt(i) ? 'moss' : undefined, near ? ['grass', 'village'] : ['light', 'grass', 'village']);
     }
   }
 
@@ -817,6 +835,42 @@ function populate(
 }
 
 /** village houses: along the upper part of each clearing, doors facing the open ground */
+/** a field of 4×3 crops beside each house (left or right, level with its front), a fence along the
+ *  back and a hay bale or flower bed at the corner; cells get occupied so nothing else lands there */
+function planFields(c: ObjectContext, forest: Uint8Array, houses: MapObject[], W: number, rng: Rng) {
+  const { g } = c;
+  const out: { crops: number[]; fence: number[]; hay: number }[] = [];
+  const free = (x: number, y: number) => {
+    if (x < 1 || y < 1 || x >= W - 1 || y >= g.H - 1) return false;
+    const i = y * W + x;
+    return g.cells[i] === CELL_ROOM && !forest[i] && c.terrain[i] === T_NONE && !c.occupied[i] && !c.reserved.has(i);
+  };
+  for (const h of houses) {
+    if (h.type !== 'house') continue;
+    let done = false;
+    // a big field if there is room, otherwise a small one; beside the house or in front of it
+    for (const [fw, fh] of [[4, 3], [3, 2]])
+      for (const [dx, dy] of rng.shuffle([[4, -(fh - 1)], [-1 - fw, -(fh - 1)], [0, 3], [4, 2], [-1 - fw, 2]])) {
+        if (done) break;
+        const x0 = h.x + dx;
+        const y0 = h.y + dy;
+        let ok = true;
+        for (let y = y0 - 1; y < y0 + fh && ok; y++) for (let x = x0; x < x0 + fw && ok; x++) ok = free(x, y);
+        if (!ok) continue;
+        const crops: number[] = [];
+        const fence: number[] = [];
+        for (let y = y0; y < y0 + fh; y++) for (let x = x0; x < x0 + fw; x++) crops.push(y * W + x);
+        for (let x = x0; x < x0 + fw; x++) fence.push((y0 - 1) * W + x);
+        const hx = dx > 0 ? x0 + fw : x0 - 1;
+        const hay = free(hx, y0 + fh - 1) ? (y0 + fh - 1) * W + hx : -1;
+        for (const i of [...crops, ...fence, ...(hay >= 0 ? [hay] : [])]) c.occupied[i] = 1;
+        out.push({ crops, fence, hay });
+        done = true;
+      }
+  }
+  return out;
+}
+
 function placeHouses(c: ObjectContext, forest: Uint8Array, rooms: { id: number; x: number; y: number; w: number; h: number; cx: number; cy: number; area: number }[], specials: Map<number, string>, W: number, rng: Rng): MapObject[] {
   const out: MapObject[] = [];
   // like canPlace, but paths (reserved cells) may run right past a house – only the footprint
