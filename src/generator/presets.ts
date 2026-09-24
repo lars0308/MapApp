@@ -81,7 +81,7 @@ export interface Preset {
 export const PRESETS: Preset[] = [
   {
     id: 'compact',
-    label: 'Compact',
+    label: 'Kompakt',
     map: { width: 48, height: 48 },
     apply: (s) => ({
       ...s,
@@ -100,7 +100,7 @@ export const PRESETS: Preset[] = [
   },
   {
     id: 'maze',
-    label: 'Maze',
+    label: 'Labyrinth',
     map: { width: 80, height: 80 },
     apply: (s) => ({
       ...s,
@@ -121,7 +121,7 @@ export const PRESETS: Preset[] = [
   },
   {
     id: 'large',
-    label: 'Large',
+    label: 'Weitläufig',
     map: { width: 140, height: 140 },
     apply: (s) => ({
       ...s,
@@ -152,7 +152,7 @@ export const PRESETS: Preset[] = [
   },
   {
     id: 'exploration',
-    label: 'Exploration',
+    label: 'Erkundung',
     map: { width: 100, height: 100 },
     apply: (s) => ({
       ...s,

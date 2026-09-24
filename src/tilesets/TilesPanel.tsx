@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import type { Perspective, TileCategory, TileMeta, TileRole, Tileset } from '../types';
@@ -9,14 +9,16 @@ import { tileBlocks } from '../editor/collision';
 import { PERSPECTIVE_INFO } from '../generator/perspective';
 import { CATEGORIES, CATEGORY_LABEL, SUGGESTED_TAGS } from './categories';
 import { TileThumb } from './TileThumb';
-import { AssignSummary, TileLabel, assignmentStats, confirmedMetas, suggestMetas } from './TileLabel';
-import { autoAssign } from './autoAssign';
+import { AssignSummary, TileLabel, confirmedMetas, suggestMetas } from './TileLabel';
+import { ROLE_SHORT } from './autoAssign';
+import { PICK_GROUPS, SIDE_PICK_GROUP, Sketch, isCurrent } from './QuickPick';
 import { RoomMarker, applyRoom } from './RoomMarker';
+import { TilesetEditor } from './TilesetEditor';
+import { uid } from '../utils/id';
 import { learnFrom } from './learning';
-import { resolveGid, createTilesetFromFile, COMMON_TILE_SIZES } from './slicing';
+import { resolveGid, COMMON_TILE_SIZES } from './slicing';
 import { Button, Chip, IconButton, NumberField, PanelTabs, Segmented, Slider, Toggle } from '../components/ui';
 import { Icon } from '../components/icons';
-import { readFileAsDataUrl } from '../utils/download';
 import { saveLibraryTileset, toLibraryTileset } from '../persistence/db';
 
 type Tab = 'palette' | 'objects' | 'tilesets';
@@ -209,6 +211,7 @@ export function TileInspector({ gids, tilesets: draftTilesets, onMeta }: { gids:
   const tilesets = draftTilesets ?? projectTilesets;
   const setTileMeta = onMeta ?? projectSetMeta;
   const [tagDraft, setTagDraft] = useState('');
+  const side = useProject((s) => s.project.map.perspective === 'side_view');
   if (!gids.length) return <div className="inspector is-empty">Tile antippen, um es zu malen und zu kategorisieren.</div>;
 
   const resolved = gids.map((g) => resolveGid(tilesets, g)).filter(Boolean) as { ts: Tileset; index: number }[];
@@ -248,37 +251,55 @@ export function TileInspector({ gids, tilesets: draftTilesets, onMeta }: { gids:
         </div>
       </div>
       <div className="field">
-        <label htmlFor="tile-cat">Kategorie</label>
-        <select
-          id="tile-cat"
-          className="select"
-          value={category}
-          onChange={(e) => setTileMeta(gids, { category: (e.target.value || undefined) as TileCategory | undefined })}
-        >
-          {category === 'mixed' && <option value="mixed">Gemischt</option>}
-          <option value="">— keine —</option>
-          {CATEGORIES.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-            </option>
-          ))}
-        </select>
+        <label>Was ist das für ein Tile?</label>
+        {[...PICK_GROUPS, ...(side ? [SIDE_PICK_GROUP] : [])].map((g) => (
+          <div key={g.title} className="inspector-picks">
+            <h5>{g.title}</h5>
+            <div className="pick-grid">
+              {g.picks.map((pk) => (
+                <button key={pk.id} type="button" className={`pick-btn${resolved.every((r) => isCurrent(r.ts.tiles[r.index], pk)) ? ' is-current' : ''}`} onClick={() => setTileMeta(gids, { category: pk.category, role: pk.role })}>
+                  <Sketch pick={pk} />
+                  <span>{pk.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+        <button type="button" className="btn btn-ghost" onClick={() => setTileMeta(gids, { category: undefined, role: undefined })}>
+          Nicht verwenden (keine Zuordnung)
+        </button>
       </div>
-      <div className="field">
-        <label htmlFor="tile-role">Rolle (Auto-Tile)</label>
-        <select
-          id="tile-role"
-          className="select mono"
-          value={resolved.every((r) => r.ts.tiles[r.index]?.role === meta.role) ? (meta.role ?? '') : 'mixed'}
-          onChange={(e) => setTileMeta(gids, { role: (e.target.value || undefined) as TileRole | undefined })}
-        >
-          <option value="">— keine —</option>
-          {TILE_ROLES.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
+      <details className="inspector-more">
+        <summary>Feineinstellungen: genaue Rolle, Kollision, Häufigkeit, Tags</summary>
+      <div className="grid-2">
+        <div className="field">
+          <label htmlFor="tile-cat">Kategorie</label>
+          <select id="tile-cat" className="select" value={category} onChange={(e) => setTileMeta(gids, { category: (e.target.value || undefined) as TileCategory | undefined })}>
+            {category === 'mixed' && <option value="mixed">Gemischt</option>}
+            <option value="">— keine —</option>
+            {CATEGORIES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="tile-role">Genaue Rolle</label>
+          <select
+            id="tile-role"
+            className="select"
+            value={resolved.every((r) => r.ts.tiles[r.index]?.role === meta.role) ? (meta.role ?? '') : 'mixed'}
+            onChange={(e) => setTileMeta(gids, { role: (e.target.value || undefined) as TileRole | undefined })}
+          >
+            <option value="">— keine —</option>
+            {TILE_ROLES.map((r) => (
+              <option key={r} value={r}>
+                {ROLE_SHORT[r] ?? r}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="grid-2">
         <div className="field">
@@ -296,7 +317,7 @@ export function TileInspector({ gids, tilesets: draftTilesets, onMeta }: { gids:
         </div>
         <NumberField label="Sortier-Offset" value={meta.sortOffset ?? 0} min={0} max={4} suffix="Tiles" onChange={(v) => setTileMeta(gids, { sortOffset: v || undefined })} />
       </div>
-      <Slider label="Gewichtung" value={meta.weight} onChange={(v) => setTileMeta(gids, { weight: v })} />
+      <Slider label="Häufigkeit" value={meta.weight} onChange={(v) => setTileMeta(gids, { weight: v })} />
       <div className="field">
         <label>Tags</label>
         <div className="chips">
@@ -321,6 +342,7 @@ export function TileInspector({ gids, tilesets: draftTilesets, onMeta }: { gids:
           </Button>
         </form>
       </div>
+      </details>
     </div>
   );
 }
@@ -329,48 +351,72 @@ export function TileInspector({ gids, tilesets: draftTilesets, onMeta }: { gids:
 
 function TilesetManager() {
   const tilesets = useProject((s) => s.project.tilesets);
-  const tileSize = useProject((s) => s.project.map.tileSize);
-  const addTileset = useProject((s) => s.addTileset);
-  const toast = useEditor((s) => s.toast);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-
-  const onFiles = async (files: FileList | null) => {
-    if (!files?.length) return;
-    setBusy(true);
-    try {
-      for (const f of Array.from(files)) {
-        if (!/image\/(png|webp|gif)/.test(f.type) && !/\.png$/i.test(f.name)) {
-          toast(`${f.name}: nur PNG-Dateien`, 'error');
-          continue;
-        }
-        const dataUrl = await readFileAsDataUrl(f);
-        const nextGid = useProject.getState().project.nextGid;
-        const { ts, note } = await createTilesetFromFile(f.name.replace(/\.[^.]+$/, ''), dataUrl, tileSize, nextGid);
-        // first guess for every tile (floor, walls, corners …) – shown as suggestions
-        ts.tiles = await autoAssign(ts);
-        addTileset(ts);
-        const st = assignmentStats(ts);
-        toast(`${ts.name}: ${ts.columns * ts.rows - ts.emptyTiles.length} Tiles (${note}), ${st.auto} automatisch zugeordnet – bitte in der Palette prüfen`, 'success');
-      }
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Upload fehlgeschlagen', 'error');
-    } finally {
-      setBusy(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  };
-
+  const [adding, setAdding] = useState(false);
   return (
     <div className="tileset-manager">
-      <input ref={fileRef} type="file" accept="image/png" multiple hidden onChange={(e) => onFiles(e.target.files)} />
-      <Button variant="primary" block icon={<Icon.Upload size={18} />} disabled={busy} onClick={() => fileRef.current?.click()}>
-        {busy ? 'Lade …' : 'PNG-Tileset hochladen'}
+      <Button variant="primary" block icon={<Icon.Plus size={18} />} onClick={() => setAdding(true)}>
+        Tileset hinzufügen
       </Button>
+      {adding && <TilesetDialog onClose={() => setAdding(false)} />}
       {tilesets.map((ts) => (
         <TilesetCard key={ts.id} ts={ts} />
       ))}
       {!tilesets.length && <p className="empty-note">Keine Tilesets vorhanden.</p>}
+    </div>
+  );
+}
+
+/**
+ * „Tileset hinzufügen“ / „Alles bearbeiten“: the whole tileset setup in one dialog – PNG, size, map
+ * kinds, room builder, what every tile is. `existing` edits a tileset of the project.
+ */
+function TilesetDialog({ existing, onClose }: { existing?: Tileset; onClose: () => void }) {
+  const perspective = useProject((s) => s.project.map.perspective);
+  const toast = useEditor((s) => s.toast);
+  // the editor works on a draft with its own gids (from 1); the project gets it on save
+  const [draft, setDraft] = useState<Tileset | null>(existing ? { ...existing, firstGid: 1 } : null);
+  const save = async (ts: Tileset) => {
+    if (existing) {
+      useProject.getState().editDoc('Tileset bearbeitet', (p) => ({
+        ...p,
+        tilesets: p.tilesets.map((t) => (t.id === existing.id ? { ...t, name: ts.name, perspectives: ts.perspectives, tiles: ts.tiles, variants: ts.variants } : t)),
+      }));
+      toast(`„${ts.name}“ gespeichert – neu generieren, um es zu sehen`, 'success');
+    } else {
+      useProject.getState().addTileset({ ...ts, id: uid('ts'), active: true });
+      // also in the library, so new projects can use it
+      void saveLibraryTileset(toLibraryTileset(ts)).catch(() => {});
+      toast(`„${ts.name}“ hinzugefügt (auch in der Tileset-Bibliothek) – jetzt generieren`, 'success');
+    }
+    void learnFrom(ts);
+    onClose();
+  };
+  return (
+    <div className="quick-pick-backdrop" role="presentation" onClick={onClose}>
+      <div className="quick-pick tileset-dialog" role="dialog" aria-label={existing ? 'Tileset bearbeiten' : 'Tileset hinzufügen'} onClick={(e) => e.stopPropagation()}>
+        <header className="quick-pick-head">
+          <div className="quick-pick-tile">
+            <div>
+              <strong>{existing ? `„${existing.name}“ bearbeiten` : 'Tileset hinzufügen'}</strong>
+              <span className="quick-pick-current">{draft ? 'Raum bauen, Tiles antippen und zuordnen, dann speichern.' : 'PNG-Bild mit deinen Tiles auswählen.'}</span>
+            </div>
+          </div>
+          <IconButton label="Schließen" onClick={onClose}>
+            <Icon.Close size={18} />
+          </IconButton>
+        </header>
+        <div className="quick-pick-body">
+          <TilesetEditor
+            perspective={perspective}
+            upload={draft}
+            setUpload={setDraft}
+            saveLabel={existing ? 'Speichern' : 'Zum Projekt hinzufügen'}
+            onSave={save}
+            onCancel={onClose}
+            fixedSize={!!existing}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -440,6 +486,7 @@ function TilesetCard({ ts }: { ts: Tileset }) {
   const removeTileset = useProject((s) => s.removeTileset);
   const [confirm, setConfirm] = useState(false);
   const [marking, setMarking] = useState(false);
+  const [editing, setEditing] = useState(false);
   const count = ts.columns * ts.rows - ts.emptyTiles.length;
   const categorized = Object.values(ts.tiles).filter((m) => m.category).length;
   const perspective = useProject((s) => s.project.map.perspective);
@@ -463,9 +510,15 @@ function TilesetCard({ ts }: { ts: Tileset }) {
         </div>
       </div>
       <Toggle label="Aktiv" description="Im Generator und in der Palette verwenden" checked={ts.active} onChange={(v) => updateTileset(ts.id, { active: v })} />
-      <Button variant="primary" block icon={<Icon.Grid size={16} />} onClick={() => setMarking(true)}>
-        Raum aus dem Tileset bauen
-      </Button>
+      <div className="tileset-actions-top">
+        <Button variant="primary" icon={<Icon.Grid size={16} />} onClick={() => setMarking(true)}>
+          Raum bauen
+        </Button>
+        <Button variant="secondary" icon={<Icon.Pencil size={16} />} onClick={() => setEditing(true)}>
+          Alles bearbeiten
+        </Button>
+      </div>
+      {editing && <TilesetDialog existing={ts} onClose={() => setEditing(false)} />}
       <p className="hint">Schnellster Weg zu richtigen Wänden: Ecken, Wände und Boden auf einen Raum-Bauplan ziehen (auch gedreht) – oder einen gezeichneten Raum im Tileset einrahmen.</p>
       {marking && (
         <RoomMarker

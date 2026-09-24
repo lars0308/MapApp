@@ -13,19 +13,17 @@ import { viewEvents } from '../store/events';
 import { Icon } from '../components/icons';
 import { IconButton } from '../components/ui';
 import { SaveState } from '../components/SaveState';
-import { TerrainPanel } from '../components/TerrainPanel';
 import { PlaytestOverlay } from '../playtest/PlaytestOverlay';
 
 const NAV: { id: MobilePanel; label: string; icon: (p: { size?: number }) => React.ReactElement }[] = [
   { id: null, label: 'Map', icon: Icon.Map },
-  { id: 'generate', label: 'Generator', icon: Icon.Sliders },
-  { id: 'terrain', label: 'Terrain', icon: Icon.Mountain },
+  { id: 'generate', label: 'Aufbau', icon: Icon.Sliders },
   { id: 'tiles', label: 'Tiles', icon: Icon.Tiles },
   { id: 'layers', label: 'Layer', icon: Icon.Layers },
 ];
 
 const TITLES: Record<Exclude<MobilePanel, null>, string> = {
-  generate: 'Generator',
+  generate: 'Karte aufbauen',
   terrain: 'Terrain',
   settings: 'Einstellungen',
   tiles: 'Tiles',
@@ -44,8 +42,6 @@ export function MobileLayout() {
   const run = useProject((s) => s.runGenerate);
   const busy = useProject((s) => s.generating);
   const manual = useProject((s) => s.project.mode === 'manual');
-  // side-scroller / hex: terrain settings live in the generator panel
-  const plain = useProject((s) => s.project.map.perspective === 'side_view' || s.project.map.perspective === 'hex');
 
   return (
     <div className={`mobile${panel ? ' has-sheet' : ''}${playtest ? ' is-playtest' : ''}`}>
@@ -57,10 +53,7 @@ export function MobileLayout() {
             <UndoRedo />
             {!manual && (
               <>
-                <IconButton label="Neue Variante" onClick={() => run({ newSeed: true })} disabled={busy}>
-                  <Icon.Dice size={19} />
-                </IconButton>
-                <button type="button" className="btn btn-primary m-generate" disabled={busy} onClick={() => run()}>
+                <button type="button" className="btn btn-primary m-generate" disabled={busy} onClick={() => run({ newSeed: true })}>
                   <Icon.Spark size={18} />
                   <span>{busy ? '…' : 'Generieren'}</span>
                 </button>
@@ -111,7 +104,6 @@ export function MobileLayout() {
           footer={panel === 'generate' || panel === 'terrain' ? <GenerateButtons /> : undefined}
         >
           {panel === 'generate' && <GeneratorPanel />}
-          {panel === 'terrain' && <TerrainPanel />}
           {panel === 'tiles' && <TilesPanel />}
           {panel === 'layers' && <LayersPanel />}
         </BottomSheet>
@@ -124,7 +116,7 @@ export function MobileLayout() {
       )}
 
       <nav className="m-nav" aria-label="Navigation">
-        {NAV.filter((n) => n.id !== 'terrain' || !plain).map((n) => {
+        {NAV.map((n) => {
           const active = panel === n.id;
           const I = n.icon;
           return (

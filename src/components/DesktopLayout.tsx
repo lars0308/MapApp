@@ -1,4 +1,3 @@
-import { useProject } from '../store/projectStore';
 import { useEffect, useState } from 'react';
 import { Workspace, ViewSwitch } from './Workspace';
 import { GeneratorPanel } from './GeneratorPanel';
@@ -7,7 +6,6 @@ import { TilesPanel } from '../tilesets/TilesPanel';
 import { PanelTabs } from './ui';
 import { BrushSize, HoverInfo, TileTurn, ToolButtons, ViewControls } from '../editor/Toolbar';
 import { Minimap } from '../editor/Minimap';
-import { TerrainPanel } from './TerrainPanel';
 import { PlaytestOverlay } from '../playtest/PlaytestOverlay';
 import { TopBar } from './TopBar';
 import { useApp } from '../store/appStore';
@@ -18,7 +16,7 @@ import { LIMITS, useLayout, type LeftTab, type PanelId } from '../store/layoutSt
 import { PanelActions, ResizeHandle } from './desktop/Dock';
 
 const LEFT_TABS: { value: LeftTab; label: string; icon: (p: { size?: number }) => React.ReactElement }[] = [
-  { value: 'generator', label: 'Generator', icon: Icon.Sliders },
+  { value: 'generator', label: 'Aufbau', icon: Icon.Sliders },
   { value: 'terrain', label: 'Terrain', icon: Icon.Mountain },
 ];
 const RAIL = 44;
@@ -58,10 +56,9 @@ export function DesktopLayout() {
     return () => window.removeEventListener('keydown', on);
   }, [L.maximized]);
 
-  // side-scroller / hex: no separate terrain panel (it lives in the generator panel)
-  const plain = useProject((st) => st.project.map.perspective === 'side_view' || st.project.map.perspective === 'hex');
-  const leftTabs = LEFT_TABS.filter((t) => t.value !== 'terrain' || !plain);
-  const leftPanel = L.leftTab === 'terrain' && !plain ? <TerrainPanel /> : <GeneratorPanel />;
+  // terrain lives in the generator panel („Gelände“) – one panel for all map settings
+  const leftTabs = LEFT_TABS.filter((t) => t.value !== 'terrain');
+  const leftPanel = <GeneratorPanel />;
 
   return (
     <div className={`desktop${L.maximized ? ' has-maximized' : ''}`} style={{ gridTemplateColumns: `${leftW}px minmax(0, 1fr) ${rightW}px` }}>
@@ -97,7 +94,7 @@ export function DesktopLayout() {
           ) : (
             <>
               <div className="dock-head">
-                <PanelTabs tabs={leftTabs.map(({ value, label }) => ({ value, label }))} value={plain ? 'generator' : L.leftTab} onChange={L.setLeftTab} />
+                <PanelTabs tabs={leftTabs.map(({ value, label }) => ({ value, label }))} value="generator" onChange={L.setLeftTab} />
                 <PanelActions id="left" label="Linkes Panel" />
               </div>
               {leftPanel}

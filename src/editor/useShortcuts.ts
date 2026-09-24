@@ -66,7 +66,7 @@ export function useShortcuts() {
       else if (key === 'escape') editor.setSelection(null);
       else if (key === '[' ) editor.setBrushSize(Math.max(1, editor.brushSize - 1));
       else if (key === ']') editor.setBrushSize(Math.min(5, editor.brushSize + 1));
-      else if (key === 'enter' && e.shiftKey && project.project.mode !== 'manual') void project.runGenerate();
+      else if (key === 'enter' && e.shiftKey && project.project.mode !== 'manual') void project.runGenerate({ newSeed: true });
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

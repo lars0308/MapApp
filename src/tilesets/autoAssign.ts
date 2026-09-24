@@ -280,7 +280,7 @@ export async function autoAssign(ts: Pick<Tileset, 'dataUrl' | 'tileSize' | 'col
 }
 
 /** Short label shown on a tile, e.g. "Boden", "Wand ↑", "Ecke ┌". */
-const ROLE_SHORT: Partial<Record<TileRole, string>> = {
+export const ROLE_SHORT: Partial<Record<TileRole, string>> = {
   floor_center: 'Boden',
   floor_edge_top: 'Rand ↑',
   floor_edge_bottom: 'Rand ↓',

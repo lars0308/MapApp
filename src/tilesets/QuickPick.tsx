@@ -84,7 +84,25 @@ export const PICK_GROUPS: { title: string; picks: Pick[] }[] = [
   },
 ];
 
-function Sketch({ pick }: { pick: Pick }) {
+/** side view (side-scroller) tiles */
+export const SIDE_PICK_GROUP: { title: string; picks: Pick[] } = {
+  title: 'Seitenansicht',
+  picks: [
+    P('g_top', 'Boden oben', 'wallTop', 'ground_top', undefined, 4, '#6cae4a'),
+    P('g_fill', 'Erde innen', 'wallTop', 'ground_fill', undefined, 4, '#7a5536'),
+    P('g_tl', 'Boden ┌', 'wallTop', 'ground_top_left', undefined, 4, '#6cae4a'),
+    P('g_tr', 'Boden ┐', 'wallTop', 'ground_top_right', undefined, 4, '#6cae4a'),
+    P('g_l', 'Erde links', 'wallTop', 'ground_left', undefined, 4, '#7a5536'),
+    P('g_r', 'Erde rechts', 'wallTop', 'ground_right', undefined, 4, '#7a5536'),
+    P('g_b', 'Erde unten', 'wallTop', 'ground_bottom', undefined, 4, '#7a5536'),
+    P('plat', 'Plattform', 'bridge', 'platform', undefined, 4, '#9a6b3f'),
+    P('ladder', 'Leiter', 'stairs', 'ladder', undefined, 4, '#b08354'),
+    P('spikes', 'Stacheln', 'obstacle', 'spikes', undefined, 4, '#c9c9d4'),
+    P('back', 'Hintergrund', 'floor', 'back_wall', undefined, 4, '#3a3548'),
+  ],
+};
+
+export function Sketch({ pick }: { pick: Pick }) {
   if (!pick.sketch) return <span className="pick-swatch" style={{ background: pick.swatch }} />;
   const cells = pick.sketch.replace(/\//g, '').split('');
   return (
@@ -96,7 +114,7 @@ function Sketch({ pick }: { pick: Pick }) {
   );
 }
 
-const isCurrent = (meta: TileMeta | undefined, p: Pick) => !!meta && meta.category === p.category && (meta.role ?? undefined) === p.role;
+export const isCurrent = (meta: TileMeta | undefined, p: Pick) => !!meta && meta.category === p.category && (meta.role ?? undefined) === p.role;
 
 /**
  * Quick choice for one (or several marked) tiles.
@@ -155,7 +173,7 @@ export function QuickPick({
           </IconButton>
         </header>
         <div className="quick-pick-body">
-          {PICK_GROUPS.map((g) => (
+          {[...PICK_GROUPS, ...(ts.perspectives?.includes('side_view') ? [SIDE_PICK_GROUP] : [])].map((g) => (
             <section key={g.title}>
               <h4>{g.title}</h4>
               <div className="pick-grid">

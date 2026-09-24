@@ -62,3 +62,40 @@ export function TerrainPanel() {
     </div>
   );
 }
+
+/** reusable terrain sets (floor materials per room) – inside the generator panel */
+export function TerrainSets() {
+  const sets = useProject((s) => s.project.terrains);
+  const setTerrains = useProject((s) => s.setTerrains);
+  const change = (id: string, patch: Partial<TerrainSet>) => setTerrains(sets.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  return (
+    <>
+        <p className="hint">Räume bekommen ein Terrain nach Gewichtung. Böden mit dem passenden Tag werden dafür verwendet (z. B. Tag „wood“).</p>
+        {sets.map((t) => (
+          <div key={t.id} className={`terrain-set${t.active ? ' is-on' : ''}`}>
+            <div className="terrain-set-head">
+              <input type="color" className="color-dot" value={t.color} aria-label="Farbe" onChange={(e) => change(t.id, { color: e.target.value })} />
+              <input className="input input-plain" value={t.name} aria-label="Name" onChange={(e) => change(t.id, { name: e.target.value })} />
+              <IconButton label="Terrain-Set löschen" disabled={sets.length <= 1} onClick={() => setTerrains(sets.filter((x) => x.id !== t.id))}>
+                <Icon.Trash size={18} />
+              </IconButton>
+            </div>
+            <div className="field">
+              <label>Tile-Tag</label>
+              <input className="input mono" value={t.tag} onChange={(e) => change(t.id, { tag: e.target.value.trim().toLowerCase() })} />
+            </div>
+            <Toggle label="Aktiv" checked={t.active} onChange={(v) => change(t.id, { active: v })} />
+            {t.active && <Slider label="Gewichtung" value={t.weight} onChange={(v) => change(t.id, { weight: v })} />}
+          </div>
+        ))}
+        <Button
+          icon={<Icon.Plus size={18} />}
+          onClick={() =>
+            setTerrains([...sets, { id: uid('terrain'), name: `Terrain ${sets.length + 1}`, tag: 'stone', color: LAYER_COLORS[sets.length % LAYER_COLORS.length], weight: 20, active: true }])
+          }
+        >
+          Terrain-Set hinzufügen
+        </Button>
+    </>
+  );
+}
