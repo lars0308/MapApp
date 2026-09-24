@@ -1,6 +1,6 @@
 # Übergabe – MapForge (Stand 2026-09-24, Version 3.0)
 
-Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (letzter Commit: „8 Richtungen …“, Version 2.9 im README).
+Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (Version 3.0 im README).
 Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI auf Deutsch, UI selbsterklärend, mobil zuerst, keine Fake-Features.
 
 ## Stand (fertig, gepusht)
