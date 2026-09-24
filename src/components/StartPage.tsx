@@ -4,7 +4,7 @@ import { useEditor } from '../store/editorStore';
 import { isPlaceholder, useApp } from '../store/appStore';
 import { Button, IconButton } from './ui';
 import { Icon } from './icons';
-import { deleteProject, listProjects, loadProject, type ProjectSummary } from '../persistence/db';
+import { deleteProject, listProjects, loadProject, onProjectsChanged, type ProjectSummary } from '../persistence/db';
 import { saveNow } from '../persistence/autosave';
 import { deserializeProject, PROJECT_EXTENSION } from '../persistence/projectFile';
 import { readFileAsText } from '../utils/download';
@@ -40,6 +40,8 @@ export function StartPage() {
   useEffect(() => {
     void refresh();
   }, [id]);
+  // cards the AI makes while this page is open show up right away
+  useEffect(() => onProjectsChanged(() => void refresh()), []);
 
   const open = async (pid: string) => {
     if (pid !== id) {
@@ -146,7 +148,7 @@ export function StartPage() {
             {recent.map((p) => (
               <li key={p.id} className={p.id === id ? 'is-current' : ''}>
                 <button type="button" className="project-open" onClick={() => open(p.id)}>
-                  <strong>{p.name}</strong>
+                  <strong>{p.name}{p.ai && <span className="badge badge-ai" title="Von der KI angelegt">KI</span>}</strong>
                   <small>
                     {p.width}×{p.height} · {p.rooms} Räume · {when(p.updatedAt)}
                   </small>

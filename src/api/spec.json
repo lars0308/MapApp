@@ -13,7 +13,7 @@
     },
     {
       "name": "new_map",
-      "description": "Create a new map project and generate it (like the setup wizard). The current project is saved first.",
+      "description": "Create a new map project and generate it (like the setup wizard). The current project is saved first. The map is saved as a project of its own; the user sees it in MapForge under Karte → „Gespeicherte Karten“ (badge „KI“). With the local server's hidden browser the maps move into the user's MapForge tab as soon as the user opens it.",
       "input": {
         "type": "object",
         "properties": {
@@ -769,7 +769,7 @@
     },
     {
       "name": "list_projects",
-      "description": "Saved map projects in this browser.",
+      "description": "Saved map projects in this browser. ai=true marks maps made by an AI.",
       "input": {
         "type": "object",
         "properties": {}

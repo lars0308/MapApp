@@ -488,6 +488,8 @@ export type ProjectMode = 'generate' | 'manual';
 export interface Project {
   formatVersion: 1;
   mode: ProjectMode;
+  /** created by an AI over the KI-Verbindung (shown as a badge in the project lists) */
+  createdBy?: 'ai';
   /** answers from the setup wizard (view, genre, effort) – see profiles/ */
   profile?: GameProfile;
   id: string;

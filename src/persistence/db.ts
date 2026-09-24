@@ -22,7 +22,21 @@ export interface ProjectSummary {
   rooms: number;
   /** "Top-Down · Action-Roguelite" (since v2.6) */
   label?: string;
+  /** made by the AI */
+  ai?: boolean;
 }
+
+/* the project lists refresh when a project is saved or deleted (e.g. by the AI while the list is open) */
+const listeners = new Set<() => void>();
+export function onProjectsChanged(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+let changeTimer: ReturnType<typeof setTimeout> | undefined;
+const changed = () => {
+  clearTimeout(changeTimer);
+  changeTimer = setTimeout(() => listeners.forEach((fn) => fn()), 300);
+};
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 let blockedNotified = false;
@@ -111,9 +125,11 @@ export async function saveProject(p: Project): Promise<void> {
     height: p.map.height,
     rooms: p.result?.rooms.length ?? 0,
     label: profileLabel(p.profile),
+    ai: p.createdBy === 'ai' || undefined,
   };
   await tx(STORE, 'readwrite', (s) => s.put({ id: p.id, name: p.name, updatedAt: p.updatedAt, summary, project: p } satisfies StoredProject));
   await tx(META, 'readwrite', (s) => s.put(p.id, 'lastProjectId'));
+  changed();
 }
 
 export async function loadProject(id: string): Promise<Project | null> {
@@ -128,6 +144,7 @@ export async function listProjects(): Promise<ProjectSummary[]> {
 
 export async function deleteProject(id: string): Promise<void> {
   await tx(STORE, 'readwrite', (s) => s.delete(id));
+  changed();
 }
 
 export async function lastProjectId(): Promise<string | null> {

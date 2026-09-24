@@ -23,7 +23,7 @@ KI  ⇄ MCP (stdio) ⇄ mcp/server.mjs ⇄ WebSocket ⇄ MapForge im Browser
 
 3. MapForge öffnen (z. B. http://127.0.0.1:8765/ – der Server liefert die App mit aus – oder deine Vercel-Adresse) und **Einstellungen → KI-Verbindung** einschalten. Der Tab verbindet sich und die KI arbeitet darin.
 
-Ist kein Tab verbunden, startet der Server MapForge selbst in einem unsichtbaren Browser (installiertes Chrome/Edge oder `MAPFORGE_CHROME=/pfad/zu/chrome`). Die Projekte dieses Browsers liegen in `~/.mapforge-mcp/`.
+Ist kein Tab verbunden, startet der Server MapForge selbst in einem unsichtbaren Browser (installiertes Chrome/Edge oder `MAPFORGE_CHROME=/pfad/zu/chrome`). Die Karten dieses Browsers liegen zunächst in `~/.mapforge-mcp/`. Sobald du MapForge unter `http://127.0.0.1:8765/?ai=1` öffnest, werden die Karten der KI in deinen Tab übernommen, auch aus früheren Sitzungen. Du findest sie unter *Karte → Gespeicherte Karten* (Abzeichen „KI“). Danach arbeitet die KI in deinem Tab weiter.
 
 ## KI von überall (Handy, claude.ai, ohne eigenen Server)
 

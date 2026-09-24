@@ -38,9 +38,58 @@ let nextId = 1;
 /** another server already runs on the port → forward calls there */
 let forwardTo = null;
 
+/** the newest connected tab – a tab the user sees wins over the hidden browser */
 function currentApp() {
+  for (let i = apps.length - 1; i >= 0; i--) if (apps[i].readyState === 1 && !apps[i].hidden) return apps[i];
   for (let i = apps.length - 1; i >= 0; i--) if (apps[i].readyState === 1) return apps[i];
   return null;
+}
+
+/** send one command to one tab */
+function ask(sock, command, args = {}, ms = 60000) {
+  const id = nextId++;
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pending.delete(id);
+      resolve({ ok: false, error: 'timeout' });
+    }, ms);
+    pending.set(id, (result) => {
+      clearTimeout(timer);
+      resolve(result);
+    });
+    sock.send(JSON.stringify({ id, command, args }));
+  });
+}
+
+/**
+ * The user opened MapForge while the hidden browser was working: move the maps the AI made
+ * there into the user's tab (so they show up under „Gespeicherte Karten“) and close the hidden one.
+ */
+const MARK = path.join(os.homedir(), '.mapforge-mcp', 'maps-to-hand-over');
+async function handOver(visible) {
+  let hidden = apps.find((a) => a.hidden && a.readyState === 1);
+  // maps from an earlier session still wait in the hidden browser: open it briefly to fetch them
+  if (!hidden && fs.existsSync(MARK) && (await startHiddenApp())) {
+    for (let t = 0; t < 250 && !hidden; t++) {
+      await new Promise((r) => setTimeout(r, 100));
+      hidden = apps.find((a) => a.hidden && a.readyState === 1);
+    }
+  }
+  if (!hidden) return;
+  const out = await ask(hidden, '__export_projects');
+  const projects = out?.data?.projects ?? [];
+  if (projects.length) {
+    const r = await ask(visible, '__import_projects', { projects });
+    log(`handed ${r?.data?.added ?? 0} of ${projects.length} maps over to the visible tab`);
+    if (!r?.ok) return;
+  }
+  fs.rmSync(MARK, { force: true });
+  if (browser) {
+    await browser.close().catch(() => {});
+    browser = null;
+    starting = null;
+    log('hidden browser closed – the visible tab takes over');
+  }
 }
 
 function waitForApp(ms) {
@@ -69,7 +118,7 @@ async function startHiddenApp() {
       log('playwright-core not installed – cannot start a hidden browser');
       return false;
     }
-    const url = `${process.env.MAPFORGE_URL || `http://${HOST}:${PORT}/`}${(process.env.MAPFORGE_URL || '').includes('?') ? '&' : '?'}ai=ws://${HOST}:${PORT}`;
+    const url = `${process.env.MAPFORGE_URL || `http://${HOST}:${PORT}/`}${(process.env.MAPFORGE_URL || '').includes('?') ? '&' : '?'}ai=ws://${HOST}:${PORT}&hidden=1`;
     const profile = path.join(os.homedir(), '.mapforge-mcp', 'browser');
     fs.mkdirSync(profile, { recursive: true });
     const tries = [];
@@ -82,6 +131,7 @@ async function startHiddenApp() {
         page.on('pageerror', (e) => log('app error:', e.message));
         await page.goto(url);
         log('hidden MapForge started:', url);
+        fs.writeFileSync(MARK, new Date().toISOString());
         return true;
       } catch (e) {
         log('browser start failed', JSON.stringify(t), String(e.message).split('\n')[0]);
@@ -107,18 +157,8 @@ async function call(command, args = {}) {
   let app = currentApp() ?? (await waitForApp(800));
   if (!app && (await startHiddenApp())) app = await waitForApp(25000);
   if (!app) return { ok: false, error: NO_APP };
-  const id = nextId++;
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      pending.delete(id);
-      resolve({ ok: false, error: `Keine Antwort von MapForge auf „${command}“ (Zeitüberschreitung)` });
-    }, 180000);
-    pending.set(id, (result) => {
-      clearTimeout(timer);
-      resolve(result);
-    });
-    app.send(JSON.stringify({ id, command, args }));
-  });
+  const r = await ask(app, command, args, 180000);
+  return r?.error === 'timeout' ? { ok: false, error: `Keine Antwort von MapForge auf „${command}“ (Zeitüberschreitung)` } : r;
 }
 
 // ------------------------------------------------------------------ HTTP + WebSocket
@@ -173,8 +213,10 @@ wss.on('connection', (sock, req) => {
       return;
     }
     if (msg.type === 'hello') {
+      sock.hidden = !!msg.hidden;
       apps.push(sock);
-      log(`MapForge connected (${origin || 'no origin'}), ${msg.commands?.length ?? 0} commands`);
+      log(`MapForge connected (${sock.hidden ? 'hidden browser' : origin || 'no origin'}), ${msg.commands?.length ?? 0} commands`);
+      if (!sock.hidden) void handOver(sock);
       return;
     }
     const done = pending.get(msg.id);

@@ -2446,6 +2446,11 @@ input[type='range']:active::-webkit-slider-thumb {
   color: var(--text);
 }
 
+.badge-ai {
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
 .badge-warn {
   align-self: flex-start;
   margin-left: 6px;

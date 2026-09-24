@@ -204,19 +204,22 @@ const H: Record<string, Handler> = {
     if (!allowed.includes(perspective)) fail(`Perspektive ${perspective} passt nicht zu ${view} (${allowed.join(', ')})`);
     const mode = a.mode === 'manual' ? 'manual' : 'generate';
     await saveNow();
+    const name = str(a.name, 'name', 'KI-Karte');
     useProject.getState().loadProject(
-      createProject(str(a.name, 'name', 'KI-Karte'), {
+      createProject(name, {
         map: { ...map, perspective, width: a.width ? int(a.width, 'width') : map.width, height: a.height ? int(a.height, 'height') : map.height },
         generator: gen,
         mode,
         profile,
       }),
     );
+    useProject.setState((st) => ({ project: { ...st.project, createdBy: 'ai' } }));
     if (mode === 'generate') await useProject.getState().runGenerate();
     else prepareBuildKit();
     await saveNow();
     useApp.getState().goTo('map');
-    return { data: summary(P()) };
+    useEditor.getState().toast(`Die KI hat die Karte „${name}“ angelegt – sie steht unter „Gespeicherte Karten“`, 'success');
+    return { text: `Karte „${name}“ angelegt und gespeichert – der Nutzer sieht sie in MapForge unter Karte → „Gespeicherte Karten“ (Abzeichen „KI“).`, data: summary(P()) };
   },
 
   generate: async (a) => {
@@ -595,7 +598,7 @@ const H: Record<string, Handler> = {
 
   save: async () => ({ data: { saved: await saveNow() } }),
 
-  list_projects: async () => ({ data: (await listProjects()).map((s) => ({ id: s.id, name: s.name, updatedAt: s.updatedAt })) }),
+  list_projects: async () => ({ data: (await listProjects()).map((s) => ({ id: s.id, name: s.name, updatedAt: s.updatedAt, ai: !!s.ai })) }),
 
   open_project: async (a) => {
     await saveNow();

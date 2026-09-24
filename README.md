@@ -342,6 +342,13 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.11 – KI legt Karten an, du siehst sie**
+
+- Jede Karte, die die KI mit `new_map` anlegt, ist ein eigenes gespeichertes Projekt. Sie steht unter *Karte → Gespeicherte Karten* und auf der Startseite mit dem Abzeichen **KI**. Eine Meldung sagt, welche Karte angelegt wurde. Offene Listen aktualisieren sich sofort.
+- Arbeitet die KI über den lokalen Server im unsichtbaren Browser, werden ihre Karten beim Öffnen von MapForge (`http://127.0.0.1:8765/?ai=1` oder mit eingeschalteter KI-Verbindung) automatisch in deinen Tab übernommen, auch Karten aus früheren Sitzungen. Danach arbeitet die KI direkt in deinem Tab weiter, und der unsichtbare Browser wird geschlossen.
+- Über „KI von überall“ (Handy) entstehen die Karten direkt in der App auf deinem Gerät.
+- `list_projects` markiert KI-Karten mit `ai: true`.
+
 **Version 3.10 – Generator im Hintergrund**
 
 - Der Generator läuft in einem Web Worker. Die App bleibt beim Generieren großer Karten bedienbar: Bei 256×256 blockiert der Hauptthread höchstens etwa 20 ms, vorher waren es am Handy 1–2 s. Kann der Browser keinen Worker starten, läuft der Generator wie bisher direkt.

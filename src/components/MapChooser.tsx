@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { isPlaceholder, useApp } from '../store/appStore';
-import { listProjects, loadProject, type ProjectSummary } from '../persistence/db';
+import { listProjects, loadProject, onProjectsChanged, type ProjectSummary } from '../persistence/db';
 import { saveNow } from '../persistence/autosave';
 import { VIEWS, profileLabel, type ViewKind } from '../profiles';
 import { Icon } from './icons';
@@ -21,9 +21,13 @@ export function MapChooser() {
   const placeholder = isPlaceholder();
 
   useEffect(() => {
-    listProjects()
-      .then((l) => setList(l.sort((a, b) => b.updatedAt - a.updatedAt)))
-      .catch(() => setList([]));
+    const load = () =>
+      listProjects()
+        .then((l) => setList(l.sort((a, b) => b.updatedAt - a.updatedAt)))
+        .catch(() => setList([]));
+    void load();
+    // maps the AI makes while this page is open show up right away
+    return onProjectsChanged(() => void load());
   }, []);
 
   const open = async (pid: string) => {
@@ -78,7 +82,7 @@ export function MapChooser() {
             {others.slice(0, 12).map((p) => (
               <li key={p.id}>
                 <button type="button" className="project-open" onClick={() => open(p.id)}>
-                  <strong>{p.name}</strong>
+                  <strong>{p.name}{p.ai && <span className="badge badge-ai" title="Von der KI angelegt">KI</span>}</strong>
                   <small>
                     {p.label ? `${p.label} · ` : ''}
                     {p.width} × {p.height} · {when(p.updatedAt)}

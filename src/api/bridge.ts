@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { COMMANDS, runCommand, spec, type Args } from './commands';
 import { useEditor } from '../store/editorStore';
+import { listProjects, loadProject, saveProject } from '../persistence/db';
+import { deserializeProject, serializeProject } from '../persistence/projectFile';
+import { saveNow } from '../persistence/autosave';
 
 // Connection to the MapForge MCP server (mcp/server.mjs) on this computer: the server gives an
 // AI tools, the tools arrive here over a WebSocket and run in this tab – the user watches the
@@ -62,6 +65,44 @@ export const useAi = create<AiState>((set, get) => ({
   },
 }));
 
+/** the MCP server's own invisible browser (opened with &hidden=1) */
+const isHidden = (() => {
+  try {
+    return new URLSearchParams(location.search).get('hidden') === '1';
+  } catch {
+    return false;
+  }
+})();
+
+async function exportProjects() {
+  await saveNow();
+  const all = await listProjects();
+  const projects: string[] = [];
+  for (const s of all) {
+    // only the AI's own maps (not the empty start project of the hidden browser)
+    const p = s.ai ? await loadProject(s.id) : null;
+    if (p) projects.push(serializeProject(p));
+  }
+  return { ok: true, data: { projects } };
+}
+
+async function importProjects(texts: string[]) {
+  let added = 0;
+  for (const t of texts) {
+    try {
+      const p = deserializeProject(t, true);
+      const have = await loadProject(p.id);
+      if (have && have.updatedAt >= p.updatedAt) continue;
+      await saveProject(p);
+      added++;
+    } catch {
+      // skip broken entries
+    }
+  }
+  if (added) useEditor.getState().toast(`${added} Karte(n) der KI übernommen – unter Karte → „Gespeicherte Karten“`, 'success');
+  return { ok: true, data: { added } };
+}
+
 let ws: WebSocket | null = null;
 let retry = 0;
 let started = false;
@@ -90,7 +131,7 @@ function connect() {
   ws = sock;
   sock.onopen = () => {
     useAi.setState({ status: 'connected', error: null });
-    sock.send(JSON.stringify({ type: 'hello', app: 'mapforge', version: spec.version, commands: COMMANDS }));
+    sock.send(JSON.stringify({ type: 'hello', app: 'mapforge', version: spec.version, commands: COMMANDS, hidden: isHidden }));
     useEditor.getState().toast('KI verbunden – sie kann jetzt Karten und Figuren bearbeiten', 'success');
   };
   sock.onmessage = async (ev) => {
@@ -101,6 +142,12 @@ function connect() {
       return;
     }
     if (!msg.command) return;
+    // server-internal: hand the maps of the hidden browser over to the tab the user sees
+    if (msg.command === '__export_projects' || msg.command === '__import_projects') {
+      const result = await (msg.command === '__export_projects' ? exportProjects() : importProjects((msg.args?.projects as string[]) ?? []));
+      if (sock.readyState === WebSocket.OPEN) sock.send(JSON.stringify({ id: msg.id, result }));
+      return;
+    }
     useAi.setState({ last: msg.command, count: useAi.getState().count + 1 });
     const result = await runCommand(msg.command, msg.args ?? {});
     if (sock.readyState === WebSocket.OPEN) sock.send(JSON.stringify({ id: msg.id, result }));
