@@ -4,7 +4,7 @@ import { Workspace, ViewSwitch } from '../components/Workspace';
 import { GeneratorPanel, GenerateButtons } from '../components/GeneratorPanel';
 import { LayersPanel } from '../layers/LayersPanel';
 import { TilesPanel } from '../tilesets/TilesPanel';
-import { ActiveTileChip, BrushSize, CollisionToggle, ToolButtons, UndoRedo } from '../editor/Toolbar';
+import { ActiveTileChip, BrushSize, CollisionToggle, TileTurn, ToolButtons, UndoRedo } from '../editor/Toolbar';
 import { BottomSheet } from './BottomSheet';
 import { useEditor, type MobilePanel } from '../store/editorStore';
 import { useProject } from '../store/projectStore';
@@ -88,6 +88,7 @@ export function MobileLayout() {
             <div className="m-float-bottom">
               <ActiveTileChip onClick={() => setPanel('tiles')} />
               <BrushSize />
+              <TileTurn />
             </div>
           )}
         </Workspace>

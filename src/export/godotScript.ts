@@ -199,7 +199,8 @@ func build_layers(data: Dictionary) -> void:
 				source.create_tile(coords)
 			if role == "collision":
 				_ensure_collision(source, coords)
-			node.set_cell(Vector2i(int(t["x"]), int(t["y"])), source_id, coords)
+			# turned / mirrored tiles: alternative = TRANSFORM_FLIP_H | FLIP_V | TRANSPOSE
+			node.set_cell(Vector2i(int(t["x"]), int(t["y"])), source_id, coords, int(t.get("alternative", 0)))
 
 	if not world_added:
 		add_child(world)
@@ -402,7 +403,7 @@ func _build_lift(parent: Node, lf: Dictionary) -> void:
 			var cell := Vector2i(c, bottom)
 			var sid := src_layer.get_cell_source_id(cell)
 			if sid >= 0:
-				tiles.set_cell(cell, sid, src_layer.get_cell_atlas_coords(cell))
+				tiles.set_cell(cell, sid, src_layer.get_cell_atlas_coords(cell), src_layer.get_cell_alternative_tile(cell))
 				src_layer.erase_cell(cell)
 	body.add_child(tiles)
 	var shape := CollisionShape2D.new()

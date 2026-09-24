@@ -8,6 +8,7 @@ import { setRenderer } from './rendererRef';
 import { computeBlocked } from './collision';
 import { applyAutoWalls } from './autoWalls';
 import { pasteClip, stampOrigin } from './clipboard';
+import { tileOf, transformOf, withTransform } from '../tilesets/gid';
 import { OBJECT_DEFS } from '../objects/defs';
 import type { MapObject, Project } from '../types';
 import { TilePools, tilesetSupports } from '../tilesets/tilePools';
@@ -50,7 +51,8 @@ export function pickTile(x: number, y: number): boolean {
   }
   if (!gid || !layerId) return false;
   setActiveLayer(layerId);
-  useEditor.setState({ selectedGid: gid, tool: 'brush' });
+  // the pipette also takes over how the tile is turned
+  useEditor.setState({ selectedGid: tileOf(gid), tileTurn: transformOf(gid), tool: 'brush' });
   return true;
 }
 
@@ -223,9 +225,9 @@ export function MapCanvas() {
     };
 
     const paintAt = (c: Pt) => {
-      const { tool, brushSize, selectedGid } = editor();
+      const { tool, brushSize, selectedGid, tileTurn } = editor();
       const { width: W, height: H } = dims();
-      const gid = tool === 'eraser' ? 0 : selectedGid;
+      const gid = tool === 'eraser' ? 0 : withTransform(selectedGid, tileTurn);
       const from = lastCell ?? c;
       const cells: number[] = [];
       for (const [x, y] of lineCells(from.x, from.y, c.x, c.y)) cells.push(...brushCells(x, y, brushSize, W, H));
@@ -490,7 +492,7 @@ export function MapCanvas() {
         const r = rectFromPoints(anchor, cell, W, H);
         if (!selectedGid) editor().toast('Zuerst ein Tile auswählen');
         else if (r.w > 0 && r.h > 0 && startStroke()) {
-          store().strokeSet(rectCells(r, W), selectedGid);
+          store().strokeSet(rectCells(r, W), withTransform(selectedGid, editor().tileTurn));
           finishStroke('Rechteck');
         }
       } else if (mode === 'select' && anchor) {
@@ -502,7 +504,7 @@ export function MapCanvas() {
           else if (startStroke()) {
             const p = store().project;
             const layer = p.layers.find((l) => l.id === p.activeLayerId)!;
-            store().strokeSet(floodCells(layer.data, W, H, cell.x, cell.y, editor().selection), selectedGid);
+            store().strokeSet(floodCells(layer.data, W, H, cell.x, cell.y, editor().selection), withTransform(selectedGid, editor().tileTurn));
             finishStroke('Füllen');
           }
         } else if (tool === 'pipette') {

@@ -75,6 +75,12 @@ export const Icon = {
       <path d="M8.6 8L20 18M8.6 16L20 6" />
     </Svg>
   ),
+  Rotate: (p: P) => (
+    <Svg {...p}>
+      <path d="M19 12a7 7 0 11-2.05-4.95" />
+      <path d="M19 4v4h-4" />
+    </Svg>
+  ),
   Play: (p: P) => (
     <Svg {...p}>
       <path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="none" />

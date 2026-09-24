@@ -1276,6 +1276,12 @@ input[type='range']:active::-webkit-slider-thumb {
   background: var(--accent-soft);
   box-shadow: inset 0 0 0 1px var(--accent-line);
 }
+.turn-wrap {
+  display: inline-flex;
+}
+.m-float-bottom {
+  flex-wrap: wrap;
+}
 .hover-info {
   padding: 7px 10px;
   border-radius: 9px;

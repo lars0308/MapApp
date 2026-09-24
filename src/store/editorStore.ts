@@ -38,6 +38,9 @@ interface EditorState {
   /** object brush (null = tiles) */
   selectedObject: ObjectType | null;
   playtest: boolean;
+  /** turn / mirror of the painted tile (TRANSFORM bits, see tilesets/gid.ts) */
+  tileTurn: number;
+  setTileTurn: (t: number) => void;
   /** copied map area (stamp) */
   clipboard: Clip | null;
   setClipboard: (c: Clip | null) => void;
@@ -92,6 +95,8 @@ export const useEditor = create<EditorState>((set, get) => ({
   autoWalls: true,
   selectedObject: null,
   playtest: false,
+  tileTurn: 0,
+  setTileTurn: (tileTurn) => set({ tileTurn }),
   clipboard: null,
   setClipboard: (clipboard) => set({ clipboard }),
   setFlag: (key, value) => set({ [key]: value } as Partial<EditorState>),
@@ -107,7 +112,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   setBrushSize: (brushSize) => set({ brushSize }),
   selectTile: (gid) => {
     const { tool } = get();
-    set({ selectedGid: gid, selectedObject: null, tool: tool === 'eraser' || tool === 'pipette' || tool === 'hand' ? 'brush' : tool });
+    set({ selectedGid: gid, tileTurn: 0, selectedObject: null, tool: tool === 'eraser' || tool === 'pipette' || tool === 'hand' ? 'brush' : tool });
   },
   toggleMark: (gid) => {
     const m = get().markedGids;

@@ -1,4 +1,5 @@
 import type { LayerRole, Project, TileCategory, TileMeta, TileRole } from '../types';
+import { tileOf } from '../tilesets/gid';
 import { OBJECT_DEFS } from '../objects/defs';
 
 // Walkability from the *current* map content (incl. manual edits).
@@ -91,7 +92,7 @@ export function computeBlocked(p: Project, opts: { voidBlocks?: boolean } = {}):
       const g = l.data[i];
       if (!g) continue;
       has = true;
-      const m = metas[g];
+      const m = metas[tileOf(g)];
       if (isBridgeTile(m)) bridge = true;
       else if (tileBlocks(m)) block = true;
     }

@@ -310,7 +310,7 @@ export const useProject = create<ProjectState>((set, get) => {
         tilesets: p.tilesets.filter((t) => t.id !== id),
         layers: p.layers.map((l) => {
           const data = l.data.slice();
-          for (let i = 0; i < data.length; i++) if (data[i] >= lo && data[i] < hi) data[i] = 0;
+          for (let i = 0; i < data.length; i++) if ((data[i] & 0x0fffffff) >= lo && (data[i] & 0x0fffffff) < hi) data[i] = 0;
           return { ...l, data };
         }),
       }), true);
@@ -333,7 +333,7 @@ export const useProject = create<ProjectState>((set, get) => {
         ),
         layers: p.layers.map((l) => {
           const data = l.data.slice();
-          for (let i = 0; i < data.length; i++) if (data[i] >= lo && data[i] < hi) data[i] = 0;
+          for (let i = 0; i < data.length; i++) if ((data[i] & 0x0fffffff) >= lo && (data[i] & 0x0fffffff) < hi) data[i] = 0;
           return { ...l, data };
         }),
       }), true);

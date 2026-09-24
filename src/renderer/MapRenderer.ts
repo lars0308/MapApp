@@ -2,6 +2,7 @@ import type { Layer, MapObject, Selection, Tileset } from '../types';
 import { OBJECT_DEFS, OBJECT_ATLAS_TILE, objectAtlas } from '../objects/defs';
 import { drawCharacter, type CharacterState } from './character';
 import { GidTable, drawGid } from './tileAtlas';
+import { tileOf } from '../tilesets/gid';
 import { clamp } from '../utils/math';
 import { HEX_CORNERS, ROW_STEP, hexAt, hexOrigin, hexWorldSize } from '../generator/hex';
 
@@ -265,7 +266,7 @@ export class MapRenderer {
       for (let y = cy0; y < y1; y++)
         for (let x = cx0; x < x1; x++) {
           const g = d[y * this.W + x];
-          if (g && !this.hiddenGids.has(g)) drawGid(c, this.table, g, (x - cx0) * ppt, (y - cy0) * ppt, ppt, ppt);
+          if (g && !this.hiddenGids.has(tileOf(g))) drawGid(c, this.table, g, (x - cx0) * ppt, (y - cy0) * ppt, ppt, ppt);
         }
     }
     chunk.dirty = false;
@@ -358,7 +359,7 @@ export class MapRenderer {
         const dh = sy(y + 1) - dy;
         for (let x = x0; x < x1; x++) {
           const g = d[y * this.W + x];
-          if (!g || this.hiddenGids.has(g)) continue;
+          if (!g || this.hiddenGids.has(tileOf(g))) continue;
           const dx = sx(x);
           drawGid(ctx, this.table, g, dx, dy, sx(x + 1) - dx, dh);
         }
@@ -436,7 +437,7 @@ export class MapRenderer {
           for (let x = x0; x < x1; x++) {
             const g = d[y * this.W + x];
             if (!g) continue;
-            const off = g < this.table.sortOff.length ? this.table.sortOff[g] : 0;
+            const off = tileOf(g) < this.table.sortOff.length ? this.table.sortOff[tileOf(g)] : 0;
             items.push({
               key: y + 1 + off - 0.001,
               draw: () => {
@@ -553,7 +554,7 @@ export class MapRenderer {
       for (let y = y0; y < y1; y++)
         for (let x = x0; x < x1; x++) {
           const g = d[y * this.W + x];
-          if (!g || this.hiddenGids.has(g)) continue;
+          if (!g || this.hiddenGids.has(tileOf(g))) continue;
           const [dx, dy, w, h] = box(x, y);
           // zoomed out: 1 px overlap closes the rounding gaps between the interlocking rows
           drawGid(ctx, this.table, g, dx, dy, w + (smooth ? 1 : 0), h + (smooth ? 1 : 0));

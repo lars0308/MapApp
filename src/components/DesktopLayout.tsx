@@ -5,7 +5,7 @@ import { GeneratorPanel } from './GeneratorPanel';
 import { LayersPanel } from '../layers/LayersPanel';
 import { TilesPanel } from '../tilesets/TilesPanel';
 import { PanelTabs } from './ui';
-import { BrushSize, HoverInfo, ToolButtons, ViewControls } from '../editor/Toolbar';
+import { BrushSize, HoverInfo, TileTurn, ToolButtons, ViewControls } from '../editor/Toolbar';
 import { TerrainPanel } from './TerrainPanel';
 import { PlaytestOverlay } from '../playtest/PlaytestOverlay';
 import { TopBar } from './TopBar';
@@ -128,6 +128,7 @@ export function DesktopLayout() {
               </div>
               <div className="float-bottom-left">
                 <BrushSize />
+                <TileTurn />
                 <HoverInfo />
               </div>
             </>

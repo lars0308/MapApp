@@ -11,7 +11,8 @@ import { TileThumb } from '../tilesets/TileThumb';
 import { ObjectThumb } from '../objects/ObjectThumb';
 import { rectCells } from './tools';
 import { applyAutoWalls } from './autoWalls';
-import { copySelection, stampFromSelection } from './clipboard';
+import { copySelection, stampFromSelection, transformClip } from './clipboard';
+import { describeTransform, mirrorH, rotateCW, withTransform } from '../tilesets/gid';
 
 const TOOL_ICON: Record<ToolId, (p: { size?: number }) => React.ReactElement> = {
   brush: Icon.Brush,
@@ -112,6 +113,47 @@ export function BrushSize() {
   );
 }
 
+/** CSS for a thumbnail of a turned / mirrored tile */
+export function turnStyle(t: number): React.CSSProperties | undefined {
+  if (!t) return undefined;
+  const { deg, mirrored } = describeTransform(t);
+  return { transform: `rotate(${deg}deg)${mirrored ? ' scaleX(-1)' : ''}` };
+}
+
+/** turn / mirror the tile being painted – or the whole stamp */
+export function TileTurn() {
+  const tool = useEditor((s) => s.tool);
+  const turn = useEditor((s) => s.tileTurn);
+  const obj = useEditor((s) => s.selectedObject);
+  const gid = useEditor((s) => s.selectedGid);
+  const clip = useEditor((s) => s.clipboard);
+  const stamp = tool === 'stamp' && !!clip;
+  if (!stamp && (!(tool === 'brush' || tool === 'rect' || tool === 'fill') || obj || !gid)) return null;
+  const e = useEditor.getState();
+  const apply = (op: 'rotate' | 'mirror') => {
+    if (stamp) e.setClipboard(transformClip(clip!, op));
+    else e.setTileTurn(op === 'rotate' ? rotateCW(turn) : mirrorH(turn));
+  };
+  const { deg, mirrored } = describeTransform(turn);
+  const what = stamp ? 'Stempel' : 'Tile';
+  return (
+    <div className="brush-size tile-turn" role="group" aria-label={`${what} drehen / spiegeln`}>
+      <button type="button" title={`${what} 90° drehen`} aria-label={`${what} drehen`} className={!stamp && deg ? 'is-active' : ''} onClick={() => apply('rotate')}>
+        <Icon.Rotate size={16} />
+      </button>
+      <button type="button" title={`${what} spiegeln (links ↔ rechts)`} aria-label={`${what} spiegeln`} className={!stamp && mirrored ? 'is-active' : ''} onClick={() => apply('mirror')}>
+        <Icon.Mirror size={16} />
+      </button>
+      {!stamp && turn !== 0 && (
+        <button type="button" title="Zurück auf normal" aria-label="Drehung zurücksetzen" onClick={() => e.setTileTurn(0)}>
+          {deg ? `${deg}°` : '0°'}
+          {mirrored ? '⇋' : ''}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function UndoRedo() {
   const canUndo = useProject((s) => s.canUndo);
   const canRedo = useProject((s) => s.canRedo);
@@ -185,9 +227,18 @@ export function ActiveTileChip({ onClick }: { onClick?: () => void }) {
   const layer = useProject((s) => s.project.layers.find((l) => l.id === s.project.activeLayerId));
   const r = resolveGid(tilesets, gid);
   const obj = useEditor((s) => s.selectedObject);
+  const turn = useEditor((s) => s.tileTurn);
   return (
     <button type="button" className="active-tile" onClick={onClick} title="Aktives Tile und Layer">
-      {obj ? <ObjectThumb type={obj} size={28} /> : r ? <TileThumb ts={r.ts} index={r.index} size={28} /> : <span className="tile-thumb is-empty" />}
+      {obj ? (
+        <ObjectThumb type={obj} size={28} />
+      ) : r ? (
+        <span style={turnStyle(turn)} className="turn-wrap">
+          <TileThumb ts={r.ts} index={r.index} size={28} />
+        </span>
+      ) : (
+        <span className="tile-thumb is-empty" />
+      )}
       <span className="active-tile-layer">
         <span className="layer-color" style={{ background: layer?.color }} />
         {layer?.name ?? '–'}
@@ -231,7 +282,7 @@ export function SelectionActions() {
     if (useEditor.getState().autoWalls) applyAutoWalls(s.strokeCells(), layer.id);
     s.endStroke(label);
   };
-  const gid = useEditor.getState().selectedGid;
+  const gid = withTransform(useEditor.getState().selectedGid, useEditor.getState().tileTurn);
   return (
     <div className="selection-bar">
       <span className="muted">

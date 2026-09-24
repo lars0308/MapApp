@@ -1,4 +1,5 @@
 import { TERRAIN_NAMES, type Project, type Tileset } from '../types';
+import { FLIP_H, FLIP_V, TRANSPOSE, tileOf, transformOf } from '../tilesets/gid';
 import { loadImage, canvasToBlob } from '../utils/image';
 import { rleEncode } from '../utils/rle';
 import { safeFileName } from '../utils/download';
@@ -30,6 +31,8 @@ export interface GodotTile {
   ySortEnabled: boolean;
   /** row (tiles) whose bottom edge is the y-sort origin */
   sortOriginY: number;
+  /** turned / mirrored tile: Godot alternative id with TRANSFORM_* flags */
+  alternative?: number;
 }
 
 export function tilesetImageName(ts: Tileset): string {
@@ -104,7 +107,7 @@ export async function buildGodotData(p: Project, opts: { embedImages: boolean; i
   const metas = metaTable(p);
   const r = p.result;
   const used = new Set<number>();
-  for (const l of p.layers) for (let i = 0; i < l.data.length; i++) if (l.data[i]) used.add(l.data[i]);
+  for (const l of p.layers) for (let i = 0; i < l.data.length; i++) if (l.data[i]) used.add(tileOf(l.data[i]));
   const exportedTilesets = p.tilesets.filter((ts) => {
     const n = ts.columns * ts.rows;
     for (let g = ts.firstGid; g < ts.firstGid + n; g++) if (used.has(g)) return true;
@@ -162,17 +165,21 @@ export async function buildGodotData(p: Project, opts: { embedImages: boolean; i
     const tiles: GodotTile[] = [];
     for (let y = 0; y < H; y++)
       for (let x = 0; x < W; x++) {
-        const gid = l.data[y * W + x];
-        if (!gid) continue;
+        const cell = l.data[y * W + x];
+        if (!cell) continue;
+        const gid = tileOf(cell);
+        const turn = transformOf(cell);
         const ts = tsFor(gid);
         if (!ts) continue;
         const local = gid - ts.firstGid;
-        const meta = metas[gid];
+        const meta = metas[tileOf(gid)];
         tiles.push({
           tilesetId: ts.id,
           tileId: local,
           sourceId: sourceIdOf.get(ts.id)!,
           atlasCoordinates: [local % ts.columns, Math.floor(local / ts.columns)],
+          // Godot alternative tile: TRANSFORM_FLIP_H 4096 | FLIP_V 8192 | TRANSPOSE 16384
+          ...(turn ? { alternative: (turn & FLIP_H ? 4096 : 0) | (turn & FLIP_V ? 8192 : 0) | (turn & TRANSPOSE ? 16384 : 0) } : {}),
           x,
           y,
           layer: godotName,

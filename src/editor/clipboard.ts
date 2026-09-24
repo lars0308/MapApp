@@ -3,6 +3,7 @@ import { useProject } from '../store/projectStore';
 import { OBJECT_DEFS } from '../objects/defs';
 import type { ObjectType, Project, Selection } from '../types';
 import { uid } from '../utils/id';
+import { mirrorH, rotateCW, transformOf, withTransform } from '../tilesets/gid';
 
 // Copy / cut / paste a map area: tiles of every layer, the objects standing in it and the
 // map structure below (so auto-walls keep working). Pasting = the stamp tool: empty cells of
@@ -144,4 +145,38 @@ export function copySelection(cut = false): boolean {
 /** copy and switch to the stamp right away */
 export function stampFromSelection(): void {
   if (copySelection()) useEditor.getState().setTool('stamp');
+}
+
+/**
+ * turn the copy 90° clockwise or mirror it: cells move and every tile turns with them
+ * (objects keep their look, only their place changes)
+ */
+export function transformClip(clip: Clip, op: 'rotate' | 'mirror'): Clip {
+  const rot = op === 'rotate';
+  const w = rot ? clip.h : clip.w;
+  const h = rot ? clip.w : clip.h;
+  // new position of an old cell
+  const to = (x: number, y: number): [number, number] => (rot ? [clip.h - 1 - y, x] : [clip.w - 1 - x, y]);
+  const move = <T extends Uint8Array | Uint32Array>(src: T, turn?: (v: number) => number): T => {
+    const out = new (src.constructor as { new (n: number): T })(w * h);
+    for (let y = 0; y < clip.h; y++)
+      for (let x = 0; x < clip.w; x++) {
+        const v = src[y * clip.w + x];
+        const [nx, ny] = to(x, y);
+        out[ny * w + nx] = turn && v ? turn(v) : v;
+      }
+    return out;
+  };
+  const turnTile = (v: number) => withTransform(v, (rot ? rotateCW : mirrorH)(transformOf(v)));
+  return {
+    w,
+    h,
+    layers: clip.layers.map((l) => ({ ...l, data: move(l.data, turnTile) })),
+    objects: clip.objects.map((o) => {
+      const [dx, dy] = to(o.dx, o.dy);
+      return { ...o, dx, dy };
+    }),
+    cells: clip.cells && move(clip.cells),
+    terrain: clip.terrain && move(clip.terrain),
+  };
 }

@@ -1,4 +1,5 @@
 import { CELL_CORRIDOR, CELL_HAZARD, CELL_ROOM, CELL_VOID, CELL_WALL, type TileRole } from '../types';
+import { tileOf } from '../tilesets/gid';
 import { useProject } from '../store/projectStore';
 import { TilePools } from '../tilesets/tilePools';
 import { frontTilePrefs, resolveWalls, roleAt } from '../generator/autotile';
@@ -37,7 +38,7 @@ export function applyAutoWalls(changed: number[], paintedLayerId: string) {
   const painted = p.layers.find((l) => l.id === paintedLayerId);
   if (!painted) return;
   const isDoor = (g: number) => {
-    const m = metas[g];
+    const m = metas[tileOf(g)];
     return !!m && (m.role === 'door' || m.category === 'door');
   };
 
@@ -49,7 +50,7 @@ export function applyAutoWalls(changed: number[], paintedLayerId: string) {
   const pathL = layerByRole('paths');
   const WALKABLE = new Set(['floor', 'floorVariant', 'path', 'bridge', 'stairs', 'transition']);
   const isWalkable = (g: number) => {
-    const m = metas[g];
+    const m = metas[tileOf(g)];
     if (!m) return false;
     if (m.role) return m.role.startsWith('floor') || m.role.startsWith('bridge') || m.role === 'raised_floor' || m.role === 'transition' || m.role === 'stairs';
     return !!m.category && WALKABLE.has(m.category);
@@ -188,7 +189,7 @@ function applyAutoGround(changed: number[], paintedLayerId: string) {
   if (!groundL || groundL.id !== paintedLayerId || !changed.length) return;
   const metas = metaTable(p);
   const isGroundGid = (g: number) => {
-    const m = metas[g];
+    const m = metas[tileOf(g)];
     return !!m && (GROUND_ROLES.has(m.role as TileRole) || (!m.role && !!m.category && m.category.startsWith('wall')));
   };
   const data = groundL.data;
@@ -196,7 +197,7 @@ function applyAutoGround(changed: number[], paintedLayerId: string) {
   const pools = new TilePools(p.tilesets, 'side_view');
   const style = p.generator.side?.style === 'cave' ? 'cave' : 'grass';
   // the style of the painted tile wins (grass / cave)
-  const paintedTag = metas[changed.map((i) => data[i]).find((g) => g) ?? 0]?.tags.find((t) => t === 'grass' || t === 'cave') ?? style;
+  const paintedTag = metas[tileOf(changed.map((i) => data[i]).find((g) => g) ?? 0)]?.tags.find((t) => t === 'grass' || t === 'cave') ?? style;
   const ring = new Set<number>();
   for (const i of changed) {
     const x = i % W;
@@ -220,7 +221,7 @@ function applyAutoGround(changed: number[], paintedLayerId: string) {
     const g = data[i];
     const isGround = isGroundGid(g);
     if (isGround) {
-      const own = metas[g]?.tags.find((t) => t === 'grass' || t === 'cave') ?? paintedTag;
+      const own = metas[tileOf(g)]?.tags.find((t) => t === 'grass' || t === 'cave') ?? paintedTag;
       const gid = pools.pickRole(new Rng(hashSeed(`${r?.seed ?? ''}:${i}`)), groundRole(solid, x, y), ['side', own]);
       if (gid && gid !== g) (cells.push(i), gids.push(gid));
     }
@@ -247,7 +248,7 @@ function applyAutoHex(changed: number[], paintedLayerId: string) {
   if (!layer || !changed.length) return;
   const metas = metaTable(p);
   const roleOf = (g: number) => {
-    const r = metas[g]?.role;
+    const r = metas[tileOf(g)]?.role;
     return r === 'hex_river' || r === 'hex_road' ? r : null;
   };
   const data = layer.data;
@@ -270,7 +271,7 @@ function applyAutoHex(changed: number[], paintedLayerId: string) {
       const [nx, ny] = hexNeighbor(i % W, (i / W) | 0, d);
       if (nx >= 0 && ny >= 0 && nx < W && ny < H && roleOf(data[ny * W + nx]) === role) mask |= 1 << d;
     }
-    if (metas[data[i]]?.tags.includes(`m${mask}`)) continue;
+    if (metas[tileOf(data[i])]?.tags.includes(`m${mask}`)) continue;
     const gid = pools.pickRole(new Rng(hashSeed(`${i}`)), role, [`m${mask}`]);
     if (gid && gid !== data[i]) (cells.push(i), gids.push(gid));
   }

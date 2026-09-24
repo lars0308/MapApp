@@ -1,4 +1,5 @@
 import type { Project, TileMeta } from '../types';
+import { tileOf } from '../tilesets/gid';
 import { metaTable, tileBlocks } from '../editor/collision';
 import { defaultSide } from '../generator/presets';
 
@@ -111,10 +112,10 @@ export function buildSideMap(p: Project): SideMap {
     for (const l of layers) {
       const g = l.data[i];
       if (!g) continue;
-      const role = metas[g]?.role;
-      if (role === 'lift') liftAt[i] = g;
+      const role = metas[tileOf(g)]?.role;
+      if (role === 'lift') liftAt[i] = tileOf(g);
       else if (role === 'lift_track') track[i] = 1;
-      const k = kindOf(metas[g]);
+      const k = kindOf(metas[tileOf(g)]);
       if (k) m[k][i] = 1;
     }
     if (collision.some((l) => l.data[i])) m.solid[i] = 1;

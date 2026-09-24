@@ -1,5 +1,6 @@
 import type { Tileset } from '../types';
 import { mapEvents } from '../store/events';
+import { TRANSPOSE, applyCanvasTransform, tileOf, transformOf } from '../tilesets/gid';
 
 // Loads tileset images once and provides a flat gid → source-rect lookup.
 
@@ -81,11 +82,23 @@ export function drawGid(
   dw: number,
   dh: number,
 ): void {
+  const t = transformOf(gid);
+  gid = tileOf(gid);
   if (gid >= table.imgIndex.length) return;
   const k = table.imgIndex[gid];
   if (k < 0) return;
   const img = table.imgs[k];
   if (!img) return;
   const s = table.size[gid];
-  ctx.drawImage(img, table.sx[gid], table.sy[gid], s, s, dx, dy, dw, dh);
+  if (!t) {
+    ctx.drawImage(img, table.sx[gid], table.sy[gid], s, s, dx, dy, dw, dh);
+    return;
+  }
+  // turned / mirrored tile
+  ctx.save();
+  applyCanvasTransform(ctx, t, dx, dy, dw, dh);
+  const w = t & TRANSPOSE ? dh : dw;
+  const h = t & TRANSPOSE ? dw : dh;
+  ctx.drawImage(img, table.sx[gid], table.sy[gid], s, s, -w / 2, -h / 2, w, h);
+  ctx.restore();
 }
