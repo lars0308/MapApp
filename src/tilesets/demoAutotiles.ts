@@ -305,6 +305,38 @@ function sand(d: D, ripples: boolean) {
   if (ripples) for (let y = 3; y < T; y += 5) d.rect(d.rng.int(0, 4), y, d.rng.int(6, 10), 1, '#9c8452');
 }
 
+/** meadow: grass with blades, optionally flowers */
+function grass(d: D, kind: 'plain' | 'blades' | 'flowers' | 'dark') {
+  const base = kind === 'dark' ? '#3f7433' : '#4f8a3c';
+  d.rect(0, 0, T, T, base);
+  d.speckle(kind === 'dark' ? ['#355f2b', '#4a8039'] : ['#5d9a47', '#437a33', '#6aa653'], 0.28);
+  if (kind === 'blades' || kind === 'flowers')
+    for (let k = 0; k < 5; k++) {
+      const x = d.rng.int(1, T - 2);
+      const y = d.rng.int(2, T - 2);
+      d.px(x, y, '#7bbf5e').px(x, y - 1, '#6aa653');
+    }
+  if (kind === 'flowers')
+    for (let k = 0; k < 3; k++) {
+      const x = d.rng.int(2, T - 3);
+      const y = d.rng.int(2, T - 3);
+      const c = d.rng.pick(['#f2d27a', '#e889b0', '#f4f1ea', '#9ab8f0']);
+      d.px(x, y, c).px(x - 1, y, c).px(x + 1, y, c).px(x, y - 1, c).px(x, y + 1, '#c9a13c');
+    }
+}
+
+/** trodden dirt path */
+function dirt(d: D, stones: boolean) {
+  d.rect(0, 0, T, T, '#8a6a45');
+  d.speckle(['#9a7a52', '#7a5c3b', '#a58660'], 0.3);
+  if (stones)
+    for (let k = 0; k < 3; k++) {
+      const x = d.rng.int(1, T - 3);
+      const y = d.rng.int(1, T - 3);
+      d.rect(x, y, 2, 2, '#b3a391').px(x, y, '#cfc2b3');
+    }
+}
+
 /** Bridge tile drawn vertically (walked north–south); horizontal ones are rotated. */
 function bridgeV(d: D, part: 'start' | 'middle' | 'end' | 'left' | 'right') {
   d.rect(0, 0, T, T, 'rgba(0,0,0,0)');
@@ -427,6 +459,13 @@ function terrainDefs(): Def[] {
     { category: 'floor', role: 'floor_center', tags: ['wood', 'broken'], weight: 30, draw: (d) => planks(d, true) },
     { category: 'floor', role: 'floor_center', tags: ['sand'], weight: 60, draw: (d) => sand(d, false) },
     { category: 'floor', role: 'floor_center', tags: ['sand'], weight: 40, draw: (d) => sand(d, true) },
+    // outdoor: meadow and dirt paths (maps with layout "outdoor" / "village")
+    { category: 'floor', role: 'floor_center', tags: ['grass'], weight: 45, draw: (d) => grass(d, 'plain') },
+    { category: 'floor', role: 'floor_center', tags: ['grass'], weight: 35, draw: (d) => grass(d, 'blades') },
+    { category: 'floor', role: 'floor_center', tags: ['grass', 'flowers'], weight: 12, draw: (d) => grass(d, 'flowers') },
+    { category: 'floor', role: 'floor_center', tags: ['grass', 'dark'], weight: 8, draw: (d) => grass(d, 'dark') },
+    { category: 'path', tags: ['dirt'], weight: 70, draw: (d) => dirt(d, false) },
+    { category: 'path', tags: ['dirt', 'stones'], weight: 30, draw: (d) => dirt(d, true) },
     { role: 'transition', tags: ['transition'], weight: 100, draw: transition },
     { role: 'abyss_edge', category: 'abyss', tags: ['edge'], weight: 100, collision: true, draw: abyssEdge },
     { role: 'cliff_shadow', category: 'shadow', tags: ['top'], weight: 100, draw: shadowGrad },

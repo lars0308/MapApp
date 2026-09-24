@@ -386,9 +386,11 @@ function WizardDialog() {
                 options={[
                   { value: 'rooms', label: 'Gebaute Räume' },
                   { value: 'cave', label: 'Natürliche Höhle' },
+                  { value: 'outdoor', label: 'Außenbereich' },
+                  { value: 'village', label: 'Dorf' },
                 ]}
               />
-              {gen.layout === 'cave' && <Slider label="Zerklüftung" value={gen.caveRoughness ?? 60} unit="%" onChange={(v) => setGen({ caveRoughness: v })} />}
+              {gen.layout && gen.layout !== 'rooms' && <Slider label="Zerklüftung" value={gen.caveRoughness ?? 60} unit="%" onChange={(v) => setGen({ caveRoughness: v })} />}
               <Slider label="Anzahl Räume" value={gen.roomCount} min={2} max={60} onChange={(v) => setGen({ roomCount: v })} />
               <div className="grid-2">
                 <NumberField label="Min. Breite" value={gen.roomMinW} min={3} max={gen.roomMaxW} onChange={(v) => setGen({ roomMinW: v })} />

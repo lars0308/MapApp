@@ -133,8 +133,10 @@ export function generate(input: GenerateInput): GenerateOutput {
   const deadEnds = carveBranches(grid, s, rBranch, placed.length);
   // natural caves: the same layout, reshaped by a cellular automaton
   const cave = s.layout === 'cave';
-  if (cave) {
-    cavify(grid, placed, corridors.map((c) => c.path), s.caveRoughness ?? 60, root.fork(127));
+  // outdoor / village: clearings and paths get natural edges too, the rest becomes forest
+  const outdoor = s.layout === 'outdoor' || s.layout === 'village';
+  if (cave || outdoor) {
+    cavify(grid, placed, corridors.map((c) => c.path), s.caveRoughness ?? (outdoor ? 45 : 60), root.fork(127));
     computeNearRoom(grid);
   }
 
@@ -159,6 +161,16 @@ export function generate(input: GenerateInput): GenerateOutput {
   if (s.terrain.transitions.enabled) placeTransitions(grid, ts, roomTerrain, corridorTerrain, s.terrain.transitions.amount, rTerrain);
   warnings.push(...ts.warnings);
 
+  // outdoor: no walls – everything outside the clearings and paths is forest (walkable ground,
+  // blocked by the collision layer, covered with trees further down)
+  const forest = new Uint8Array(outdoor ? W * H : 0);
+  if (outdoor)
+    for (let i = 0; i < W * H; i++)
+      if (grid.cells[i] === CELL_VOID) {
+        forest[i] = 1;
+        grid.cells[i] = CELL_ROOM;
+      }
+
   // 11: walls + auto-tile roles (fronts/caps in 3/4 views), shadow + floor masks
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
@@ -179,7 +191,7 @@ export function generate(input: GenerateInput): GenerateOutput {
 
   // 12: doors where corridors meet rooms (narrow openings only) + door frames
   // caves have no doors (openings stay open)
-  const doors = (cave ? [] : findDoors(grid)).filter((d) => {
+  const doors = (cave || outdoor ? [] : findDoors(grid)).filter((d) => {
     const t = ts.terrain[d.y * W + d.x];
     return t === T_NONE || t === T_TRANSITION;
   });
@@ -192,7 +204,11 @@ export function generate(input: GenerateInput): GenerateOutput {
   const reserved = new Set<number>(ts.reserved);
   for (const d of doors) for (let oy = -2; oy <= 2; oy++) for (let ox = -2; ox <= 2; ox++) reserved.add((d.y + oy) * W + d.x + ox);
   const octx: ObjectContext = { g: grid, terrain: ts.terrain, reserved, occupied: new Uint8Array(W * H) };
-  const objects = placeObjects(octx, placed, (id) => specials.get(id) ?? 'normal', s, rObjects);
+  // forest cells are no place for room objects
+  if (outdoor) for (let i = 0; i < W * H; i++) if (forest[i]) octx.occupied[i] = 1;
+  // village: houses at the clearings, a well in the start clearing
+  const houses: MapObject[] = s.layout === 'village' ? placeHouses(octx, forest, placed, specials, W, root.fork(131)) : [];
+  const objects = [...houses, ...placeObjects(octx, placed, (id) => specials.get(id) ?? 'normal', s, rObjects)];
 
   // small obstacles (single tiles) in room interiors
   const obstacles = new Set<number>();
@@ -309,11 +325,14 @@ export function generate(input: GenerateInput): GenerateOutput {
     if (colL && collisionGid) colL[i] = collisionGid;
   };
   const tagAt = (i: number) => {
+    if (outdoor) return 'grass';
     const rid = grid.roomId[i];
     return terrainTag(rid >= 0 ? roomTerrain[rid] : corridorTerrain);
   };
   const walk = (i: number) => grid.cells[i] !== CELL_VOID && grid.cells[i] !== CELL_WALL;
   const floorTile = (i: number) => {
+    // outdoor: light meadow in the clearings, darker ground under the trees
+    if (outdoor) return pools.pickRole(rTiles, 'floor_center', forest[i] ? ['grass', 'dark'] : ['grass'], forest[i] ? undefined : ['dark']);
     if (pools.has('floorVariant') && rTiles.chance(variation)) return pools.pick(rTiles, ['floorVariant', 'floor']);
     // edge-aware floor when the tileset provides edge roles
     const edge: TileRole | null = !walk(i - W) ? 'floor_edge_top' : !walk(i + W) ? 'floor_edge_bottom' : !walk(i - 1) ? 'floor_edge_left' : !walk(i + 1) ? 'floor_edge_right' : null;
@@ -344,7 +363,9 @@ export function generate(input: GenerateInput): GenerateOutput {
     if (t === T_BRIDGE) {
       const b = ts.bridges.get(i)!;
       if (pathL) pathL[i] = pools.pickRole(rTiles, b.role, [b.orient]);
-    } else if (c === CELL_CORRIDOR && pathL && t !== T_WATER && t !== T_LAVA && t !== T_ABYSS) pathL[i] = pools.pick(rTiles, ['path']);
+    } else if (c === CELL_CORRIDOR && pathL && t !== T_WATER && t !== T_LAVA && t !== T_ABYSS)
+      // outdoor: dirt paths; dungeons: no dirt
+      pathL[i] = outdoor ? pools.pickPref(rTiles, ['path'], 'dirt') : pools.pickPref(rTiles, ['path'], undefined, ['dirt']);
     if (t === T_TRANSITION && detailL && pools.hasRole('transition')) detailL[i] = pools.pickRole(rTiles, 'transition');
     const sh = walls.shadows[i];
     if (sh && shadowL && t !== T_ABYSS) shadowL[i] = pools.pickRole(rTiles, 'shadow', [sh]);
@@ -428,6 +449,27 @@ export function generate(input: GenerateInput): GenerateOutput {
     }
   }
   for (const o of objects) for (const [dx, dy] of objectDef(o.type)?.collision ?? []) block((o.y + dy) * W + o.x + dx);
+  if (outdoor) {
+    // forest: impassable, densely covered with trees (a little jitter so it looks grown)
+    const rForest = root.fork(137);
+    const taken = new Uint8Array(W * H);
+    for (let i = 0; i < W * H; i++) if (forest[i]) block(i);
+    for (let y = 2; y < H + 1; y += 2)
+      for (let x = -1; x < W; x += 2) {
+        const tx = x + (rForest.chance(0.4) ? 1 : 0);
+        const ty = Math.min(H - 1, y + (rForest.chance(0.3) ? 1 : 0));
+        let fits = true;
+        for (let yy = ty - 1; yy <= ty && fits; yy++)
+          for (let xx = tx; xx < tx + 2 && fits; xx++) {
+            if (xx < 0 || xx >= W) continue;
+            const i = yy * W + xx;
+            if (!forest[i] || taken[i]) fits = false;
+          }
+        if (!fits || rForest.chance(0.04)) continue;
+        for (let yy = ty - 1; yy <= ty; yy++) for (let xx = tx; xx < tx + 2; xx++) if (xx >= 0 && xx < W) taken[yy * W + xx] = 1;
+        objects.push({ id: `forest_${objects.length}`, type: 'tree', x: tx, y: ty });
+      }
+  }
 
   if (decoL && s.decoDensity > 0 && pools.has('deco')) {
     const p = (s.decoDensity / 100) * 0.14;
@@ -435,7 +477,8 @@ export function generate(input: GenerateInput): GenerateOutput {
       const c = grid.cells[i];
       if ((c !== CELL_ROOM && c !== CELL_CORRIDOR) || doorSet.has(i) || obstacles.has(i) || octx.occupied[i]) continue;
       if (ts.terrain[i] !== T_NONE && ts.terrain[i] !== T_PLATEAU) continue;
-      if (rDeco.chance(c === CELL_ROOM ? p : p * 0.35)) decoL[i] = pools.pick(rDeco, ['deco']);
+      // outdoor: only deco meant for outside (tag grass), no bones in the meadow
+      if (rDeco.chance(c === CELL_ROOM ? p : p * 0.35)) decoL[i] = outdoor ? pools.pickTagged(rDeco, 'deco', 'grass') : pools.pick(rDeco, ['deco']);
     }
   }
 
@@ -660,4 +703,70 @@ function populate(
     }
   }
   return { spawns };
+}
+
+/** village houses: along the upper part of each clearing, doors facing the open ground */
+function placeHouses(c: ObjectContext, forest: Uint8Array, rooms: { id: number; x: number; y: number; w: number; h: number; cx: number; cy: number; area: number }[], specials: Map<number, string>, W: number, rng: Rng): MapObject[] {
+  const out: MapObject[] = [];
+  // like canPlace, but paths (reserved cells) may run right past a house – only the footprint
+  // itself must be free, the ring around it only needs to stay open ground
+  const { g } = c;
+  const inside = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < g.W && yy < g.H;
+  // forest may be cleared around a house (roof row and ring), the front row stays open ground
+  const fits = (type: 'house' | 'well', x: number, y: number) => {
+    const def = objectDef(type)!;
+    for (let yy = y - def.h; yy <= y + 1; yy++)
+      for (let xx = x - 1; xx <= x + def.w; xx++) {
+        if (!inside(xx, yy)) return false;
+        const i = yy * g.W + xx;
+        const foot = yy > y - def.h && yy <= y && xx >= x && xx < x + def.w;
+        const t = c.terrain[i];
+        if (t !== T_NONE && t !== T_TRANSITION) return false;
+        const clearable = forest[i] && yy <= y - def.h + 1 && xx > 0 && yy > 0 && xx < g.W - 1;
+        if (clearable) continue;
+        if (c.occupied[i]) return false;
+        if (foot ? g.cells[i] !== CELL_ROOM || c.reserved.has(i) : g.cells[i] !== CELL_ROOM && g.cells[i] !== CELL_CORRIDOR) return false;
+      }
+    return true;
+  };
+  const bounds = new Map<number, [number, number, number, number]>();
+  for (let i = 0; i < g.W * g.H; i++) {
+    const id = g.roomId[i];
+    if (id < 0) continue;
+    const x = i % g.W;
+    const y = (i / g.W) | 0;
+    const b = bounds.get(id);
+    if (!b) bounds.set(id, [x, y, x, y]);
+    else (b[0] = Math.min(b[0], x)), (b[1] = Math.min(b[1], y)), (b[2] = Math.max(b[2], x)), (b[3] = Math.max(b[3], y));
+  }
+  const add = (type: 'house' | 'well', x: number, y: number) => {
+    if (!fits(type, x, y)) return false;
+    const def = objectDef(type)!;
+    for (let yy = y - def.h; yy <= y + 1; yy++) for (let xx = x - 1; xx <= x + def.w; xx++) forest[yy * g.W + xx] = 0;
+    occupy(c, type, x, y);
+    out.push({ id: `${type}_${out.length}`, type, x, y });
+    return true;
+  };
+  for (const r of rooms) {
+    const type = specials.get(r.id) ?? 'normal';
+    if (type === 'start') {
+      for (const [dx, dy] of [[2, 0], [-2, 0], [0, 2], [2, 2]]) if (add('well', r.cx + dx, r.cy + dy)) break;
+      continue;
+    }
+    const want = Math.max(1, Math.min(4, Math.round(r.area / 70)));
+    // every spot in the clearing that fits, the back half first (the square in front stays open)
+    // (the clearing grew beyond its rectangle – search its real extent)
+    const spots: [number, number, number][] = [];
+    const [x0, y0, x1, y1] = bounds.get(r.id) ?? [r.x, r.y, r.x + r.w - 1, r.y + r.h - 1];
+    for (let y = y0 + 2; y <= y1; y++)
+      for (let x = x0; x <= x1 - 2; x++) if (fits('house', x, y)) spots.push([x, y, (y > r.cy ? 1 : 0) + rng.next()]);
+    spots.sort((a, b) => a[2] - b[2]);
+    let made = 0;
+    for (const [x, y] of spots) {
+      if (made >= want) break;
+      if (add('house', x, y)) made++;
+    }
+  }
+  void W;
+  return out;
 }

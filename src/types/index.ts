@@ -245,7 +245,7 @@ export interface GeneratorSettings {
   terrain: TerrainSettings;
   objects: { trees: number; rocks: number; arches: number; pillars: boolean };
   /** room layout: built rooms (default) or natural caves */
-  layout?: 'rooms' | 'cave';
+  layout?: 'rooms' | 'cave' | 'outdoor' | 'village';
   /** caves: 0 = smooth, 100 = very ragged with niches and pillars */
   caveRoughness?: number;
   /** enemies and loot placed by room type and distance from the start (0–100, missing = none) */
@@ -330,7 +330,7 @@ export interface TerrainSet {
   active: boolean;
 }
 
-export type BuiltinObjectType = 'tree' | 'pillar' | 'rock' | 'arch' | 'chest' | 'merchant';
+export type BuiltinObjectType = 'tree' | 'pillar' | 'rock' | 'arch' | 'chest' | 'merchant' | 'house' | 'well';
 /** a built-in object or the id of an own object (CustomObject) */
 export type ObjectType = string;
 

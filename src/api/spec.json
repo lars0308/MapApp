@@ -115,7 +115,7 @@
     },
     {
       "name": "set_generator",
-      "description": "Change generator settings (deep merge of `patch`, same shape as get_generator). regenerate=true generates right away.",
+      "description": "Change generator settings (deep merge of `patch`, same shape as get_generator). regenerate=true generates right away. layout: rooms | cave | outdoor (forest clearings + dirt paths) | village (outdoor + houses + well); caveRoughness 0-100.",
       "input": {
         "type": "object",
         "properties": {

@@ -31,6 +31,9 @@ export const OBJECT_DEFS: Record<BuiltinObjectType, ObjectDef> = {
   arch: { type: 'arch', label: 'Torbogen', w: 3, h: 3, sx: 5, sy: 0, collision: [[0, 0], [2, 0]], overheadRows: 2, ySort: true, godotType: 'arch' },
   chest: { type: 'chest', label: 'Truhe', w: 1, h: 1, sx: 3, sy: 2, collision: [[0, 0]], overheadRows: 0, ySort: true, godotType: 'chest' },
   merchant: { type: 'merchant', label: 'Händler', w: 1, h: 2, sx: 8, sy: 0, collision: [[0, 0]], overheadRows: 0, ySort: true, godotType: 'npc' },
+  // village: the roof row is drawn over characters walking behind the house
+  house: { type: 'house', label: 'Haus', w: 3, h: 3, sx: 0, sy: 3, collision: [[0, 0], [1, 0], [2, 0], [0, -1], [1, -1], [2, -1]], overheadRows: 1, ySort: true, godotType: 'house' },
+  well: { type: 'well', label: 'Brunnen', w: 1, h: 2, sx: 3, sy: 3, collision: [[0, 0]], overheadRows: 0, ySort: true, godotType: 'well' },
 };
 
 export const OBJECT_TYPES = Object.keys(OBJECT_DEFS) as BuiltinObjectType[];
@@ -132,7 +135,7 @@ function atlasTiles(): { cols: number; rows: number } {
 
 const T = 16;
 const COLS = 9;
-const ROWS = 3;
+const ROWS = 6;
 
 let cached: { canvas: HTMLCanvasElement; dataUrl: string } | null = null;
 let builtin: HTMLCanvasElement | null = null;
@@ -232,6 +235,49 @@ function drawBuiltin(): HTMLCanvasElement {
     rect(ox + 2, oy + 4, 12, 4, '#945f33');
     rect(ox + 2, oy + 8, 12, 1, '#c79a3d');
     rect(ox + 7, oy + 8, 2, 3, '#f2d27a');
+  }
+  // house (3×3 at 0,3): roof (2 rows, drawn from above), wall with door and windows
+  {
+    const ox = 0;
+    const oy = 3 * T;
+    rect(ox + 2, oy + 44, 44, 4, 'rgba(0,0,0,0.35)');
+    // walls
+    rect(ox + 3, oy + 26, 42, 20, '#c9b38a');
+    rect(ox + 3, oy + 26, 42, 2, '#dcc9a2');
+    for (let x = ox + 3; x < ox + 45; x += 7) rect(x, oy + 28, 1, 18, '#a8916a');
+    rect(ox + 3, oy + 44, 42, 2, '#8f7a58');
+    // door + windows
+    rect(ox + 20, oy + 33, 8, 13, '#5a3d27');
+    rect(ox + 21, oy + 34, 6, 12, '#6d4a2d');
+    rect(ox + 26, oy + 40, 1, 1, '#f2d27a');
+    for (const wx of [ox + 7, ox + 34]) {
+      rect(wx, oy + 32, 7, 6, '#3a3048');
+      rect(wx + 1, oy + 33, 5, 4, '#9ab8f0');
+      rect(wx + 3, oy + 33, 1, 4, '#3a3048');
+    }
+    // roof
+    for (let y = 0; y < 26; y++) {
+      const inset = Math.max(0, 8 - Math.floor(y / 2));
+      rect(ox + 1 + inset, oy + 2 + y, 46 - inset * 2, 1, y % 4 === 3 ? '#7a3a2e' : '#a44b3a');
+    }
+    rect(ox + 9, oy + 1, 30, 2, '#c05b47');
+    rect(ox + 1, oy + 26, 46, 2, '#6a3026');
+    rect(ox + 34, oy + 4, 5, 9, '#6f6679');
+    rect(ox + 34, oy + 4, 5, 2, '#8a8195');
+  }
+  // well (1×2 at 3,3)
+  {
+    const ox = 3 * T;
+    const oy = 3 * T;
+    rect(ox + 1, oy + 28, 14, 3, 'rgba(0,0,0,0.35)');
+    rect(ox + 2, oy + 18, 12, 11, '#6f6679');
+    rect(ox + 2, oy + 18, 12, 2, '#8a8195');
+    rect(ox + 4, oy + 19, 8, 3, '#2d4f7a');
+    for (let x = ox + 2; x < ox + 14; x += 4) rect(x, oy + 22, 1, 7, '#57505f');
+    rect(ox + 2, oy + 4, 2, 15, '#5a3d27');
+    rect(ox + 12, oy + 4, 2, 15, '#5a3d27');
+    rect(ox + 1, oy + 3, 14, 3, '#a44b3a');
+    rect(ox + 7, oy + 6, 2, 8, '#b3a391');
   }
   // merchant NPC (1×2 at 8,0)
   {

@@ -342,6 +342,13 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.8 – Außenbereiche und Dörfer**
+
+- Generator → *Räume* → **Aufbau: Außenbereich** oder **Dorf** (auch im Assistenten). Die Räume werden zu Lichtungen und die Gänge zu Erdwegen. Alles dazwischen ist dichter Wald aus Baum-Objekten; er ist nicht begehbar, die Kollision steht in der Kollisionsebene. Waldboden ist dunkleres Gras. Regler **Zerklüftung** für die Ränder der Lichtungen.
+- **Dorf**: Zusätzlich stehen Häuser (3×3, das Dach wird über der Figur gezeichnet) in den Lichtungen, bevorzugt im hinteren Teil, und am Start steht ein Brunnen. Wo nötig, wird Wald für ein Haus gerodet. Der Eingang bleibt immer frei.
+- Neue Demo-Tiles: vier Gras-Böden (Tag `grass`, mit Blumen oder dunkel) und zwei Erdwege (Tag `dirt`). Neue Objekte: *Haus* und *Brunnen*, auch im Godot-Export.
+- Alle Lichtungen sind vom Start aus erreichbar (geprüft für Top-Down, Low Top-Down und 45°). KI: `set_generator` mit `{ "layout": "village" }`.
+
 **Version 3.7 – Natürliche Höhlen**
 
 - Generator → *Räume* → **Aufbau: Natürliche Höhle** (auch im Assistenten): Räume und Gänge werden per Zellautomat zu Höhlen mit unregelmäßigen Wänden, Ausbuchtungen, Nischen und Felssäulen, ohne Türen. Regler **Zerklüftung** (glatt … sehr zerklüftet). Raummitten und Gangverläufe bleiben offen, abgetrennte Stücke werden entfernt – alle Kammern bleiben erreichbar (geprüft für Top-Down, Low Top-Down und 45°). Spezialräume, Gelände, Gegner und Beute, Export funktionieren wie gewohnt. KI: `set_generator` mit `{ "layout": "cave", "caveRoughness": 60 }`.

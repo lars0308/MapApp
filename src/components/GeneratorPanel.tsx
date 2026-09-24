@@ -140,8 +140,19 @@ export function GeneratorPanel() {
           options={[
             { value: 'rooms', label: 'Gebaute Räume' },
             { value: 'cave', label: 'Natürliche Höhle' },
+            { value: 'outdoor', label: 'Außenbereich' },
+            { value: 'village', label: 'Dorf' },
           ]}
         />
+        {(g.layout === 'outdoor' || g.layout === 'village') && (
+          <>
+            <Slider label="Zerklüftung" value={g.caveRoughness ?? 45} unit=" %" onChange={(v) => update({ caveRoughness: v })} />
+            <p className="hint">
+              Räume werden zu Lichtungen, Gänge zu Erdwegen, dazwischen dichter Wald aus Baum-Objekten (blockiert).
+              {g.layout === 'village' ? ' Im Dorf stehen Häuser in den Lichtungen und ein Brunnen am Start.' : ''} Braucht ein Tileset mit Gras-Böden (Tag „grass“) – die Demo-Tiles haben welche.
+            </p>
+          </>
+        )}
         {g.layout === 'cave' && (
           <>
             <Slider label="Zerklüftung" value={g.caveRoughness ?? 60} unit=" %" onChange={(v) => update({ caveRoughness: v })} />

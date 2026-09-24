@@ -32,7 +32,7 @@ Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI 
 - Generator: `populate()` in `src/generator/index.ts` (Einstellung `generator.population {enemies, loot}`), Truhen als Objekte. Testspiel-Kampf: `src/playtest/combat.ts` (Gegner, Truhen, HUD-Store), eingebunden in `controller.ts` (`renderer.playItems`). Side-Scroller hat noch keinen Kampf im App-Testspiel.
 
 ## Danach offen
-6. Außenbereiche und Dörfer (Höhlen fertig: `src/generator/cave.ts`, `generator.layout = 'cave'`). Braucht neue Demo-Tiles: Gras, Erdweg, Hauswand/Dach.
+6. ~~Außenbereiche und Dörfer~~ erledigt: `generator.layout = 'outdoor' | 'village'`. Das nutzt `cavify` und eine Wald-Maske in `src/generator/index.ts`; Häuser setzt `placeHouses`. Höhlen: `src/generator/cave.ts`.
 7. Echtes isometrisches Rautenraster + Höhenebenen.
 8. Godot-Terrain-Set für Wände; direkter `.tscn`/`.tres`-Export.
 9. Tilesets mit Rand/Abstand, nicht-quadratische Tiles; Generator im Web Worker.
