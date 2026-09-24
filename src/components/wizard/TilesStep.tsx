@@ -219,7 +219,8 @@ function UploadEditor({
     try {
       const dataUrl = await readFileAsDataUrl(f);
       // draft gids start at 1 (own id space, only used inside the wizard)
-      const ts = await createTilesetFromFile(f.name.replace(/\.[^.]+$/, ''), dataUrl, 16, 1);
+      const { ts, note } = await createTilesetFromFile(f.name.replace(/\.[^.]+$/, ''), dataUrl, 16, 1);
+      if (note.includes('Einzelteile') || note.includes('kein klares')) toast(`${f.name}: ${note}`, 'success');
       setDetected(ts.tileSize);
       // first guess for every tile – the user only corrects
       setUpload({ ...ts, perspectives: [perspective], tiles: await autoAssign(ts) });

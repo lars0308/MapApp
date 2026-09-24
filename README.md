@@ -343,6 +343,11 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.3.1 – Tileset-Upload: Einzelteile statt Tausender Krümel**
+
+- Bilder, die kein sauberes Raster sind (KI-generierte Tile-Sheets, Teile mit Abständen, verschieden große Stücke, transparenter / einfarbiger / Verlaufs-Hintergrund), werden jetzt **in ihre Einzelteile zerlegt**: jedes Teil ausgeschnitten, in ganze Tiles gemessen (auch 2×1, 1×2 …), auf 16 / 32 / 48 / 64 px gebracht und in ein neues, sauberes Tileset gepackt. Kleine Splitter (Punkte, Steinchen neben Rissen) bleiben beim Teil daneben, weiche Schatten zählen als Hintergrund.
+- Vorher wurde so ein Bild in bis zu 6000 16-px-Stücke geschnitten – das hat Handys lahmgelegt. Jetzt nie mehr als 1500 Tiles pro Bild; die Tile-Größen-Erkennung ist deutlich schneller.
+
 **Version 3.3 – Eigene Figuren und Objekte auf der Karte**
 
 - Figuren-Baukasten → **Export → Als Objekt auf die Karte**: Charakter, Kreatur oder Objekt wird ein eigenes Karten-Objekt (Vorderansicht, 1 Figur-Pixel = 1 Pixel bei 32 px pro Tile, steht auf seiner Fußzeile). Die App springt zur Karte, das Objekt ist schon als Pinsel gewählt.

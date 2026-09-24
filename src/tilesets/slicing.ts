@@ -1,6 +1,7 @@
 import type { TileMeta, Tileset } from '../types';
 import { loadImage } from '../utils/image';
 import { uid } from '../utils/id';
+import { slicePieces } from './pieces';
 
 export const COMMON_TILE_SIZES = [16, 32, 48, 64];
 
@@ -52,22 +53,23 @@ export async function detectTileSize(dataUrl: string, preferred: number): Promis
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
   ctx.drawImage(img, 0, 0);
   const { data } = ctx.getImageData(0, 0, w, h);
-  const px = (x: number, y: number) => {
-    const k = (y * w + x) * 4;
-    return [data[k], data[k + 1], data[k + 2], data[k + 3]];
+  // colour jump between two pixels (index math only – big sheets stay fast on phones)
+  const diff = (i: number, j: number) => {
+    const a = i * 4;
+    const b = j * 4;
+    return Math.abs(data[a] - data[b]) + Math.abs(data[a + 1] - data[b + 1]) + Math.abs(data[a + 2] - data[b + 2]) + Math.abs(data[a + 3] - data[b + 3]);
   };
-  const diff = (a: number[], b: number[]) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) + Math.abs(a[3] - b[3]);
   // column jump between x-1 and x, row jump between y-1 and y
   const colJump = new Float64Array(w);
   const rowJump = new Float64Array(h);
   for (let x = 1; x < w; x++) {
     let sum = 0;
-    for (let y = 0; y < h; y++) sum += diff(px(x - 1, y), px(x, y));
+    for (let y = 0; y < h; y++) sum += diff(y * w + x - 1, y * w + x);
     colJump[x] = sum / h;
   }
   for (let y = 1; y < h; y++) {
     let sum = 0;
-    for (let x = 0; x < w; x++) sum += diff(px(x, y - 1), px(x, y));
+    for (let x = 0; x < w; x++) sum += diff((y - 1) * w + x, y * w + x);
     rowJump[y] = sum / w;
   }
   const mean = (arr: Float64Array, step: number, offset: number, n: number) => {
@@ -90,16 +92,35 @@ export async function detectTileSize(dataUrl: string, preferred: number): Promis
   return { size: guessTileSize(w, h, preferred), confident: false };
 }
 
-export async function createTilesetFromFile(
-  name: string,
-  dataUrl: string,
-  preferredTileSize: number,
-  firstGid: number,
-): Promise<Tileset> {
-  const img = await loadImage(dataUrl);
-  const tileSize = (await detectTileSize(dataUrl, preferredTileSize)).size;
+/** more tiles than this from one image is no tileset but a picture cut into crumbs */
+const MAX_GRID_TILES = 1500;
+
+/**
+ * Tileset from an uploaded image. A clean grid is cut as it is; a sheet of separate pieces
+ * (gaps, different sizes, gradient / white / transparent background) is cut into its pieces,
+ * which are scaled to whole tiles and packed into a new tileset image. `note` explains what happened.
+ */
+export async function createTilesetFromFile(name: string, dataUrl: string, preferredTileSize: number, firstGid: number): Promise<{ ts: Tileset; note: string }> {
+  let img = await loadImage(dataUrl);
+  const det = await detectTileSize(dataUrl, preferredTileSize);
+  let tileSize = det.size;
+  let note = `Raster ${tileSize} px`;
+  const gridTiles = Math.floor(img.naturalWidth / tileSize) * Math.floor(img.naturalHeight / tileSize);
+  if (!det.confident || gridTiles > MAX_GRID_TILES) {
+    const sheet = await slicePieces(dataUrl, preferredTileSize);
+    if (sheet) {
+      dataUrl = sheet.dataUrl;
+      img = await loadImage(dataUrl);
+      tileSize = sheet.tileSize;
+      note = `${sheet.pieces.length} Einzelteile erkannt, auf ${tileSize} px pro Tile gebracht`;
+    } else if (gridTiles > MAX_GRID_TILES) {
+      // no pieces found: coarser grid instead of thousands of crumbs
+      tileSize = [32, 48, 64, 96, 128].find((s) => Math.floor(img.naturalWidth / s) * Math.floor(img.naturalHeight / s) <= MAX_GRID_TILES) ?? 128;
+      note = `kein klares Raster – als ${tileSize}-px-Raster geschnitten`;
+    }
+  }
   const { columns, rows, empty } = await findEmptyTiles(dataUrl, tileSize);
-  return {
+  const ts: Tileset = {
     id: uid('ts'),
     name,
     source: 'upload',
@@ -115,6 +136,7 @@ export async function createTilesetFromFile(
     emptyTiles: empty,
     perspectives: [],
   };
+  return { ts, note };
 }
 
 export function tileCount(ts: Tileset): number {

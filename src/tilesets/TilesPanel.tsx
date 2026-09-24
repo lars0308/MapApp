@@ -345,12 +345,12 @@ function TilesetManager() {
         }
         const dataUrl = await readFileAsDataUrl(f);
         const nextGid = useProject.getState().project.nextGid;
-        const ts = await createTilesetFromFile(f.name.replace(/\.[^.]+$/, ''), dataUrl, tileSize, nextGid);
+        const { ts, note } = await createTilesetFromFile(f.name.replace(/\.[^.]+$/, ''), dataUrl, tileSize, nextGid);
         // first guess for every tile (floor, walls, corners …) – shown as suggestions
         ts.tiles = await autoAssign(ts);
         addTileset(ts);
         const st = assignmentStats(ts);
-        toast(`${ts.name}: ${ts.columns * ts.rows - ts.emptyTiles.length} Tiles (${ts.tileSize} px), ${st.auto} automatisch zugeordnet – bitte in der Palette prüfen`, 'success');
+        toast(`${ts.name}: ${ts.columns * ts.rows - ts.emptyTiles.length} Tiles (${note}), ${st.auto} automatisch zugeordnet – bitte in der Palette prüfen`, 'success');
       }
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Upload fehlgeschlagen', 'error');
