@@ -377,7 +377,7 @@ function WizardDialog() {
                     </div>
                   </div>
                   {gen.layout && gen.layout !== 'rooms' && <Slider label="Zerklüftung" value={gen.caveRoughness ?? (gen.layout === 'cave' ? 60 : 45)} unit="%" hint={['Glatt', 'Zerklüftet']} onChange={(v) => setGen({ caveRoughness: v })} />}
-                  <Slider label="Anzahl Räume" value={gen.roomCount} min={2} max={60} onChange={(v) => setGen({ roomCount: v })} />
+                  <Slider label="Anzahl Räume" value={gen.roomCount} min={1} max={60} onChange={(v) => setGen({ roomCount: v })} />
                   <div className="field">
                     <label>Raumgröße</label>
                     <Segmented

@@ -68,6 +68,8 @@ export function TilesetEditor({
       // first guess for every tile – the user only corrects
       setUpload({ ...ts, perspectives: [perspective], tiles: await autoAssign(ts) });
       setMarked([]);
+      // straight into "Raum füllen": tap a tile, tap where it goes in the room
+      setMarking(true);
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Upload fehlgeschlagen', 'error');
     } finally {
@@ -187,9 +189,9 @@ export function TilesetEditor({
           Tiles <span className="muted">· {indices.length} Tiles – antippen, um den Typ zu wählen</span>
         </label>
         <Button variant="primary" block icon={<Icon.Grid size={16} />} onClick={() => setMarking(true)}>
-          Raum aus dem Tileset bauen
+          Raum füllen
         </Button>
-        <p className="hint">Am schnellsten: Ecken, Wände und Boden auf einen Raum-Bauplan ziehen (auch gedreht) oder einen gezeichneten Raum einrahmen. Einzelne Tiles (Tür, Deko …) danach antippen.</p>
+        <p className="hint">Am schnellsten: Tile antippen, dann ins passende Feld des Raums tippen (Ecken, Wände, Boden, Tür, Wasser) – so weiß MapForge genau, was wohin gehört. Deko und Sonstiges danach unten antippen.</p>
         {marking && (
           <RoomMarker
             ts={upload}

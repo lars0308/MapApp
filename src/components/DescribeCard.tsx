@@ -6,6 +6,7 @@ import { useApp } from '../store/appStore';
 import { saveNow } from '../persistence/autosave';
 import { readFileAsDataUrl } from '../utils/download';
 import { askPlan, buildFromPlan, setReference } from '../api/describe';
+import { runAgent } from '../api/agent';
 
 const EXAMPLES = [
   'Kleine Insel mit Dorf und Hafen, viel Wald im Süden, für ein gemütliches RPG',
@@ -41,15 +42,28 @@ export function DescribeCard() {
     try {
       setBusy('Die KI plant deine Karte …');
       await saveNow();
+      // 1. quick plan: view, size, generator settings → project + first map
       const plan = await askPlan({ text, image: image ?? undefined, tileset: tileset?.dataUrl });
       const done = await buildFromPlan(plan, tileset ?? undefined, setBusy);
-      // the project keeps description + picture: "Mit KI anpassen" shows them to the AI again
+      // the project keeps description + picture: later AI requests see them again
       await setReference({ text, image });
-      toast([done.summary || 'Karte erstellt', ...done.tips.map((t) => `Tipp: ${t}`)].join(' '), 'success');
-      goTo('map');
+      const ownTiles = tileset && done.tilesetId ? { name: tileset.name, id: done.tilesetId } : null;
       setText('');
       setImage(null);
       setTileset(null);
+      setBusy(null);
+      goTo('map');
+      // 2. the AI builds the rest itself, live on the map (banner shows the steps, stop anytime)
+      const task = [
+        `Der Nutzer möchte: ${text.trim() || '(siehe Referenzbild)'}`,
+        `Ich habe das Projekt „${plan.name ?? ''}“ schon angelegt und generiert (${done.summary}). Einstellungen: ${JSON.stringify(plan.generator ?? {})}.`,
+        ownTiles
+          ? `Der Nutzer hat sein eigenes Tileset „${ownTiles.name}“ (id ${ownTiles.id}) hinzugefügt, die Demo-Tiles sind aus. Ordne es zuerst zu (tileset_render abschnittsweise, tileset_assign: Boden, Wände mit Rollen, Wasser, Wege, Türen, Deko) und generiere dann neu, damit die Karte aus seinen Tiles besteht.`
+          : '',
+        'Setze danach alles um, was der Generator nicht von selbst macht: bestimmte Räume, Wege, Wasser, Objekte, Figuren, Hindernisse, Deko an den beschriebenen Stellen. Prüfe dein Ergebnis mit render.',
+      ].filter(Boolean).join('\n');
+      const words = await runAgent(task, image ? [{ label: 'Referenzbild des Nutzers (so soll es aussehen)', dataUrl: image }] : []);
+      toast(words || done.summary || 'Karte fertig', 'success');
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Das hat nicht geklappt', 'error');
     } finally {
@@ -65,7 +79,7 @@ export function DescribeCard() {
         </span>
         <div>
           <h2 id="describe-title">Beschreibe dein Spiel</h2>
-          <p>Was für ein Spiel, welche Karte, welche Stimmung – die KI stellt alles ein und baut die Karte.</p>
+          <p>Was für ein Spiel, welche Karte, welche Räume, Wege, Objekte und Figuren – die KI baut es für dich.</p>
         </div>
       </div>
       <textarea

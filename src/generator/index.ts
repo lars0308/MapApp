@@ -144,7 +144,8 @@ export function generate(input: GenerateInput): GenerateOutput {
   // special rooms (start is needed to validate terrain reachability)
   const specials = assignSpecialRooms(placed, edges, s, rSpecial);
   const missingSpecials = requiredRooms(s.specials) - specials.size;
-  if (missingSpecials > 0) warnings.push(`${missingSpecials} Spezialraum/-räume ohne freien Raum – Raumanzahl erhöhen.`);
+  // a one-room map is its own start and goal – no warning about missing special rooms
+  if (missingSpecials > 0 && placed.length > 1) warnings.push(`${missingSpecials} Spezialraum/-räume ohne freien Raum – Raumanzahl erhöhen.`);
   const startRoom = [...specials.entries()].find(([, t]) => t === 'start')?.[0] ?? 0;
 
   // room terrains (reusable terrain sets, weighted)

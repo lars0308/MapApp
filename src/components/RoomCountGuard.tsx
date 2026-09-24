@@ -13,7 +13,8 @@ export function RoomCountGuard({
   onFix: (count: number) => void;
 }) {
   const need = requiredRooms(specials);
-  if (roomCount >= need) return null;
+  // a single room is fine: it is the start (and the goal) of a one-room map
+  if (roomCount >= need || roomCount === 1) return null;
   return (
     <div className="guard" role="alert">
       <p>

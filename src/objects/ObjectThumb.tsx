@@ -1,6 +1,7 @@
 import type { ObjectType } from '../types';
 import { useSyncExternalStore } from 'react';
 import { OBJECT_ATLAS_TILE, atlasVersion, objectAtlas, objectDef, onAtlasChange } from './defs';
+import { imageUrl } from '../tilesets/TileThumb';
 
 /** Scaled sprite preview of an object (fits into a square). */
 export function ObjectThumb({ type, size = 40 }: { type: ObjectType; size?: number }) {
@@ -17,7 +18,7 @@ export function ObjectThumb({ type, size = 40 }: { type: ObjectType; size?: numb
         style={{
           width: w,
           height: h,
-          backgroundImage: `url(${atlas.dataUrl})`,
+          backgroundImage: `url(${imageUrl(atlas.dataUrl)})`,
           backgroundSize: `${atlas.canvas.width * scale}px ${atlas.canvas.height * scale}px`,
           backgroundPosition: `${-d.sx * OBJECT_ATLAS_TILE * scale}px ${-d.sy * OBJECT_ATLAS_TILE * scale}px`,
         }}

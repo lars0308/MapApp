@@ -223,7 +223,7 @@
     },
     {
       "name": "tileset_render",
-      "description": "Picture of a tileset with every tile's gid and its current assignment (short label; '?' = unconfirmed suggestion) – to see what the tiles are before assigning them.",
+      "description": "Picture of a tileset with every tile's gid and its current assignment (short label; '?' = unconfirmed suggestion) – to see what the tiles are before assigning them. Big tilesets: look at a band of rows with row / rows and col / cols (e.g. 12×12 tiles at a time) so the gids stay readable.",
       "input": {
         "type": "object",
         "properties": {
@@ -235,6 +235,26 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 8
+          },
+          "row": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "first tile row (default 0)"
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "number of rows (default: all)"
+          },
+          "col": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "first tile column (default 0)"
+          },
+          "cols": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "number of columns (default: all)"
           }
         },
         "required": [

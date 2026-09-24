@@ -6184,3 +6184,66 @@ details.more[open] {
 .section .describe-text {
   margin-bottom: 8px;
 }
+
+/* KI baut – banner at the top while the AI works */
+.agent-banner {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  transform: translateX(-50%);
+  width: min(460px, calc(100vw - 32px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--accent-line);
+  background: var(--surface-2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.agent-banner-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  animation: agent-pulse 1.4s ease-in-out infinite;
+}
+@keyframes agent-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+.agent-banner-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.agent-banner-text small {
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-banner-stop {
+  flex: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-banner-icon {
+    animation: none;
+  }
+}
+
+/* Raum füllen: tile in hand */
+.room-mark.is-hand {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  background: rgba(232, 137, 176, 0.35);
+  box-shadow: 0 0 0 3px rgba(232, 137, 176, 0.35);
+  animation: agent-pulse 1s ease-in-out infinite;
+}

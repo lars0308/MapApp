@@ -31,6 +31,10 @@
     },
     "api/describe.js": {
       "maxDuration": 60
+    },
+    "api/agent.js": {
+      "maxDuration": 120,
+      "includeFiles": "src/api/spec.json"
     }
   }
 }

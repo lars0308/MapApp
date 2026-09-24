@@ -336,6 +336,22 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.25 – Die KI baut selbst, schnelle Tilesets, Raum füllen**
+
+- **Die KI baut die Karte selbst.** Neuer Server-Endpunkt `api/agent.js`:
+  - Claude (Vercel AI Gateway) bekommt die Befehle der App als Werkzeuge, die gleichen wie bei der MCP-Schnittstelle.
+  - Die App führt sie aus und schickt Text und Bilder der Karte zurück, bis die KI fertig ist.
+  - So legt die KI Räume, Wege, Wasser, Objekte, Hindernisse und Figuren an, ordnet eigene Tilesets zu und prüft ihr Ergebnis mit Bildern der Karte.
+  - Oben zeigt ein Balken „KI baut“ jeden Schritt, mit Stopp-Knopf.
+- **Startseite:** Erst entsteht der schnelle Plan (Ansicht, Größe, Einstellungen), danach baut die KI live auf der Karte weiter. Bei eigenem Tileset ordnet sie es zuerst zu und generiert neu.
+- **Aufbau → „Mit KI bauen“** (vorher „Mit KI anpassen“): zum Beispiel „Truhe in den Raum oben links, Fluss mit Brücke, Händler am Start“. Die KI sieht die Karte, das Referenzbild und die Projektbeschreibung.
+- **Tiles → „Mit KI zuordnen“:** Die KI schaut sich das Tileset abschnittsweise an. `tileset_render` kann dafür Ausschnitte mit `row`/`rows`/`col`/`cols`. Danach setzt sie Boden, Wände mit Rollen, Wasser, Wege, Türen und Deko.
+- **Große Tilesets laden schnell:**
+  - Vorschaubilder verweisen auf eine Blob-Adresse statt je eine Kopie des ganzen Bildes zu tragen.
+  - 1024 Kacheln erscheinen in 0,4 statt 13 Sekunden, 4096 Kacheln in 0,5 Sekunden statt mehr als 3 Minuten.
+- **Raum füllen:** Nach dem Hochladen öffnet sich ein Raum-Bauplan. Tile antippen, dann ins Feld tippen, wo es hingehört: Ecken, Wände, Boden, Front, Innenecken, Tür oder das neue Feld **Wasser**. Ziehen geht weiter, „durch Drehen ergänzen“ füllt fehlende Ecken und Wände.
+- **1 Raum** ist jetzt erlaubt (vorher mindestens 2). Ein einzelner Raum ist Start und Ziel, ohne Warnung.
+
 **Version 3.24 – KI passt Karten an, ordnet Tiles zu, Referenzbild bleibt im Projekt**
 
 - **Referenzbild und Beschreibung werden im Projekt gespeichert** (`project.reference`). Die KI sieht beides bei jeder späteren Anfrage.

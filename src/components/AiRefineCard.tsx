@@ -4,17 +4,19 @@ import { Icon } from './icons';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { readFileAsDataUrl } from '../utils/download';
-import { refineMap, setReference } from '../api/describe';
+import { setReference } from '../api/describe';
+import { runAgent, useAgent } from '../api/agent';
 
 /**
- * Aufbau → "Mit KI anpassen": say what should change ("mehr Wasser, Boss näher am Start") – the AI
- * sees the current map, the project's reference picture and description and changes the settings.
+ * Aufbau → "Mit KI bauen": say what to build or change ("Truhe oben links, Fluss mit Brücke") – the
+ * AI looks at the map, sees the project's reference picture and description and builds it with the
+ * app's own tools (settings, painting, objects, figures).
  */
 export function AiRefineCard() {
   const reference = useProject((s) => s.project.reference);
   const toast = useEditor((s) => s.toast);
   const [wish, setWish] = useState('');
-  const [busy, setBusy] = useState<string | null>(null);
+  const busy = useAgent((s) => (s.running ? s.step || 'Die KI baut …' : null));
   const fileRef = useRef<HTMLInputElement>(null);
 
   const pickImage = async (file: File | undefined) => {
@@ -25,21 +27,23 @@ export function AiRefineCard() {
   };
 
   const run = async () => {
-    if (!wish.trim() && !reference?.image) return toast('Schreib, was anders werden soll, oder füge ein Referenzbild hinzu', 'error');
+    if (!wish.trim() && !reference?.image) return toast('Schreib, was die KI bauen oder ändern soll, oder füge ein Referenzbild hinzu', 'error');
+    const task = [
+      `Wunsch des Nutzers für die offene Karte: ${wish.trim() || 'Passe die Karte besser an das Referenzbild an.'}`,
+      reference?.text ? `Projektbeschreibung: ${reference.text}` : '',
+      'Schau dir die Karte zuerst mit render an und setze den Wunsch dann mit den Werkzeugen um.',
+    ].filter(Boolean).join('\n');
+    setWish('');
     try {
-      setBusy('Die KI plant …');
-      const done = await refineMap(wish, setBusy);
-      toast([done.summary, ...done.tips.map((t) => `Tipp: ${t}`)].join(' '), 'success');
-      setWish('');
+      const done = await runAgent(task, reference?.image ? [{ label: 'Referenzbild des Nutzers (so soll es aussehen)', dataUrl: reference.image }] : []);
+      toast(done || 'Fertig', 'success');
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Das hat nicht geklappt', 'error');
-    } finally {
-      setBusy(null);
     }
   };
 
   return (
-    <Section title="Mit KI anpassen">
+    <Section title="Mit KI bauen">
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => (void pickImage(e.target.files?.[0]), (e.target.value = ''))} />
       <div className="ai-ref">
         <button type="button" className="describe-slot-btn" onClick={() => fileRef.current?.click()} disabled={!!busy}>
@@ -60,14 +64,14 @@ export function AiRefineCard() {
         className="input describe-text"
         rows={2}
         maxLength={1500}
-        placeholder="z. B. mehr Wasser, Boss näher am Start, dichterer Wald"
+        placeholder="z. B. Truhe in den Raum oben links, Fluss mit Brücke, Händler am Start, mehr Wald"
         value={wish}
         disabled={!!busy}
         onChange={(e) => setWish(e.target.value)}
-        aria-label="Was soll an der Karte anders werden?"
+        aria-label="Was soll die KI bauen oder ändern?"
       />
       <Button variant="primary" block icon={<Icon.Spark size={16} />} disabled={!!busy} onClick={() => void run()}>
-        {busy ?? 'Mit KI anpassen'}
+        {busy ?? 'KI bauen lassen'}
       </Button>
     </Section>
   );

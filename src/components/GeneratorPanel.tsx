@@ -200,7 +200,7 @@ export function GeneratorPanel() {
       </Section>
 
       <Section title={natural ? 'Lichtungen & Wege' : 'Räume & Wege'}>
-        <Slider label={natural ? 'Anzahl Bereiche' : 'Anzahl Räume'} value={g.roomCount} min={2} max={60} onChange={(v) => update({ roomCount: v })} />
+        <Slider label={natural ? 'Anzahl Bereiche' : 'Anzahl Räume'} value={g.roomCount} min={1} max={60} onChange={(v) => update({ roomCount: v })} />
         <div className="field">
           <label>Raumgröße</label>
           <Segmented

@@ -3,7 +3,7 @@ import type { TileCategory, TileMeta, TileRole, TileVariant, Tileset } from '../
 import { Button, Segmented } from '../components/ui';
 import { IconButton } from '../components/ui';
 import { Icon } from '../components/icons';
-import { tileStyle } from './TileThumb';
+import { imageUrl, tileStyle } from './TileThumb';
 import { applyCanvasTransform, mirrorH, rotateCW } from './gid';
 import { turnStyle } from '../editor/Toolbar';
 
@@ -33,6 +33,7 @@ const CATEGORY_OF: Partial<Record<TileRole, TileCategory>> = {
   inner_corner_bottom_left: 'innerCorner',
   inner_corner_bottom_right: 'innerCorner',
   door: 'door',
+  water: 'water',
 };
 
 /** "Teile zuordnen": slots besides the room board */
@@ -42,6 +43,7 @@ const EXTRA_SLOTS: { role: TileRole; label: string }[] = [
   { role: 'inner_corner_bottom_left', label: 'Innen └' },
   { role: 'inner_corner_bottom_right', label: 'Innen ┘' },
   { role: 'door', label: 'Tür' },
+  { role: 'water', label: 'Wasser' },
 ];
 const SLOT_LABEL: Partial<Record<TileRole, string>> = {
   corner_top_left: 'Ecke ┌',
@@ -56,8 +58,6 @@ const SLOT_LABEL: Partial<Record<TileRole, string>> = {
   wall_front_upper: 'Front oben',
   floor_center: 'Boden',
 };
-/** order in which empty slots are offered after a pick */
-const SLOT_ORDER: TileRole[] = ['corner_top_left', 'wall_top', 'corner_top_right', 'wall_left', 'wall_right', 'wall_front_upper', 'wall_front', 'floor_center', 'corner_bottom_left', 'wall_bottom', 'corner_bottom_right'];
 
 /** role of the cell (x, y) inside the framed room; `front` = rows of wall face below the top edge */
 export function roomRole(r: Rect, x: number, y: number, front: number): TileRole {
@@ -186,7 +186,7 @@ export interface RoomResult {
 }
 
 export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r: RoomResult, clearOthers: boolean) => void; onClose: () => void }) {
-  const [mode, setMode] = useState<'frame' | 'pieces'>(() => (ts.variants?.length ? 'pieces' : 'frame'));
+  const [mode, setMode] = useState<'frame' | 'pieces'>('pieces');
   const [start, setStart] = useState<{ x: number; y: number } | null>(null);
   const [rect, setRect] = useState<Rect | null>(null);
   const [front, setFront] = useState(0);
@@ -200,6 +200,8 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
   });
   const [slot, setSlot] = useState<TileRole>('corner_top_left');
   const [drag, setDrag] = useState<{ i: number; x: number; y: number; moved: boolean } | null>(null);
+  /** builder: tile picked up with a tap – the next tap on a field of the room puts it there */
+  const [hand, setHand] = useState<number | null>(null);
   const dragging = useRef(false);
   const wide = window.innerWidth >= 760;
   const sheetWidth = mode === 'pieces' && wide ? 380 : Math.min(560, window.innerWidth - 56);
@@ -223,17 +225,16 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
     const next: Pieces = {};
     for (const [r, list] of Object.entries(pieces) as [TileRole, Piece[]][]) next[r] = (list ?? []).filter((p) => !(p.i === i && p.t === 0 && r !== role));
     const cur = next[role] ?? [];
-    const had = cur.length > 0;
     next[role] = cur.some((p) => p.i === i && p.t === 0) ? cur.filter((p) => !(p.i === i && p.t === 0)) : [...cur, { i, t: 0 }];
     setPieces(next);
     setSlot(role);
-    // first tile for this slot: go on to the next empty one
-    if (!had && next[role]!.length) {
-      const order = SLOT_ORDER.filter((r) => front > 1 || r !== 'wall_front_upper').filter((r) => front > 0 || !r.startsWith('wall_front'));
-      const after = order.slice(order.indexOf(role) + 1).concat(order);
-      const empty = after.find((r) => !(next[r] ?? []).length);
-      if (empty) setSlot(empty);
-    }
+  };
+  /** tap on a field: the tile in hand goes there, otherwise the field is chosen (turn / mirror / remove) */
+  const drop = (role: TileRole) => {
+    if (hand === null) return setSlot(role);
+    place(role, hand);
+    setSlot(role);
+    setHand(null);
   };
   /** turn / mirror / remove the first tile of the chosen slot */
   const edit = (fn: 'turn' | 'mirror' | 'remove') => {
@@ -251,7 +252,7 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
     <div className="room-sheet-wrap">
       <div
         className="room-sheet"
-        style={{ width: ts.columns * cell, height: ts.rows * cell, backgroundImage: `url(${ts.dataUrl})`, backgroundSize: `${ts.columns * cell}px ${ts.rows * cell}px`, ['--cell' as string]: `${cell}px` }}
+        style={{ width: ts.columns * cell, height: ts.rows * cell, backgroundImage: `url(${imageUrl(ts.dataUrl)})`, backgroundSize: `${ts.columns * cell}px ${ts.rows * cell}px`, ['--cell' as string]: `${cell}px` }}
         onPointerDown={(e) => {
           const el = e.currentTarget as HTMLElement;
           const p = cellAt(e, el);
@@ -284,7 +285,8 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
             // dropped on a slot of the room plan → that slot; a plain tap → the chosen slot
             const target = drag.moved ? (document.elementsFromPoint(e.clientX, e.clientY).find((el) => (el as HTMLElement).dataset?.role) as HTMLElement | undefined) : undefined;
             if (target) place(target.dataset.role as TileRole, drag.i);
-            else if (!drag.moved) place(slot, drag.i);
+            // a plain tap picks the tile up (tap it again to put it down)
+            else if (!drag.moved) setHand(hand === drag.i ? null : drag.i);
             setDrag(null);
             return;
           }
@@ -297,6 +299,7 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
         }}
         onPointerCancel={() => setDrag(null)}
       >
+        {mode === 'pieces' && hand !== null && <span className="room-mark is-hand" style={{ left: (hand % ts.columns) * cell, top: Math.floor(hand / ts.columns) * cell, width: cell, height: cell }} />}
         {mode === 'pieces' &&
           Object.entries(pieces).flatMap(([role, list]) =>
             (list ?? []).map((p, k) => <span key={`${role}-${p.i}-${k}`} className={`room-mark${role === slot ? ' is-active' : ''}`} style={{ left: (p.i % ts.columns) * cell, top: Math.floor(p.i / ts.columns) * cell, width: cell, height: cell }} />),
@@ -324,7 +327,7 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
           const list = pieces[role] ?? [];
           const p = list[(x + y) % Math.max(1, list.length)];
           return (
-            <button key={k} type="button" data-role={role} className={`room-slot${role === slot ? ' is-active' : ''}${list.length ? ' is-set' : ''}`} title={SLOT_LABEL[role]} onClick={() => setSlot(role)} style={{ width: slotPx, height: slotPx }}>
+            <button key={k} type="button" data-role={role} className={`room-slot${role === slot ? ' is-active' : ''}${list.length ? ' is-set' : ''}`} title={SLOT_LABEL[role]} onClick={() => drop(role)} style={{ width: slotPx, height: slotPx }}>
               {p ? <span className="room-slot-tile" data-role={role} style={{ ...tileStyle(ts, p.i, slotPx), ...turnStyle(p.t) }} /> : <span data-role={role}>{SLOT_LABEL[role]}</span>}
             </button>
           );
@@ -334,7 +337,7 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
         {EXTRA_SLOTS.map((e) => {
           const p = (pieces[e.role] ?? [])[0];
           return (
-            <button key={e.role} type="button" data-role={e.role} className={`room-slot room-slot-wide${e.role === slot ? ' is-active' : ''}`} onClick={() => setSlot(e.role)}>
+            <button key={e.role} type="button" data-role={e.role} className={`room-slot room-slot-wide${e.role === slot ? ' is-active' : ''}`} onClick={() => drop(e.role)}>
               {p ? <span className="tile-thumb" data-role={e.role} style={{ ...tileStyle(ts, p.i, 24), ...turnStyle(p.t) }} /> : null}
               <span data-role={e.role}>{e.label}</span>
             </button>
@@ -369,7 +372,7 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
           <div className="quick-pick-tile">
             <div>
               <strong>Raum aus dem Tileset bauen</strong>
-              <span className="quick-pick-current">{mode === 'frame' ? 'Rahmen über einen gezeichneten Raum ziehen.' : 'Tiles aus dem Tileset auf den Raum-Bauplan ziehen, drehen und spiegeln.'}</span>
+              <span className="quick-pick-current">{mode === 'frame' ? 'Rahmen über einen gezeichneten Raum ziehen.' : hand !== null ? 'Jetzt ins passende Feld des Raums tippen.' : 'Tile im Tileset antippen, dann ins passende Feld des Raums tippen.'}</span>
             </div>
           </div>
           <IconButton label="Schließen" onClick={onClose}>
@@ -382,14 +385,14 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
             value={mode}
             onChange={(v) => setMode(v)}
             options={[
-              { value: 'pieces', label: 'Baukasten (Teile ziehen)' },
+              { value: 'pieces', label: 'Raum füllen' },
               { value: 'frame', label: 'Raum einrahmen' },
             ]}
           />
           <p className="hint">
             {mode === 'frame'
               ? 'Ist im Tileset ein Raum gezeichnet? Rahmen darüberziehen: die äußeren Ecken werden Ecken, die Ränder Wände, das Innere Boden. Am Handy: erst eine Ecke antippen, dann die gegenüberliegende.'
-              : 'Tile aus dem Tileset auf ein Feld des Bauplans ziehen (oder Feld wählen und Tile antippen). Mit Drehen / Spiegeln passt du es an – eine Ecke reicht, „durch Drehen ergänzen“ setzt die anderen drei. Mehrere Tiles pro Feld = Varianten.'}
+              : '1. Tile im Tileset antippen. 2. Ins Feld des Raums tippen, wo es hingehört (Ecke, Wand, Boden, Tür, Wasser …). Ziehen geht auch. Mit Drehen / Spiegeln passt du das gewählte Feld an – eine Ecke reicht, „durch Drehen ergänzen“ setzt die anderen drei. Mehrere Tiles pro Feld = Varianten.'}
           </p>
           <div className={mode === 'pieces' && wide ? 'room-split' : undefined}>
             {sheet}
@@ -423,7 +426,7 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
             Abbrechen
           </button>
           <Button variant="primary" disabled={!ready} onClick={() => onApply({ ...piecesResult(shown), replaceVariants: mode === 'pieces' }, clearOthers)}>
-            {ready ? `${count} Tiles übernehmen` : mode === 'frame' ? 'Rahmen ziehen' : 'Tiles ziehen'}
+            {ready ? `${count} Tiles übernehmen` : mode === 'frame' ? 'Rahmen ziehen' : 'Raum füllen'}
           </Button>
         </footer>
         {drag?.moved && <span className="room-drag" style={{ ...tileStyle(ts, drag.i, 44), left: drag.x - 22, top: drag.y - 22 }} />}

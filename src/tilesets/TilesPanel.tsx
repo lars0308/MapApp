@@ -8,7 +8,7 @@ import { ObjectThumb } from '../objects/ObjectThumb';
 import { tileBlocks } from '../editor/collision';
 import { PERSPECTIVE_INFO } from '../generator/perspective';
 import { tilesetSupports } from './tilePools';
-import { aiAssignTiles } from '../api/describe';
+import { runAgent, useAgent } from '../api/agent';
 import { CATEGORIES, CATEGORY_LABEL, SUGGESTED_TAGS } from './categories';
 import { TileThumb } from './TileThumb';
 import { AssignSummary, TileLabel, confirmedMetas, suggestMetas } from './TileLabel';
@@ -49,6 +49,23 @@ interface PaletteItem {
   ts: Tileset;
   index: number;
   gid: number;
+}
+
+/** the AI looks at the tileset in sections and assigns floor, walls, water, doors, deco … */
+function AiAssignButton({ ts }: { ts: Tileset }) {
+  const toast = useEditor((s) => s.toast);
+  const running = useAgent((s) => s.running);
+  const run = () =>
+    void runAgent(
+      `Ordne das Tileset „${ts.name}“ (id ${ts.id}, ${ts.columns}×${ts.rows} Tiles à ${ts.tileSize} px) zu: schau es dir mit tileset_render abschnittsweise an und setze mit tileset_assign Kategorie, Rolle und Tags – Boden, Wände mit ihren Rollen (Kanten, Ecken, Innenecken, Fronten), Wasser, Wege, Türen, Deko, Hindernisse. Leere oder unklare Tiles auslassen. Danach generate, damit die Karte mit dem Tileset gebaut wird.`,
+    )
+      .then((done) => toast(done || 'Tiles zugeordnet', 'success'))
+      .catch((e: unknown) => toast(e instanceof Error ? e.message : 'KI-Zuordnung fehlgeschlagen', 'error'));
+  return (
+    <Button variant="secondary" block icon={<Icon.Spark size={16} />} disabled={running} onClick={run}>
+      {running ? 'Die KI arbeitet …' : 'Mit KI zuordnen'}
+    </Button>
+  );
 }
 
 /** demo sets without a view list are top-down family tiles – not for side-scroller or hex maps */
@@ -573,23 +590,7 @@ function TilesetCard({ ts }: { ts: Tileset }) {
           void learnFrom({ ...ts, tiles: { ...ts.tiles, ...confirmed } });
         }}
       />
-      {ts.source === 'upload' && (
-        <Button
-          variant="secondary"
-          block
-          icon={<Icon.Spark size={16} />}
-          disabled={detecting}
-          onClick={() => {
-            setDetecting(true);
-            void aiAssignTiles(ts.id)
-              .then(({ count, summary }) => toast(`${summary ? `${summary} ` : ''}Die KI hat ${count} Tiles zugeordnet – bitte prüfen und bestätigen, dann neu generieren.`, 'success'))
-              .catch((e) => toast(e instanceof Error ? e.message : 'KI-Zuordnung fehlgeschlagen', 'error'))
-              .finally(() => setDetecting(false));
-          }}
-        >
-          {detecting ? 'Die KI schaut sich die Tiles an …' : 'Mit KI zuordnen'}
-        </Button>
-      )}
+      {ts.source === 'upload' && <AiAssignButton ts={ts} />}
       <div className="field">
         <label>Geeignet für</label>
         <div className="chips">

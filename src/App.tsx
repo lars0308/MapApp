@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { DesktopLayout } from './components/DesktopLayout';
 import { MobileLayout } from './mobile/MobileLayout';
+import { AgentBanner } from './components/AgentBanner';
 import { Toasts } from './components/Toasts';
 import { SetupWizard } from './components/wizard/SetupWizard';
 import { useMediaQuery } from './utils/useMediaQuery';
@@ -93,6 +94,7 @@ export function App() {
         <SetupWizard />
       </ErrorBoundary>
       <Toasts />
+      <AgentBanner />
     </div>
   );
 }

@@ -347,26 +347,31 @@ const H: Record<string, Handler> = {
     const ts = findTileset(P(), a.tileset);
     const img = await loadImage(ts.dataUrl);
     const t = ts.tileSize;
+    // big sheets: a band of rows (row / rows), so gids stay readable
+    const row0 = Math.max(0, Math.min(ts.rows - 1, int(a.row, 'row', 0)));
+    const rowN = Math.max(1, Math.min(ts.rows - row0, int(a.rows, 'rows', ts.rows - row0)));
+    const col0 = Math.max(0, Math.min(ts.columns - 1, int(a.col, 'col', 0)));
+    const colN = Math.max(1, Math.min(ts.columns - col0, int(a.cols, 'cols', ts.columns - col0)));
     const scale = int(a.scale, 'scale', Math.max(1, Math.min(8, Math.round(48 / t))));
     const cell = t * scale;
     const c = document.createElement('canvas');
-    c.width = ts.columns * cell;
-    c.height = ts.rows * cell;
+    c.width = colN * cell;
+    c.height = rowN * cell;
     if (c.width * c.height > 16_000_000) fail('Bild wäre zu groß – kleineres scale');
     const g = c.getContext('2d')!;
     g.fillStyle = '#26232c';
     g.fillRect(0, 0, c.width, c.height);
     g.imageSmoothingEnabled = false;
-    g.drawImage(img, 0, 0, ts.columns * t, ts.rows * t, 0, 0, c.width, c.height);
+    g.drawImage(img, col0 * t, row0 * t, colN * t, rowN * t, 0, 0, c.width, c.height);
     const empty = new Set(ts.emptyTiles);
     const fs = Math.max(9, Math.min(14, Math.round(cell / 4)));
     g.font = `bold ${fs}px sans-serif`;
     g.textBaseline = 'top';
-    for (let r = 0; r < ts.rows; r++)
-      for (let q = 0; q < ts.columns; q++) {
+    for (let r = row0; r < row0 + rowN; r++)
+      for (let q = col0; q < col0 + colN; q++) {
         const i = r * ts.columns + q;
-        const x = q * cell;
-        const y = r * cell;
+        const x = (q - col0) * cell;
+        const y = (r - row0) * cell;
         g.strokeStyle = 'rgba(255,255,255,0.35)';
         g.strokeRect(x + 0.5, y + 0.5, cell - 1, cell - 1);
         if (empty.has(i)) continue;
@@ -382,7 +387,7 @@ const H: Record<string, Handler> = {
           g.fillText(line, x + 3, ly + 1);
         });
       }
-    return { text: `${ts.name}: gid oben links, Zuordnung unten (? = Vorschlag, noch nicht bestätigt)`, binary: { kind: 'image', mime: 'image/png', name: 'tileset.png', base64: dataUrlBase64(c.toDataURL('image/png')) } };
+    return { text: `${ts.name}: Zeilen ${row0}–${row0 + rowN - 1} von ${ts.rows}, Spalten ${col0}–${col0 + colN - 1} von ${ts.columns}, gid oben links, Zuordnung unten (? = Vorschlag, noch nicht bestätigt)`, binary: { kind: 'image', mime: 'image/png', name: 'tileset.png', base64: dataUrlBase64(c.toDataURL('image/png')) } };
   },
 
   tileset_assign: (a) => {
