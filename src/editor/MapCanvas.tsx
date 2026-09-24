@@ -244,8 +244,11 @@ export function MapCanvas() {
     /** end a stroke; with "Auto-Wände" the walls around painted ground / doors are re-tiled */
     const finishStroke = (label: string) => {
       const s = store();
-      applyAutoEdges(s.strokeCells(), s.project.activeLayerId);
-      if (editor().autoWalls) applyAutoWalls(s.strokeCells(), s.project.activeLayerId);
+      // "Einzeln setzen": exactly the chosen tile, nothing around it changes
+      if (editor().autoWalls) {
+        applyAutoEdges(s.strokeCells(), s.project.activeLayerId);
+        applyAutoWalls(s.strokeCells(), s.project.activeLayerId);
+      }
       s.endStroke(label);
     };
 

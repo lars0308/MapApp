@@ -1763,7 +1763,7 @@ input[type='range']:active::-webkit-slider-thumb {
 }
 .m-tools .icon-btn {
   width: 46px;
-  max-width: calc((100vw - 8px) / 9);
+  max-width: calc((100vw - 8px) / 10);
   height: 44px;
 }
 .m-nav {
@@ -6281,4 +6281,15 @@ details.more[open] {
 }
 .room-size-free > :first-child {
   flex: 1 1 auto;
+}
+
+/* separator before "Einzeln setzen" in the tool bar */
+.tool-sep {
+  display: block;
+  height: 1px;
+  margin: 3px 6px;
+  background: var(--line-2);
+}
+.m-tools .tool-sep {
+  display: none;
 }

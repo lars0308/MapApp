@@ -29,6 +29,9 @@ const TOOL_ICON: Record<ToolId, (p: { size?: number }) => React.ReactElement> = 
 export function ToolButtons({ withKeys }: { withKeys?: boolean }) {
   const tool = useEditor((s) => s.tool);
   const setTool = useEditor((s) => s.setTool);
+  const autoWalls = useEditor((s) => s.autoWalls);
+  const setFlag = useEditor((s) => s.setFlag);
+  const toast = useEditor((s) => s.toast);
   return (
     <>
       {TOOLS.map((t) => {
@@ -39,6 +42,19 @@ export function ToolButtons({ withKeys }: { withKeys?: boolean }) {
           </IconButton>
         );
       })}
+      <span className="tool-sep" aria-hidden="true" />
+      <IconButton
+        label={autoWalls ? 'Einzeln setzen: aus – Wände und Ränder passen sich beim Malen an' : 'Einzeln setzen: an – nur genau dieses Tile, nichts wird angepasst'}
+        active={!autoWalls}
+        onClick={() => {
+          setFlag('autoWalls', !autoWalls);
+          // "manually insert a single tile": pick the pencil right away
+          if (autoWalls && tool !== 'brush') setTool('brush');
+          toast(autoWalls ? 'Einzeln setzen: das gewählte Tile kommt genau dorthin, wo du tippst – Wände und Ränder werden nicht angepasst' : 'Auto-Wände wieder an: Boden malen setzt Wände, Ecken und Ränder automatisch');
+        }}
+      >
+        <Icon.Crosshair size={20} />
+      </IconButton>
     </>
   );
 }
@@ -49,7 +65,6 @@ export function BrushSize() {
   const setSize = useEditor((s) => s.setBrushSize);
   const eraseRect = useEditor((s) => s.eraseRect);
   const eraseAll = useEditor((s) => s.eraseAllLayers);
-  const autoWalls = useEditor((s) => s.autoWalls);
   const setFlag = useEditor((s) => s.setFlag);
   const [more, setMore] = useState(false);
   if (tool !== 'brush' && tool !== 'eraser') return null;
@@ -92,15 +107,6 @@ export function BrushSize() {
           <span>{size}×{size}</span>
         </label>
       )}
-      <button
-        type="button"
-        aria-pressed={autoWalls}
-        title={autoWalls ? 'Auto-Wände an: Boden malen setzt Wände, Ecken und Kollision drumherum automatisch' : 'Auto-Wände aus: es wird nur das gewählte Tile gesetzt'}
-        className={`brush-all${autoWalls ? ' is-active' : ''}`}
-        onClick={() => setFlag('autoWalls', !autoWalls)}
-      >
-        Auto-Wände {autoWalls ? 'an' : 'aus'}
-      </button>
       {tool === 'eraser' && (
         <>
           <button type="button" role="radio" aria-checked={rect} aria-label="Rechteck radieren" title="Rechteck aufziehen und löschen" className={rect ? 'is-active' : ''} onClick={() => setFlag('eraseRect', true)}>
@@ -300,8 +306,10 @@ export function SelectionActions() {
     }
     if (!s.beginStroke(layer.id)) return;
     s.strokeSet(rectCells(sel, p.map.width), gid);
-    applyAutoEdges(s.strokeCells(), layer.id);
-    if (useEditor.getState().autoWalls) applyAutoWalls(s.strokeCells(), layer.id);
+    if (useEditor.getState().autoWalls) {
+      applyAutoEdges(s.strokeCells(), layer.id);
+      applyAutoWalls(s.strokeCells(), layer.id);
+    }
     s.endStroke(label);
   };
   const gid = withTransform(useEditor.getState().selectedGid, useEditor.getState().tileTurn);

@@ -336,6 +336,12 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.36 – Einzeln setzen**
+
+- **Neuer Knopf „Einzeln setzen“ (Fadenkreuz) in der Werkzeugleiste**, am Desktop links unter den Werkzeugen, am Handy ganz rechts. Ist er an, kommt das gewählte Tile genau dorthin, wo du tippst oder malst. Wände, Ecken, Boden-Ränder und weiche Übergänge drumherum werden nicht angepasst. Beim Einschalten wird der Stift gewählt.
+- Ist er aus, bleibt alles wie bisher: Boden malen setzt Wände, Ecken, Ränder und Kollision automatisch.
+- Der alte Schalter „Auto-Wände“ neben der Pinselgröße ist in diesem Knopf aufgegangen und gilt jetzt auch für Rechteck und Füllen.
+
 **Version 3.35 – Wände mit Vorderseite auch in Top-Down, keine zufälligen Weg-Tiles mehr**
 
 - **Aufbau → Karte → Wände:** „Nur Kante“, „+ 1 Reihe“ oder „+ 2 Reihen“ – für Top-Down, Low Top-Down und Schräg 45°. So bekommt auch eine Top-Down-Karte oben die Kante und darunter ein Stück Mauer.
