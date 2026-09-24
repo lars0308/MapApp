@@ -52,12 +52,13 @@ export function defaultGenerator(seed = randomSeed()): GeneratorSettings {
   };
 }
 
+/** terrain features are opt-in: a plain map unless water, lava, chasms or plateaus are switched on */
 export function defaultTerrain(): TerrainSettings {
   return {
-    water: { enabled: true, amount: 20 },
+    water: { enabled: false, amount: 20 },
     lava: { enabled: false, amount: 10 },
-    abyss: { enabled: true, amount: 15, minSize: 4, maxSize: 14, islands: true, bridges: true, inRooms: true, betweenRooms: true },
-    cliffs: { enabled: true, amount: 25 },
+    abyss: { enabled: false, amount: 15, minSize: 4, maxSize: 14, islands: true, bridges: true, inRooms: true, betweenRooms: true },
+    cliffs: { enabled: false, amount: 25 },
     bridges: true,
     transitions: { enabled: true, amount: 50 },
   };

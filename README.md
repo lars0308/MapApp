@@ -336,6 +336,13 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.32 – Gelände nur, wenn du es willst**
+
+- **Wasser, Lava, Abgründe (mit Brücken) und Plateaus sind bei neuen Karten standardmäßig aus.** Flüsse, Häuser und Winter/Wüste waren schon aus beziehungsweise auf Sommer. Eine neue Karte ist also schlicht, bis du Gelände unter Aufbau → Gelände einschaltest. „Groß & detailliert“ schaltet Plateaus nicht mehr von selbst ein.
+- **Die Überschrift zeigt, was aktiv ist**, zum Beispiel „Gelände · Wasser, Plateaus“ oder „Gelände · aus“.
+- **Die KI** (Planen und Bauen) setzt Gelände, Flüsse, Brücken und Häuser nur, wenn du sie beschreibst oder das Referenzbild sie zeigt.
+- Bestehende Projekte behalten ihre Einstellungen und lassen sich dort ausschalten.
+
 **Version 3.31 – Godot-Export der Rautenansicht**
 
 - **Isometrische Karten exportieren jetzt echt isometrisch:** `tileset.tres` nutzt `TILE_SHAPE_ISOMETRIC` mit `TILE_LAYOUT_DIAMOND_DOWN` und Kacheln von 2T × T. Das ist dasselbe Raster wie in MapForge, geprüft in Godot 4.3: Feldmitten stimmen exakt überein.

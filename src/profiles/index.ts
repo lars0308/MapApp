@@ -161,7 +161,7 @@ export function applyProfile(p: GameProfile, base: GeneratorSettings, map: Pick<
         water: { ...t.water, amount: amt(t.water.amount) },
         lava: { ...t.lava, amount: amt(t.lava.amount) },
         abyss: { ...t.abyss, amount: amt(t.abyss.amount) },
-        cliffs: { ...t.cliffs, enabled: big || t.cliffs.enabled, amount: amt(t.cliffs.amount) },
+        cliffs: { ...t.cliffs, amount: amt(t.cliffs.amount) },
       },
     };
   }

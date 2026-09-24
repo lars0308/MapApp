@@ -2,7 +2,7 @@ import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { PRESETS } from '../generator/presets';
 import { deriveConfig } from '../profiles';
-import { lookOf, type MapLook, type Perspective, type RoomShape, type SideSettings } from '../types';
+import { lookOf, type MapLook, type Perspective, type RoomShape, type SideSettings, type TerrainSettings } from '../types';
 import { CORRIDOR_OPTS, DISTRIBUTIONS, SHAPES, SPECIALS } from './generatorOptions';
 import { PERSPECTIVE_INFO } from '../generator/perspective';
 import { RoomCountGuard } from './RoomCountGuard';
@@ -295,7 +295,7 @@ export function GeneratorPanel() {
         <RoomCountGuard specials={g.specials} roomCount={g.roomCount} onFix={(n) => update({ roomCount: n })} />
       </Section>
 
-      <Section title="Gelände" defaultOpen={false}>
+      <Section title={terrainTitle(g)} defaultOpen={false}>
         <TerrainFields value={g.terrain} onChange={(t) => update({ terrain: t })} />
         <details className="more">
           <summary>Boden-Materialien (Terrain-Sets)</summary>
@@ -345,6 +345,13 @@ const SIDE_PRESETS: { id: string; label: string; text: string; side: Partial<Sid
 ];
 
 /** Settings of the side-scroller generator (perspective side_view). */
+/** "Gelände · Wasser, Flüsse" – what is switched on, so nothing appears in the map by surprise */
+function terrainTitle(g: { terrain: TerrainSettings; rivers?: number }) {
+  const t = g.terrain;
+  const on = [t.water.enabled && 'Wasser', t.lava.enabled && 'Lava', t.abyss.enabled && 'Abgründe', t.cliffs.enabled && 'Plateaus'].filter(Boolean);
+  return on.length ? `Gelände · ${on.join(', ')}` : 'Gelände · aus';
+}
+
 /** switchable finishing touches – for every top-down map kind (rooms, cave, outdoor, village, island) */
 function LookSection({ manual = false }: { manual?: boolean }) {
   const g = useProject((s) => s.project.generator);

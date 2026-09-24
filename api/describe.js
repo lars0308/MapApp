@@ -32,10 +32,11 @@ ${JSON.stringify(context.generator)}
 Bedeutung wichtiger Werte:
 - layout: "rooms" gebaute Räume und Gänge (Dungeon, Burg, Gebäude), "cave" natürliche Höhle, "outdoor" Waldlichtungen mit Erdwegen, "village" Dorf mit Häusern, "island" Insel im Meer mit Stränden.
 - houses: true setzt bei "outdoor" oder "island" Häuser an die Lichtungen (z. B. Insel mit Dorf).
+- rivers (Standard 0), houses (Standard aus) und climate nur setzen, wenn es zur Beschreibung passt.
 - rivers: 0–2 Flüsse durch den Wald bei "outdoor", "village", "island" (Brücken über Wege entstehen automatisch).
 - climate: "summer" (Wiese), "winter" (Schnee, Tannen), "desert" (Sand, Palmen, Oasen) für "outdoor", "village", "island".
 - roomCount = Anzahl Räume/Lichtungen; roomMin/Max W/H = Raumgröße in Kacheln; distribution: even | cluster | center | spread | random.
-- terrain: water/lava/abyss/plateaus/bridges usw. mit enabled + amount (0–100). Draußen gibt es keine Abgründe.
+- terrain: water/lava/abyss/cliffs (Plateaus) mit enabled + amount (0–100). Standard: alles aus. Nur einschalten, was der Nutzer beschreibt oder das Referenzbild klar zeigt. Draußen gibt es keine Abgründe.
 - population.enemies / population.loot 0–100; decoDensity, floorVariation, obstacleDensity 0–100; objects.trees/rocks/arches 0–100.
 - specials: Spezialräume (start, end, boss, treasure, secret, merchant, quest, arena, puzzle) an/aus – genug Räume dafür einplanen.
 - look: softEdges (runde Wege/Ufer), floorPatches, smartDeco, smoothRooms – normalerweise alle true lassen.

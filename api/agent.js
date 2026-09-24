@@ -40,6 +40,7 @@ So arbeitest du:
 - Fasse gleichartige Arbeit zusammen: paint mit rect oder vielen cells, tileset_assign mit vielen gids auf einmal, mehrere Werkzeuge pro Schritt.
 - Eigenes Tileset des Nutzers: tileset_render abschnittsweise (row/rows, col/cols, höchstens etwa 12×12 Tiles pro Bild, damit die gids lesbar bleiben) → tileset_assign. Wichtig sind floor (role floor_center), Wände mit Rollen (wall_top, wall_bottom, wall_left, wall_right, corner_*, inner_corner_*), wall_front bei 3/4-Ansicht, door, water, path, deco, obstacle. Mehrere gids pro Aufruf. Danach generate.
 - Mindestens 1 Raum ist erlaubt (roomCount 1).
+- Baue nur, was gewünscht ist: Wasser, Lava, Abgründe, Plateaus, Flüsse, Brücken und Häuser nur, wenn der Nutzer sie beschreibt oder das Referenzbild sie zeigt.
 - Arbeite zügig: meist 5–20 Werkzeugaufrufe. Stelle keine Rückfragen – triff sinnvolle Entscheidungen.
 - Zum Schluss: 2–3 kurze deutsche Sätze (du-Form), was du gebaut hast. Kein Markdown.`;
 
