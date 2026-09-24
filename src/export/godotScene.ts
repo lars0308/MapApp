@@ -52,6 +52,69 @@ export function tileMapData(tiles: { x: number; y: number; sourceId: number; atl
   return base64(buf);
 }
 
+/*
+ * Godot terrains, so walls and ground can be painted further in Godot (TileMap → Terrains):
+ * set 0 „Wände“ (MATCH_SIDES): MapForge walls are lines – a wall tile connects to its wall neighbours
+ *   N / E / S / W; the role says which (same rule as classifyWall in generator/autotile.ts).
+ * set 1 „Boden (Seitenansicht)“ (MATCH_CORNERS_AND_SIDES): side-view ground, peering = solid neighbours.
+ */
+const N = 'top_side';
+const E = 'right_side';
+const S = 'bottom_side';
+const W = 'left_side';
+const NE = 'top_right_corner';
+const NW = 'top_left_corner';
+const SE = 'bottom_right_corner';
+const SW = 'bottom_left_corner';
+const WALL_SIDES: Record<string, string[]> = {
+  junction_cross: [N, E, S, W],
+  junction_t_right: [N, E, S],
+  junction_t_left: [N, S, W],
+  junction_t_down: [E, S, W],
+  junction_t_up: [N, E, W],
+  wall_horizontal: [E, W],
+  wall_top: [E, W],
+  wall_bottom: [E, W],
+  wall_vertical: [N, S],
+  wall_left: [N, S],
+  wall_right: [N, S],
+  corner_top_left: [E, S],
+  inner_corner_top_left: [E, S],
+  corner_top_right: [W, S],
+  inner_corner_top_right: [W, S],
+  corner_bottom_left: [E, N],
+  inner_corner_bottom_left: [E, N],
+  corner_bottom_right: [W, N],
+  inner_corner_bottom_right: [W, N],
+  end_cap_top: [S],
+  end_cap_bottom: [N],
+  end_cap_left: [E],
+  end_cap_right: [W],
+};
+const ALL8 = [N, NE, E, SE, S, SW, W, NW];
+const GROUND_SOLID: Record<string, string[]> = {
+  ground_fill: ALL8,
+  ground_top: [E, SE, S, SW, W],
+  ground_top_left: [E, SE, S],
+  ground_top_right: [S, SW, W],
+  ground_left: [N, NE, E, SE, S],
+  ground_right: [N, S, SW, W, NW],
+  ground_bottom: [N, NE, E, W, NW],
+  ground_inner_left: ALL8.filter((b) => b !== NW),
+  ground_inner_right: ALL8.filter((b) => b !== NE),
+};
+
+/** terrain lines of one tile (set, terrain, peering bits) or [] */
+function terrainLines(prefix: string, role: string | null, hex: boolean): string[] {
+  if (!role || hex) return [];
+  const wall = WALL_SIDES[role];
+  const ground = GROUND_SOLID[role];
+  const bits = wall ?? ground;
+  if (!bits) return [];
+  const set = wall ? 0 : 1;
+  return [`${prefix}/terrain_set = ${set}`, `${prefix}/terrain = 0`, ...bits.map((b) => `${prefix}/terrains_peering_bit/${b} = 0`)];
+}
+
 export function buildTileSetResource(data: GodotData): string {
   const T = data.map.tileSize;
   const half = T / 2;
@@ -75,6 +138,7 @@ export function buildTileSetResource(data: GodotData): string {
       lines.push(`${p}/y_sort_origin = ${Math.round(t.ySortOrigin + T / 2)}`);
       if (t.category) lines.push(`${p}/custom_data_0 = ${str(t.category)}`);
       if (t.role) lines.push(`${p}/custom_data_1 = ${str(t.role)}`);
+      lines.push(...terrainLines(p, t.role, data.map.perspective === 'hex'));
       if (solid.has(`${ts.id}:${key}`)) lines.push(`${p}/physics_layer_0/polygon_0/points = PackedVector2Array(${-half}, ${-half}, ${half}, ${-half}, ${half}, ${half}, ${-half}, ${half})`);
     }
     subs.push(lines.join('\n'));
@@ -86,6 +150,16 @@ export function buildTileSetResource(data: GodotData): string {
     ...(data.map.perspective === 'hex' ? ['tile_shape = 3'] : []),
     `tile_size = Vector2i(${T}, ${T})`,
     'physics_layer_0/collision_layer = 1',
+    ...(data.map.perspective === 'hex'
+      ? []
+      : [
+          'terrain_set_0/mode = 2',
+          'terrain_set_0/terrain_0/name = "Wände"',
+          'terrain_set_0/terrain_0/color = Color(0.62, 0.5, 0.38, 1)',
+          'terrain_set_1/mode = 0',
+          'terrain_set_1/terrain_0/name = "Boden (Seitenansicht)"',
+          'terrain_set_1/terrain_0/color = Color(0.36, 0.6, 0.3, 1)',
+        ]),
     'custom_data_layer_0/name = "category"',
     'custom_data_layer_0/type = 4',
     'custom_data_layer_1/name = "role"',

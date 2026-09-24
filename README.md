@@ -350,6 +350,10 @@ Wichtige Entscheidungen:
 - Mit Godot 4.3 geprüft für Top-Down/Dorf, Low Top-Down, 45°, Side-Scroller und Hex:
   - Jede Kachel (Quelle, Atlas-Position, Drehung, Y-Sort, Kollision, Rolle) stimmt mit dem bisherigen Laufzeit-Aufbau überein.
   - Die Spielfigur erscheint.
+- **Godot-Terrains** in `tileset.tres`. Damit malst du in Godot im Reiter *TileMap → Terrains* weiter:
+  - **„Wände“** (Match Sides): MapForge-Wände sind Linien, jede Wandkachel verbindet sich mit ihren Wand-Nachbarn. Ein gemaltes Rechteck bekommt passende Ecken, Kanten, T-Stücke und Endkappen.
+  - **„Boden (Seitenansicht)“** (Match Corners and Sides) für Side-Scroller-Boden: oben, Ecken, Seiten, Füllung und Unterkante.
+  - Welche Seite „Raum“ ist, kann Godot nicht wissen. Es wählt deshalb zwischen gleich verbundenen Varianten, z. B. innerer oder äußerer Ecke, selbst.
 - Die Spawn-Marker heißen jetzt `SpawnMarkers`, die Objekt-Dächer `OverheadObjects`. Vorher kollidierten diese Namen mit den gleichnamigen Kachel-Ebenen.
 
 **Version 3.12 – KI arbeitet auch, wenn MapForge zu ist**

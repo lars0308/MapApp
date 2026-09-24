@@ -663,7 +663,8 @@ Contents
 - tilesets/*.png        tileset images, re-sampled to the map tile size
 - objects.png           object sprites (trees, pillars, rocks, arches …), same scale
 - mapforge_loader.gd    loader script (Godot 4.3+, TileMapLayer)
-- tileset.tres          ready TileSet: all tiles, y-sort origins, custom data "category" / "role", collision
+- tileset.tres          ready TileSet: all tiles, y-sort origins, custom data "category" / "role", collision,
+                        terrains „Wände“ (walls) and „Boden (Seitenansicht)“ for painting on in TileMap → Terrains
 - Map.tscn              ready scene: every layer is a TileMapLayer with its tiles, objects are Sprite2D
                         nodes with collision – visible and editable in the editor, just run it
 - player/               your own character from MapForge (only if set as player)
