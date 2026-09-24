@@ -5,6 +5,7 @@ import { DEFAULT_MAP, defaultGenerator, defaultTerrainSets } from '../../generat
 import { TerrainFields } from '../TerrainFields';
 import { PERSPECTIVE_INFO, requiredRooms } from '../../generator/perspective';
 import { SideFields, resolveSide } from '../SideFields';
+import { HexFields, resolveHex } from '../HexFields';
 import { randomSeed } from '../../generator/rng';
 import { COMMON_TILE_SIZES } from '../../tilesets/slicing';
 import { createProject, useProject } from '../../store/projectStore';
@@ -22,7 +23,7 @@ import { listLibraryTilesets, type LibraryTileset } from '../../persistence/db';
 import { TilePools } from '../../tilesets/tilePools';
 import { Rng } from '../../generator/rng';
 
-type StepId = 'game' | 'mode' | 'perspective' | 'tiles' | 'map' | 'level' | 'rooms' | 'paths' | 'specials' | 'terrain' | 'equip' | 'summary';
+type StepId = 'game' | 'mode' | 'perspective' | 'tiles' | 'map' | 'level' | 'world' | 'rooms' | 'paths' | 'specials' | 'terrain' | 'equip' | 'summary';
 
 const STEP_LABEL: Record<StepId, string> = {
   game: 'Spiel',
@@ -31,6 +32,7 @@ const STEP_LABEL: Record<StepId, string> = {
   tiles: 'Tiles',
   map: 'Map',
   level: 'Level',
+  world: 'Welt',
   rooms: 'Räume',
   paths: 'Wege',
   specials: 'Spezialräume',
@@ -48,6 +50,12 @@ const FLOW: Record<ProjectMode, StepId[]> = {
 /** side-scroller: one perspective, the level settings replace rooms / paths / terrain */
 const SIDE_FLOW: Record<ProjectMode, StepId[]> = {
   generate: ['game', 'mode', 'tiles', 'map', 'level', 'summary'],
+  manual: ['game', 'mode', 'tiles', 'map', 'summary'],
+};
+
+/** hex world: the world settings replace rooms / paths / terrain */
+const HEX_FLOW: Record<ProjectMode, StepId[]> = {
+  generate: ['game', 'mode', 'tiles', 'map', 'world', 'summary'],
   manual: ['game', 'mode', 'tiles', 'map', 'summary'],
 };
 
@@ -76,7 +84,7 @@ interface Draft {
 /** new answers → sliders and map size start from the profile (seed and tile size stay) */
 function withProfile(d: Draft, patch: Partial<GameProfile>): Draft {
   const profile = { ...d.profile, ...patch };
-  if (!genreInfo(profile.genre).views.includes(profile.view)) profile.genre = profile.view === 'side_scroller' ? 'platformer' : 'other';
+  if (!genreInfo(profile.genre).views.includes(profile.view)) profile.genre = profile.view === 'side_scroller' ? 'platformer' : profile.view === 'hexagonal' ? 'strategy' : 'other';
   const { gen, map } = applyProfile(profile, defaultGenerator(d.gen.seed), DEFAULT_MAP);
   const allowed = deriveConfig(profile).perspectives;
   return { ...d, profile, gen, map: { ...d.map, ...map, perspective: allowed.includes(d.map.perspective) ? d.map.perspective : allowed[allowed.length - 1] } };
@@ -108,14 +116,15 @@ function WizardDialog() {
     // "Neue Karte → Side-Scroller …": start with that view (still changeable in step 1)
     const d = freshDraft();
     const view = useEditor.getState().wizardView;
-    return view ? withProfile(d, { view }) : d;
+    return view ? withProfile(d, { view, genre: view === 'hexagonal' ? 'strategy' : view === 'side_scroller' ? 'platformer' : d.profile.genre }) : d;
   });
   const [busy, setBusy] = useState(false);
   const [library, setLibrary] = useState<LibraryTileset[] | null>(null);
   const [upload, setUpload] = useState<Tileset | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const sideView = draft.map.perspective === 'side_view';
-  const steps = (sideView ? SIDE_FLOW : FLOW)[draft.mode];
+  const hexView = draft.map.perspective === 'hex';
+  const steps = (sideView ? SIDE_FLOW : hexView ? HEX_FLOW : FLOW)[draft.mode];
   const id = steps[Math.min(step, steps.length - 1)];
 
   const reloadLibrary = async () => {
@@ -157,7 +166,7 @@ function WizardDialog() {
     setBusy(true);
     let gen = draft.gen;
     const need = requiredRooms(gen.specials);
-    if (!sideView && gen.roomCount < need) {
+    if (!sideView && !hexView && gen.roomCount < need) {
       gen = { ...gen, roomCount: need };
       toast(`Raumanzahl automatisch auf ${need} erhöht`);
     }
@@ -188,9 +197,13 @@ function WizardDialog() {
         draft.mode === 'generate'
           ? sideView
             ? 'Level erstellt – mit ▶ gleich testen'
-            : 'Map erstellt'
+            : hexView
+              ? 'Welt erstellt – Gelände, Flüsse und Straßen lassen sich übermalen'
+              : 'Map erstellt'
           : sideView
             ? 'Baukasten geöffnet – festen Boden malen, Gras und Kanten entstehen automatisch'
+            : hexView
+              ? 'Baukasten geöffnet – Gelände-Hexe malen; Flüsse und Straßen verbinden sich selbst'
             : 'Baukasten geöffnet – Boden malen legt Räume und Wege an, Wände entstehen automatisch',
         'success',
       );
@@ -281,6 +294,12 @@ function WizardDialog() {
                 deco={gen.decoDensity}
                 onDeco={(v) => setGen({ decoDensity: v })}
               />
+            </StepSection>
+          )}
+
+          {id === 'world' && (
+            <StepSection title="Wie soll deine Welt aussehen?">
+              <HexFields hex={resolveHex(gen.hex)} onChange={(patch) => setGen({ hex: { ...resolveHex(gen.hex), ...patch } })} />
             </StepSection>
           )}
 
@@ -602,8 +621,20 @@ function Summary({ draft, library, onName, onFixRooms }: { draft: Draft; library
     ['Inhalt', `Gegner ${sd.enemies} % · Belohnungen ${sd.loot} %${gen.specials.boss ? ' · Boss-Arena' : ''}`],
     ['Seed', gen.seed],
   ];
+  const hx = resolveHex(gen.hex);
+  const hexRows: [string, string][] = [
+    ['Welt', `${hx.shape === 'islands' ? 'Inseln' : 'Kontinent'} · ${hx.climate === 'cold' ? 'kalt' : hx.climate === 'hot' ? 'heiß' : 'gemäßigt'}`],
+    ['Gelände', `Wasser ${hx.water} % · Gebirge ${hx.mountains} % · Wald ${hx.forests} % · Flüsse ${hx.rivers} %`],
+    ['Völker & Orte', `${hx.players} Spieler · ${hx.towns} Siedlungen${hx.roads ? ' · Straßen' : ''} · Rohstoffe ${hx.resources} %`],
+    ['Seed', gen.seed],
+  ];
   const side = map.perspective === 'side_view';
-  const rows = draft.mode === 'generate' ? [...(side ? base.map(([k, v]) => [k, k === 'Perspektive' ? PERSPECTIVE_INFO[map.perspective].label : v] as [string, string]) : base), ...(side ? sideRows : generatorRows)] : base;
+  const hex = map.perspective === 'hex';
+  const plain = side || hex;
+  const rows =
+    draft.mode === 'generate'
+      ? [...(plain ? base.map(([k, v]) => [k, k === 'Perspektive' ? PERSPECTIVE_INFO[map.perspective].label : v] as [string, string]) : base), ...(side ? sideRows : hex ? hexRows : generatorRows)]
+      : base;
   return (
     <StepSection title="Zusammenfassung">
       <div className="field">
@@ -618,7 +649,7 @@ function Summary({ draft, library, onName, onFixRooms }: { draft: Draft; library
           </div>
         ))}
       </dl>
-      {draft.mode === 'generate' && !side && <RoomCountGuard specials={gen.specials} roomCount={gen.roomCount} onFix={onFixRooms} />}
+      {draft.mode === 'generate' && !plain && <RoomCountGuard specials={gen.specials} roomCount={gen.roomCount} onFix={onFixRooms} />}
     </StepSection>
   );
 }
@@ -627,10 +658,11 @@ function Summary({ draft, library, onName, onFixRooms }: { draft: Draft; library
 function prepareBuildKit() {
   const p = useProject.getState().project;
   const side = p.map.perspective === 'side_view';
+  const hex = p.map.perspective === 'hex';
   const floor = p.layers.find((l) => l.role === (side ? 'walls' : 'floor'));
   if (floor) useProject.getState().setActiveLayer(floor.id);
   const pools = new TilePools(p.tilesets, p.map.perspective);
-  const gid = side ? pools.pickRole(new Rng(1), 'ground_top', ['side', 'grass']) : pools.pickPref(new Rng(1), ['floor']);
+  const gid = side ? pools.pickRole(new Rng(1), 'ground_top', ['side', 'grass']) : hex ? pools.pickTagged(new Rng(1), 'floor', 'grass') : pools.pickPref(new Rng(1), ['floor']);
   const editor = useEditor.getState();
   if (gid) editor.selectTile(gid);
   editor.setTool('hand'); // tile ready, drawing starts with the brush (no accidental strokes)

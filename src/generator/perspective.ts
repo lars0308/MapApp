@@ -36,6 +36,14 @@ export const PERSPECTIVE_INFO: Record<Perspective, PerspectiveInfo> = {
     faceRows: 2,
     sideFaces: true,
   },
+  hex: {
+    id: 'hex',
+    label: 'Hexagonal',
+    short: 'Sechseck-Raster für Strategie',
+    points: ['Sechseck-Felder, jede zweite Reihe versetzt', 'Gelände, Flüsse, Straßen, Städte', 'Godot-TileSet im Hexagon-Modus'],
+    faceRows: 0,
+    sideFaces: false,
+  },
   side_view: {
     id: 'side_view',
     label: 'Seitenansicht',

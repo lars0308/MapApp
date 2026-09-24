@@ -72,15 +72,25 @@ export const SIDE_LAYER_NAME: Partial<Record<LayerRole, string>> = {
   deco: 'Deko',
 };
 
+/** layer names in hex projects */
+export const HEX_LAYER_NAME: Partial<Record<LayerRole, string>> = {
+  floor: 'Gelände',
+  groundDetails: 'Flüsse',
+  paths: 'Straßen',
+  objects: 'Städte & Orte',
+};
+
 /** rename default-named layers for a perspective (own names stay) */
-export function namesFor(layers: Layer[], side: boolean): Layer[] {
+export function namesFor(layers: Layer[], perspective: string): Layer[] {
+  const table = perspective === 'side_view' ? SIDE_LAYER_NAME : perspective === 'hex' ? HEX_LAYER_NAME : {};
+  const special = [SIDE_LAYER_NAME, HEX_LAYER_NAME];
   return layers.map((l) => {
-    const sideName = SIDE_LAYER_NAME[l.role];
-    if (!sideName) return l;
     const def = DEFAULT_LAYERS.find((d) => d.role === l.role)?.name;
-    if (side && l.name === def) return { ...l, name: sideName };
-    if (!side && l.name === sideName && def) return { ...l, name: def };
-    return l;
+    if (!def) return l;
+    // only layers that still carry a default name (of any perspective) are renamed
+    const isDefault = l.name === def || special.some((t) => t[l.role] === l.name);
+    if (!isDefault) return l;
+    return { ...l, name: table[l.role] ?? def };
   });
 }
 

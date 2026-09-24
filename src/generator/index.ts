@@ -42,6 +42,7 @@ import { placeObjects, type ObjectContext } from './objectsGen';
 import { OBJECT_DEFS } from '../objects/defs';
 import { isWalkable } from './nav';
 import { generateSide } from './side';
+import { generateHex } from './hexgen';
 
 export interface GenerateInput {
   settings: GeneratorSettings;
@@ -86,6 +87,7 @@ export function emptyResult(W: number, H: number, seed: string, perspective: Per
 
 export function generate(input: GenerateInput): GenerateOutput {
   if (input.map.perspective === 'side_view') return generateSide(input);
+  if (input.map.perspective === 'hex') return generateHex(input);
   const { settings: s, map } = input;
   const W = Math.max(16, map.width);
   const H = Math.max(16, map.height);

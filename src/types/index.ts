@@ -33,8 +33,8 @@ export type TileCategory =
  * Camera perspective of the map. Controls which wall/tile roles the generator uses.
  * side_view = 2D side-scroller (gravity, ground, platforms) – its own generator.
  */
-export type Perspective = 'top_down' | 'low_top_down' | 'isometric_45' | 'side_view';
-export const PERSPECTIVES: Perspective[] = ['top_down', 'low_top_down', 'isometric_45', 'side_view'];
+export type Perspective = 'top_down' | 'low_top_down' | 'isometric_45' | 'side_view' | 'hex';
+export const PERSPECTIVES: Perspective[] = ['top_down', 'low_top_down', 'isometric_45', 'side_view', 'hex'];
 
 /**
  * Auto-tile roles. The generator asks for a role first and falls back to
@@ -115,6 +115,9 @@ export const TILE_ROLES = [
   // moving platform (lift / elevator) + its rail: the lift travels along the rail tiles
   'lift',
   'lift_track',
+  // hex maps: rivers and roads connect to their neighbour hexes (tag m<bits>: E=1 SE=2 SW=4 W=8 NW=16 NE=32)
+  'hex_river',
+  'hex_road',
 ] as const;
 export type TileRole = (typeof TILE_ROLES)[number];
 
@@ -241,6 +244,27 @@ export interface GeneratorSettings {
   objects: { trees: number; rocks: number; arches: number; pillars: boolean };
   /** side-scroller levels (perspective side_view) */
   side?: SideSettings;
+  /** hex world maps (perspective hex) */
+  hex?: HexSettings;
+}
+
+/** Settings of the hex world generator. */
+export interface HexSettings {
+  /** continent: one big land mass, islands: many small ones */
+  shape: 'continent' | 'islands';
+  climate: 'temperate' | 'hot' | 'cold';
+  /** 0–100 */
+  water: number;
+  mountains: number;
+  forests: number;
+  rivers: number;
+  /** settlements (towns, villages, castles) */
+  towns: number;
+  /** start positions, spread far apart (capital + flag) */
+  players: number;
+  roads: boolean;
+  /** mines, farms, ruins */
+  resources: number;
 }
 
 /** Settings of the side-scroller generator. Heights / widths are in tiles. */
@@ -383,7 +407,17 @@ export const T_LADDER = 10;
 export const T_SPIKES = 11;
 /** side view: path of a lift (moving platform) */
 export const T_LIFT = 12;
-export const TERRAIN_NAMES = ['ground', 'water', 'lava', 'abyss', 'plateau', 'cliff', 'stairs', 'bridge', 'transition', 'platform', 'ladder', 'spikes', 'lift'];
+/** hex maps: terrain of each hex (water = T_WATER) */
+export const T_DEEP = 13;
+export const T_SAND = 14;
+export const T_GRASS = 15;
+export const T_FOREST = 16;
+export const T_HILLS = 17;
+export const T_MOUNTAIN = 18;
+export const T_SNOW = 19;
+export const T_DESERT = 20;
+export const T_SWAMP = 21;
+export const TERRAIN_NAMES = ['ground', 'water', 'lava', 'abyss', 'plateau', 'cliff', 'stairs', 'bridge', 'transition', 'platform', 'ladder', 'spikes', 'lift', 'deep_water', 'sand', 'grass', 'forest', 'hills', 'mountain', 'snow', 'desert', 'swamp'];
 
 export interface GenerationResult {
   seed: string;

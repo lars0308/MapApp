@@ -4,6 +4,7 @@ import { TilePools } from '../tilesets/tilePools';
 import { frontTilePrefs, resolveWalls, roleAt } from '../generator/autotile';
 import { Rng, hashSeed } from '../generator/rng';
 import { groundRole } from '../generator/side';
+import { hexNeighbor } from '../generator/hex';
 import { metaTable } from './collision';
 
 // Keeps walls consistent while editing by hand ("Auto-Wände"):
@@ -19,6 +20,10 @@ export function applyAutoWalls(changed: number[], paintedLayerId: string) {
   const p = store.project;
   if (p.map.perspective === 'side_view') {
     applyAutoGround(changed, paintedLayerId);
+    return;
+  }
+  if (p.map.perspective === 'hex') {
+    applyAutoHex(changed, paintedLayerId);
     return;
   }
   const r = p.result;
@@ -227,4 +232,47 @@ function applyAutoGround(changed: number[], paintedLayerId: string) {
   }
   if (cells.length) store.strokeSetLayer(groundL.id, cells, gids);
   if (colL && colCells.length) store.strokeSetLayer(colL.id, colCells, colGids);
+}
+
+/**
+ * Hex maps: rivers and roads connect themselves – after painting / erasing, every river or
+ * road hex around the stroke gets the tile whose arms point to its river / road neighbours.
+ */
+function applyAutoHex(changed: number[], paintedLayerId: string) {
+  const store = useProject.getState();
+  const p = store.project;
+  const W = p.map.width;
+  const H = p.map.height;
+  const layer = p.layers.find((l) => l.id === paintedLayerId);
+  if (!layer || !changed.length) return;
+  const metas = metaTable(p);
+  const roleOf = (g: number) => {
+    const r = metas[g]?.role;
+    return r === 'hex_river' || r === 'hex_road' ? r : null;
+  };
+  const data = layer.data;
+  const ring = new Set<number>();
+  for (const i of changed) {
+    ring.add(i);
+    for (let d = 0; d < 6; d++) {
+      const [nx, ny] = hexNeighbor(i % W, (i / W) | 0, d);
+      if (nx >= 0 && ny >= 0 && nx < W && ny < H) ring.add(ny * W + nx);
+    }
+  }
+  const pools = new TilePools(p.tilesets, 'hex');
+  const cells: number[] = [];
+  const gids: number[] = [];
+  for (const i of ring) {
+    const role = roleOf(data[i]);
+    if (!role) continue;
+    let mask = 0;
+    for (let d = 0; d < 6; d++) {
+      const [nx, ny] = hexNeighbor(i % W, (i / W) | 0, d);
+      if (nx >= 0 && ny >= 0 && nx < W && ny < H && roleOf(data[ny * W + nx]) === role) mask |= 1 << d;
+    }
+    if (metas[data[i]]?.tags.includes(`m${mask}`)) continue;
+    const gid = pools.pickRole(new Rng(hashSeed(`${i}`)), role, [`m${mask}`]);
+    if (gid && gid !== data[i]) (cells.push(i), gids.push(gid));
+  }
+  if (cells.length) store.strokeSetLayer(layer.id, cells, gids);
 }

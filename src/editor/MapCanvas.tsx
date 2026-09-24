@@ -9,6 +9,8 @@ import { computeBlocked } from './collision';
 import { applyAutoWalls } from './autoWalls';
 import { OBJECT_DEFS } from '../objects/defs';
 import type { MapObject, Project } from '../types';
+import { TilePools, tilesetSupports } from '../tilesets/tilePools';
+import { Rng } from '../generator/rng';
 
 /** Top-most object whose sprite covers the cell. */
 export function objectAt(objects: MapObject[], x: number, y: number): MapObject | null {
@@ -76,6 +78,8 @@ export function MapCanvas() {
     r.setDocument(p.map.width, p.map.height, p.layers, p.tilesets);
     r.objects = p.objects;
     r.backdrop = backdropOf(p);
+    r.hex = p.map.perspective === 'hex';
+    fitTileToPerspective(p);
 
     let fitted = false;
     const ro = new ResizeObserver(() => {
@@ -102,6 +106,11 @@ export function MapCanvas() {
         r.objects = p.objects;
         r.requestRender();
       }
+      if ((p.map.perspective === 'hex') !== r.hex) {
+        r.hex = p.map.perspective === 'hex';
+        r.fit();
+      }
+      if (p.map.perspective !== prev.map.perspective || projectSwitched) fitTileToPerspective(p);
       if (backdropOf(p) !== r.backdrop) {
         r.backdrop = backdropOf(p);
         r.requestRender();
@@ -542,4 +551,16 @@ export function MapCanvas() {
 function backdropOf(p: Project): 'plain' | 'sky' | 'cave' {
   if (p.map.perspective !== 'side_view') return 'plain';
   return p.generator.side?.style === 'cave' ? 'cave' : 'sky';
+}
+
+/** the selected tile should belong to the map's view (grass hex, grass ground, floor) */
+function fitTileToPerspective(p: Project) {
+  const e = useEditor.getState();
+  const persp = p.map.perspective;
+  const ts = p.tilesets.find((t) => e.selectedGid >= t.firstGid && e.selectedGid < t.firstGid + t.columns * t.rows);
+  if (ts && ts.active && tilesetSupports(ts, persp) && (ts.perspectives?.length || persp !== 'hex')) return;
+  const pools = new TilePools(p.tilesets, persp);
+  const rng = new Rng(1);
+  const gid = persp === 'hex' ? pools.pickTagged(rng, 'floor', 'grass') : persp === 'side_view' ? pools.pickRole(rng, 'ground_top', ['side', 'grass']) : pools.pickPref(rng, ['floor']);
+  if (gid) useEditor.setState({ selectedGid: gid });
 }

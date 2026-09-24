@@ -346,6 +346,15 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 2.8 – Modus „Hexagonal“ (Strategie-Weltkarten)**
+
+- Im Setup und unter *Karte → Neue Karte* jetzt verfügbar: **Hexagonal** (Genre *Strategie / 4X*, auch Taktik). Eigener Ablauf mit Schritt **Welt**.
+- **Welt-Generator**: Höhe + Feuchtigkeit + Klima (Breitengrad) → Tiefsee, Küste, Strand, Wiese, Wald, Hügel, Gebirge, Schnee, Wüste, Sumpf. Flüsse fließen bergab ins Meer (ohne Zickzack), **Siedlungen** mit Abstand auf gutem Land (Fluss / Küste bevorzugt), **Hauptstädte** der Spieler (Burg + Fahne in Spielerfarbe) möglichst weit auseinander, **Straßen** verbinden alle Siedlungen über das günstigste Gelände (A*), Rohstoffe (Minen, Felder, Ruinen). Regler: Landform (Kontinent / Inseln), Klima, Wasser, Gebirge, Wälder, Flüsse, Spieler, Siedlungen, Straßen, Rohstoffe.
+- **Hex-Editor**: jede zweite Reihe versetzt, Hex-Gitter, Hex-Markierung unter dem Finger/Mauszeiger, Malen/Radieren/Füllen auf Hexen. **Flüsse und Straßen verbinden sich selbst** (Auto-Anschluss) – in der Palette gibt es je ein Tile. Layer heißen *Gelände, Flüsse, Straßen, Städte & Orte*.
+- **Demo-Tiles Hex** (32 px): 17 Gelände-Hexe, Flüsse/Straßen für alle 64 Nachbar-Kombinationen, Stadt, Dorf, Burg, Feld, Mine, Ruine, 6 Spielerfahnen.
+- **Godot-Paket**: TileSet im Hexagon-Modus (gleiches Raster wie in MapForge, in Godot 4.3 geprüft: gleiche Mittelpunkte, gleiche Nachbarn). Kamera (Pfeiltasten, Mausrad, Ziehen), Klick → Signal *hex_clicked* mit Gelände/Kosten/Fluss/Straße/Siedlung, `terrain_at`, `move_cost`, `hex_path` (AStar2D über Bewegungskosten, Straßen günstig, Wasser gesperrt).
+- Side-Scroller und Hex: kein „Room Graph“ und kein eigenes Terrain-Panel mehr (alles im Generator-Panel); das gewählte Tile passt automatisch zur Kartenart.
+
 **Version 2.7 – Aufzüge im Side-Scroller**
 
 - Neuer Abschnitt **Aufzug**: eine Plattform fährt in einem flachen Schacht zwischen Boden und einer hohen Kante auf und ab (bündig oben und unten, einfach drauflaufen), wartet an beiden Enden 1 s. Schiene im Hintergrund zeigt den Weg. Schalter *Aufzüge* in den Level-Einstellungen.

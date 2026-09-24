@@ -3,6 +3,7 @@ import { OBJECT_DEFS, OBJECT_ATLAS_TILE, objectAtlas } from '../objects/defs';
 import { drawCharacter, type CharacterState } from './character';
 import { GidTable, drawGid } from './tileAtlas';
 import { clamp } from '../utils/math';
+import { HEX_CORNERS, ROW_STEP, hexAt, hexOrigin, hexWorldSize } from '../generator/hex';
 
 // Canvas 2D map renderer.
 // - zoomed in: draws only the visible tiles directly
@@ -145,18 +146,28 @@ export class MapRenderer {
     this.requestRender();
   }
 
+  /** hex map (odd rows shifted, rows 3/4 apart) – see generator/hex.ts */
+  hex = false;
+  /** map size in world units (a hex map is half a cell wider and ¾ as high) */
+  get worldW() {
+    return this.hex ? hexWorldSize(this.W, this.H)[0] : this.W;
+  }
+  get worldH() {
+    return this.hex ? hexWorldSize(this.W, this.H)[1] : this.H;
+  }
+
   /* ---------- camera ---------- */
   get minZoom() {
-    return Math.max(0.5, Math.min(this.viewW / this.W, this.viewH / this.H) * 0.4);
+    return Math.max(0.5, Math.min(this.viewW / this.worldW, this.viewH / this.worldH) * 0.4);
   }
   readonly maxZoom = 96;
 
   fit(padding = 0.92) {
     if (!this.viewW || !this.viewH) return;
-    const zoom = Math.min(this.viewW / this.W, this.viewH / this.H) * padding;
+    const zoom = Math.min(this.viewW / this.worldW, this.viewH / this.worldH) * padding;
     this.cam.zoom = zoom;
-    this.cam.x = this.W / 2 - this.viewW / zoom / 2;
-    this.cam.y = this.H / 2 - this.viewH / zoom / 2;
+    this.cam.x = this.worldW / 2 - this.viewW / zoom / 2;
+    this.cam.y = this.worldH / 2 - this.viewH / zoom / 2;
     this.cameraChanged();
   }
 
@@ -199,13 +210,14 @@ export class MapRenderer {
     // keep at least part of the map on screen
     const vw = this.viewW / this.cam.zoom;
     const vh = this.viewH / this.cam.zoom;
-    this.cam.x = clamp(this.cam.x, -vw + 2, this.W - 2);
-    this.cam.y = clamp(this.cam.y, -vh + 2, this.H - 2);
+    this.cam.x = clamp(this.cam.x, -vw + 2, this.worldW - 2);
+    this.cam.y = clamp(this.cam.y, -vh + 2, this.worldH - 2);
     this.onCameraChange?.(this.cam);
     this.requestRender();
   }
 
   screenToCell(sx: number, sy: number): { x: number; y: number } {
+    if (this.hex) return hexAt(this.cam.x + sx / this.cam.zoom, this.cam.y + sy / this.cam.zoom);
     return {
       x: Math.floor(this.cam.x + sx / this.cam.zoom),
       y: Math.floor(this.cam.y + sy / this.cam.zoom),
@@ -300,6 +312,10 @@ export class MapRenderer {
 
   render() {
     if (this.table.refresh()) for (const c of this.chunks) c.dirty = true;
+    if (this.hex) {
+      this.renderHex();
+      return;
+    }
     const { ctx, cam } = this;
     const z = cam.zoom;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -500,6 +516,98 @@ export class MapRenderer {
 
     this.drawOverlay(sx, sy);
     if (this.overlay.showCoords) this.drawRulers(sx, sy, x0, y0, x1, y1);
+  }
+
+  /** hex maps: no y-sort, every hex drawn at its offset position, hex grid and hex highlights */
+  private renderHex() {
+    const { ctx, cam } = this;
+    const z = cam.zoom;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    // zoomed out: smooth down-scaling, otherwise single outline pixels of the hexes form stripes
+    const smooth = z * this.dpr < 24;
+    ctx.fillStyle = COLORS.outside;
+    ctx.fillRect(0, 0, this.viewW, this.viewH);
+    const sx = (wx: number) => Math.round((wx - cam.x) * z);
+    const sy = (wy: number) => Math.round((wy - cam.y) * z);
+    ctx.fillStyle = COLORS.mapBg;
+    ctx.fillRect(sx(0), sy(0), sx(this.worldW) - sx(0), sy(this.worldH) - sy(0));
+
+    const y0 = Math.max(0, Math.floor(cam.y / ROW_STEP) - 1);
+    const y1 = Math.min(this.H, Math.ceil((cam.y + this.viewH / z) / ROW_STEP) + 1);
+    const x0 = Math.max(0, Math.floor(cam.x) - 1);
+    const x1 = Math.min(this.W, Math.ceil(cam.x + this.viewW / z) + 1);
+    const box = (x: number, y: number) => {
+      const [ox, oy] = hexOrigin(x, y);
+      const dx = sx(ox);
+      const dy = sy(oy);
+      return [dx, dy, sx(ox + 1) - dx, sy(oy + 1) - dy] as const;
+    };
+    ctx.imageSmoothingEnabled = smooth;
+    for (const layer of this.layers) {
+      if (!layer.visible) continue;
+      const d = layer.data;
+      for (let y = y0; y < y1; y++)
+        for (let x = x0; x < x1; x++) {
+          const g = d[y * this.W + x];
+          if (!g || this.hiddenGids.has(g)) continue;
+          const [dx, dy, w, h] = box(x, y);
+          // zoomed out: 1 px overlap closes the rounding gaps between the interlocking rows
+          drawGid(ctx, this.table, g, dx, dy, w + (smooth ? 1 : 0), h + (smooth ? 1 : 0));
+        }
+    }
+    ctx.imageSmoothingEnabled = false;
+    const hexPath = (x: number, y: number, inset = 0) => {
+      const [ox, oy] = hexOrigin(x, y);
+      HEX_CORNERS.forEach(([cx, cy], k) => {
+        const px = sx(ox + inset + cx * (1 - 2 * inset));
+        const py = sy(oy + inset + cy * (1 - 2 * inset));
+        if (k) ctx.lineTo(px, py);
+        else ctx.moveTo(px, py);
+      });
+      ctx.closePath();
+    };
+    if (this.overlay.collision) {
+      const c = this.overlay.collision;
+      ctx.fillStyle = 'rgba(230, 80, 100, 0.32)';
+      ctx.beginPath();
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (c[y * this.W + x]) hexPath(x, y);
+      ctx.fill();
+    }
+    if (this.overlay.showGrid && z >= 6) {
+      ctx.beginPath();
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) hexPath(x, y);
+      ctx.strokeStyle = COLORS.grid;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.strokeStyle = COLORS.border;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(sx(0) - 0.5, sy(0) - 0.5, sx(this.worldW) - sx(0) + 1, sy(this.worldH) - sy(0) + 1);
+
+    // highlights: every hex of the rectangle (in cell coordinates)
+    const o = this.overlay;
+    const cells = (r: Selection, fill: string | null, stroke: string, dash: number[] = []) => {
+      ctx.beginPath();
+      for (let y = Math.max(0, r.y); y < Math.min(this.H, r.y + r.h); y++) for (let x = Math.max(0, r.x); x < Math.min(this.W, r.x + r.w); x++) hexPath(x, y, 0.04);
+      if (fill) {
+        ctx.fillStyle = fill;
+        ctx.fill();
+      }
+      ctx.setLineDash(dash);
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    };
+    if (o.highlight) cells(o.highlight, 'rgba(232,137,176,0.10)', COLORS.accent, [6, 4]);
+    if (o.selection) cells(o.selection, 'rgba(232,137,176,0.08)', COLORS.accent, [5, 4]);
+    if (o.preview) cells(o.preview, COLORS.accentFill, COLORS.accent);
+    if (o.hover && this.inBounds(o.hover.x, o.hover.y) && o.activeTool !== 'hand') {
+      const n = o.activeTool === 'brush' || o.activeTool === 'eraser' ? o.brushSize : 1;
+      const off = Math.floor((n - 1) / 2);
+      cells({ x: o.hover.x - off, y: o.hover.y - off, w: n, h: n }, 'rgba(255,255,255,0.08)', COLORS.accent);
+    }
   }
 
   private drawOverlay(sx: (x: number) => number, sy: (y: number) => number) {

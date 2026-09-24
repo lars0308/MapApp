@@ -8,6 +8,7 @@ import { emptyResult, generate } from '../generator';
 import { createDemoTileset } from '../tilesets/demoTileset';
 import { createDemoAutotileSets } from '../tilesets/demoAutotiles';
 import { createDemoSideTileset } from '../tilesets/demoSide';
+import { createDemoHexTileset } from '../tilesets/demoHex';
 import { applyTileMeta, findEmptyTiles } from '../tilesets/slicing';
 import { libraryToProjectTilesets, withTerrainsFor } from '../tilesets/library';
 import { learnFrom } from '../tilesets/learning';
@@ -39,10 +40,12 @@ export function createProject(
   const auto = createDemoAutotileSets(1 + demo.columns * demo.rows).map((ts) => ({ ...ts, active: demoActive }));
   const lastAuto = auto[auto.length - 1];
   auto.push({ ...createDemoSideTileset(lastAuto.firstGid + lastAuto.columns * lastAuto.rows), active: demoActive });
+  const sideTs = auto[auto.length - 1];
+  auto.push({ ...createDemoHexTileset(sideTs.firstGid + sideTs.columns * sideTs.rows), active: demoActive });
   const last = auto[auto.length - 1];
   const own = libraryToProjectTilesets(opts.library ?? [], last.firstGid + last.columns * last.rows);
   const side = map.perspective === 'side_view';
-  const layers = namesFor(createDefaultLayers(map.width * map.height), side);
+  const layers = namesFor(createDefaultLayers(map.width * map.height), map.perspective);
   const now = Date.now();
   const mode = opts.mode ?? 'generate';
   const generator = opts.generator ? { ...opts.generator } : defaultGenerator();
@@ -252,8 +255,7 @@ export const useProject = create<ProjectState>((set, get) => {
     setMapOptions: (patch) => {
       const p = get().project;
       const map = { ...p.map, ...patch };
-      const switched = (map.perspective === 'side_view') !== (p.map.perspective === 'side_view');
-      touch({ ...p, map, layers: switched ? namesFor(p.layers, map.perspective === 'side_view') : p.layers });
+      touch({ ...p, map, layers: map.perspective !== p.map.perspective ? namesFor(p.layers, map.perspective) : p.layers });
     },
     updateGenerator: (patch) => {
       const p = get().project;

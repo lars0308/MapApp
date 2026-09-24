@@ -189,6 +189,10 @@ function tick(now: number) {
 
 export function startPlaytest(): boolean {
   if (running) return true;
+  if (useProject.getState().project.map.perspective === 'hex') {
+    useEditor.getState().toast('Hex-Karten sind Strategie-Karten: kein Lauftest. Im Godot-Paket kannst du die Welt mit Kamera erkunden, Felder anklicken und Wege finden.', 'info');
+    return false;
+  }
   refreshBlocked();
   const pos = side ? sideSpawn() : spawnPosition();
   const editor = useEditor.getState();

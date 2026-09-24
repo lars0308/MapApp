@@ -1,3 +1,4 @@
+import { useProject } from '../store/projectStore';
 import { useEffect, useState } from 'react';
 import { Workspace, ViewSwitch } from './Workspace';
 import { GeneratorPanel } from './GeneratorPanel';
@@ -56,7 +57,10 @@ export function DesktopLayout() {
     return () => window.removeEventListener('keydown', on);
   }, [L.maximized]);
 
-  const leftPanel = L.leftTab === 'terrain' ? <TerrainPanel /> : <GeneratorPanel />;
+  // side-scroller / hex: no separate terrain panel (it lives in the generator panel)
+  const plain = useProject((st) => st.project.map.perspective === 'side_view' || st.project.map.perspective === 'hex');
+  const leftTabs = LEFT_TABS.filter((t) => t.value !== 'terrain' || !plain);
+  const leftPanel = L.leftTab === 'terrain' && !plain ? <TerrainPanel /> : <GeneratorPanel />;
 
   return (
     <div className={`desktop${L.maximized ? ' has-maximized' : ''}`} style={{ gridTemplateColumns: `${leftW}px minmax(0, 1fr) ${rightW}px` }}>
@@ -83,7 +87,7 @@ export function DesktopLayout() {
               <IconButton label="Linkes Panel ausklappen" onClick={() => L.toggleCollapsed('left')}>
                 <Icon.ChevronRight size={16} />
               </IconButton>
-              {LEFT_TABS.map((t) => (
+              {leftTabs.map((t) => (
                 <IconButton key={t.value} label={t.label} active={L.leftTab === t.value} onClick={() => L.show('left', t.value)}>
                   <t.icon size={18} />
                 </IconButton>
@@ -92,7 +96,7 @@ export function DesktopLayout() {
           ) : (
             <>
               <div className="dock-head">
-                <PanelTabs tabs={LEFT_TABS.map(({ value, label }) => ({ value, label }))} value={L.leftTab} onChange={L.setLeftTab} />
+                <PanelTabs tabs={leftTabs.map(({ value, label }) => ({ value, label }))} value={plain ? 'generator' : L.leftTab} onChange={L.setLeftTab} />
                 <PanelActions id="left" label="Linkes Panel" />
               </div>
               {leftPanel}

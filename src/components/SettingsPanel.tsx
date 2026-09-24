@@ -33,13 +33,13 @@ export function SettingsPanel({ desktop = false }: { desktop?: boolean }) {
         />
       </Section>
       <ClearMap />
-      {map.perspective !== 'side_view' && (
+      {map.perspective !== 'side_view' && map.perspective !== 'hex' && (
         <Section title="Perspektive">
           <Segmented
             label="Perspektive"
             value={map.perspective}
             options={deriveConfig(profile)
-              .perspectives.filter((p) => p !== 'side_view')
+              .perspectives.filter((p) => p !== 'side_view' && p !== 'hex')
               .map((p: Perspective) => ({ value: p, label: PERSPECTIVE_INFO[p].label.replace(' / Isometric-like', '') }))}
             onChange={(perspective) => setMapOptions({ perspective })}
           />

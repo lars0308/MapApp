@@ -13,6 +13,7 @@ import { randomSeed } from '../generator/rng';
 import { COMMON_TILE_SIZES } from '../tilesets/slicing';
 import { Stats } from './Stats';
 import { SideFields, resolveSide } from './SideFields';
+import { HexFields, resolveHex } from './HexFields';
 
 export function SeedField() {
   const seed = useProject((s) => s.project.generator.seed);
@@ -68,7 +69,7 @@ export function MapSettingsFields() {
           />
         </div>
       )}
-      {!side && <Toggle label="Schatten" description="Wandschatten in den Layer „Schatten“ generieren" checked={map.shadows} onChange={(shadows) => setMapOptions({ shadows })} />}
+      {!side && map.perspective !== 'hex' && <Toggle label="Schatten" description="Wandschatten in den Layer „Schatten“ generieren" checked={map.shadows} onChange={(shadows) => setMapOptions({ shadows })} />}
       <div className="grid-2">
         <NumberField label="Breite" value={map.width} min={16} max={256} step={1} suffix="Tiles" onChange={(w) => setMapSize(w, map.height)} />
         <NumberField label="Höhe" value={map.height} min={16} max={256} step={1} suffix="Tiles" onChange={(h) => setMapSize(map.width, h)} />
@@ -101,6 +102,7 @@ export function GeneratorPanel() {
   const applyPreset = useProject((s) => s.applyPreset);
 
   const side = useProject((s) => s.project.map.perspective === 'side_view');
+  const hex = useProject((s) => s.project.map.perspective === 'hex');
 
   const setShape = (id: RoomShape) => {
     const next = { ...g.shapes, [id]: !g.shapes[id] };
@@ -109,6 +111,7 @@ export function GeneratorPanel() {
   };
 
   if (side) return <SidePanel />;
+  if (hex) return <HexPanel />;
 
   return (
     <div className="panel-scroll">
@@ -252,6 +255,28 @@ function SidePanel() {
       </Section>
 
       <SideFields side={side} onChange={set} boss={g.specials.boss} onBoss={(boss) => update({ specials: { ...g.specials, boss } })} deco={g.decoDensity} onDeco={(v) => update({ decoDensity: v })} />
+    </div>
+  );
+}
+
+/** Settings of the hex world generator (perspective hex). */
+function HexPanel() {
+  const g = useProject((s) => s.project.generator);
+  const update = useProject((s) => s.updateGenerator);
+  const hex = resolveHex(g.hex);
+  return (
+    <div className="panel-scroll">
+      <BuildModeCard />
+      <Stats />
+      <p className="hint side-intro">Weltkarte aus Sechsecken: Gelände nach Höhe, Feuchtigkeit und Klima, Flüsse fließen bergab ins Meer, Straßen verbinden die Siedlungen. Alles lässt sich danach übermalen.</p>
+      <Section title="Map">
+        <SeedField />
+        <MapSettingsFields />
+      </Section>
+      <HexFields hex={hex} onChange={(patch) => update({ hex: { ...hex, ...patch } })} />
+      <Section title="Ausstattung" defaultOpen={false}>
+        <Slider label="Deko" value={g.decoDensity} unit=" %" onChange={(v) => update({ decoDensity: v })} />
+      </Section>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { safeFileName } from '../utils/download';
 import { GODOT_LAYER_NAME } from '../layers/defaults';
 import { computeBlocked, metaTable, tileBlocks } from '../editor/collision';
 import { GRAVITY, LIFT_PAUSE, LIFT_SPEED, buildSideMap, jumpSpeed } from '../playtest/sidePhysics';
+import { HEX_COST, HEX_TERRAIN_TAG } from '../generator/hexgen';
 import { OBJECT_ATLAS_TILE, OBJECT_DEFS, objectAtlas } from '../objects/defs';
 
 // Map data for Godot 4 (TileMapLayer based, editable after import).
@@ -254,6 +255,7 @@ export async function buildGodotData(p: Project, opts: { embedImages: boolean; i
       rects: mergeRects(solidContent, W, H),
     },
     ...(p.map.perspective === 'side_view' ? { side: sideData(p) } : {}),
+    ...(p.map.perspective === 'hex' && r ? { hex: hexData(p) } : {}),
     spawnPoints: r?.spawnPoints ?? [],
     spawnTypes: ['player', 'enemy', 'loot', 'npc', 'quest'],
     navigation: {
@@ -323,5 +325,31 @@ function sideData(p: Project) {
       jumpWidthTiles: p.generator.side?.jumpWidth ?? 4,
     },
     fallLimit: (H + 2) * ts,
+  };
+}
+
+/**
+ * Hex data for the loader: terrain per hex (+ movement costs), river / road neighbour masks,
+ * settlements and the players' capitals. Layout: odd rows shifted (Godot TILE_LAYOUT_STACKED,
+ * TILE_OFFSET_AXIS_HORIZONTAL); a TileMapLayer's get_surrounding_cells() gives the neighbours.
+ */
+function hexData(p: Project) {
+  const r = p.result!;
+  const costs: Record<string, number> = {};
+  for (const [code, name] of Object.entries(HEX_TERRAIN_TAG)) {
+    const c = HEX_COST[Number(code)];
+    costs[name] = isFinite(c) ? c : -1;
+  }
+  return {
+    note: 'terrain: RLE of terrain codes (terrainLegend), costs: movement cost per terrain (-1 = not walkable), masks: E=1 SE=2 SW=4 W=8 NW=16 NE=32',
+    layout: { shape: 'hexagon', layout: 'stacked', offsetAxis: 'horizontal', rowStep: 0.75 },
+    terrainLegend: Object.fromEntries(TERRAIN_NAMES.map((n, i) => [i, n])),
+    terrain: rleEncode(r.terrain),
+    costs,
+    rivers: rleEncode(r.wallMask),
+    roads: rleEncode(r.floorMask),
+    settlements: r.rooms.map((room) => ({ x: room.x, y: room.y, kind: room.terrain })),
+    players: r.spawnPoints.filter((sp) => sp.type === 'player').map((sp) => ({ player: sp.properties.player, x: sp.x, y: sp.y })),
+    resources: r.spawnPoints.filter((sp) => sp.properties.resource).map((sp) => ({ kind: sp.properties.resource, x: sp.x, y: sp.y })),
   };
 }

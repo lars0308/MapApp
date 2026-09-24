@@ -14,7 +14,17 @@ export function Stats() {
   const specials = result.rooms.filter((r) => r.type !== 'normal').length;
   const count = (t: string) => result.spawnPoints.filter((sp) => sp.type === t).length;
   const side = result.perspective === 'side_view';
-  const items: [string, string | number][] = side
+  const hex = result.perspective === 'hex';
+  const items: [string, string | number][] = hex
+    ? [
+        ['Größe', `${map.width}×${map.height}`],
+        ['Siedlungen', result.rooms.length],
+        ['Spieler', count('player')],
+        ['Rohstoffe', count('loot')],
+        ['Ansicht', PERSPECTIVE_INFO.hex.label],
+        ['Seed', result.seed],
+      ]
+    : side
     ? [
         ['Größe', `${map.width}×${map.height}`],
         ['Gegner', count('enemy')],

@@ -43,6 +43,8 @@ export function MobileLayout() {
   const run = useProject((s) => s.runGenerate);
   const busy = useProject((s) => s.generating);
   const manual = useProject((s) => s.project.mode === 'manual');
+  // side-scroller / hex: terrain settings live in the generator panel
+  const plain = useProject((s) => s.project.map.perspective === 'side_view' || s.project.map.perspective === 'hex');
 
   return (
     <div className={`mobile${panel ? ' has-sheet' : ''}${playtest ? ' is-playtest' : ''}`}>
@@ -116,7 +118,7 @@ export function MobileLayout() {
       )}
 
       <nav className="m-nav" aria-label="Navigation">
-        {NAV.map((n) => {
+        {NAV.filter((n) => n.id !== 'terrain' || !plain).map((n) => {
           const active = panel === n.id;
           const I = n.icon;
           return (

@@ -353,6 +353,8 @@ const ROLE_SHORT: Partial<Record<TileRole, string>> = {
   back_wall: 'Hintergrund',
   lift: 'Aufzug',
   lift_track: 'Schiene',
+  hex_river: 'Fluss',
+  hex_road: 'Straße',
 };
 
 const CATEGORY_SHORT: Record<TileCategory, string> = {

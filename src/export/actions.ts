@@ -41,8 +41,9 @@ export async function exportGodotPackage(p: Project, includeShadows = true) {
   }
   // ready scene + player figure: the own one from "Animieren", else the figure from the builder
   const side = p.map.perspective === 'side_view';
-  let player = playerSpriteData();
-  if (!player) {
+  // hex maps are strategy maps: camera instead of a walking figure
+  let player = p.map.perspective === 'hex' ? null : playerSpriteData();
+  if (!player && p.map.perspective !== 'hex') {
     try {
       player = playerSheet(useSprites.getState().character.doc);
     } catch {

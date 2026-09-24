@@ -1,12 +1,12 @@
 import type { GeneratorSettings, MapSettings, Perspective } from '../types';
-import { PRESETS, defaultSide } from '../generator/presets';
+import { PRESETS, defaultHex, defaultSide } from '../generator/presets';
 
 // Game profile: the answers to "what kind of game is this?" from the setup wizard.
 // Only the answers are stored in the project (`project.profile`); everything the editor
 // derives from them comes from `deriveConfig()`, so better profiles also help old projects.
 
 export type ViewKind = 'top_down' | 'isometric' | 'side_scroller' | 'hexagonal';
-export type Genre = 'action_roguelite' | 'dungeon_crawler' | 'rpg' | 'tactics' | 'puzzle' | 'platformer' | 'other';
+export type Genre = 'action_roguelite' | 'dungeon_crawler' | 'rpg' | 'tactics' | 'puzzle' | 'platformer' | 'strategy' | 'other';
 
 export type Effort = 'small' | 'medium' | 'large';
 
@@ -37,7 +37,7 @@ export const VIEWS: ViewInfo[] = [
   { id: 'top_down', label: 'Top-Down', text: 'Von oben oder schräg von oben (3/4) – Zelda, Enter the Gungeon, Stardew Valley.', available: true, perspectives: ['top_down', 'low_top_down'] },
   { id: 'isometric', label: 'Isometrisch', text: 'Diagonale 45°-Ansicht mit hohen Wänden – Diablo, Hades.', available: true, perspectives: ['isometric_45'] },
   { id: 'side_scroller', label: '2D Side-Scroller', text: 'Seitenansicht mit Schwerkraft, Plattformen, Leitern – Mario, Celeste, Hollow Knight.', available: true, perspectives: ['side_view'] },
-  { id: 'hexagonal', label: 'Hexagonal', text: 'Sechseck-Raster für Strategie und Taktik – Civilization, Into the Breach (Hex).', available: false, perspectives: [] },
+  { id: 'hexagonal', label: 'Hexagonal', text: 'Sechseck-Raster für Strategie und Taktik – Civilization, Battle for Wesnoth.', available: true, perspectives: ['hex'] },
 ];
 
 export interface GenreInfo {
@@ -97,6 +97,7 @@ export const GENRES: GenreInfo[] = [
     map: preset('linear').map,
     apply: (g) => specials(preset('linear').apply(g), ['start', 'end', 'puzzle', 'secret']),
   },
+  { id: 'strategy', label: 'Strategie / 4X', text: 'Weltkarte mit Völkern, Städten, Rohstoffen – erkunden, ausbauen, erobern.', views: ['hexagonal'] },
   { id: 'platformer', label: 'Platformer', text: 'Springen, Plattformen, Leitern, Gruben – Level von links nach rechts.', views: ['side_scroller'] },
   { id: 'other', label: 'Anderes', text: 'Keine Vorgaben – alle Einstellungen selbst wählen.', views: ['top_down', 'isometric', 'side_scroller', 'hexagonal'] },
 ];
@@ -110,6 +111,17 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, Math.
  * Genre first (room layout, special rooms), then the effort scales size and detail.
  */
 export function applyProfile(p: GameProfile, base: GeneratorSettings, map: Pick<MapSettings, 'width' | 'height'>): { gen: GeneratorSettings; map: Pick<MapSettings, 'width' | 'height'> } {
+  if (p.view === 'hexagonal') {
+    // world map: size and number of peoples / places by effort
+    const effort = p.effort ?? 'medium';
+    const big = effort === 'large';
+    const small = effort === 'small';
+    const hex = defaultHex();
+    return {
+      gen: { ...base, hex: { ...hex, players: small ? 2 : big ? 6 : hex.players, towns: small ? 5 : big ? 18 : hex.towns, resources: big ? 55 : small ? 25 : hex.resources } },
+      map: { width: big ? 72 : small ? 32 : 48, height: big ? 54 : small ? 24 : 36 },
+    };
+  }
   if (p.view === 'side_scroller') {
     // a level runs left → right: wide and flat; effort = length and amount of content
     const effort = p.effort ?? 'medium';
@@ -174,7 +186,7 @@ export function profileLabel(p: GameProfile | undefined): string {
 
 /** Profile of a project saved before profiles existed. */
 export function profileFromPerspective(perspective: Perspective): GameProfile {
-  return { view: perspective === 'isometric_45' ? 'isometric' : perspective === 'side_view' ? 'side_scroller' : 'top_down', genre: 'other', effort: 'medium' };
+  return { view: perspective === 'isometric_45' ? 'isometric' : perspective === 'side_view' ? 'side_scroller' : perspective === 'hex' ? 'hexagonal' : 'top_down', genre: 'other', effort: 'medium' };
 }
 
 /** Everything the app derives from a profile. */

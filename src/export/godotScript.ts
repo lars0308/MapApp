@@ -50,6 +50,14 @@ var _objects_texture: Texture2D
 
 ## side-scroller: emitted when a body of group "player" reaches the goal
 signal goal_reached(body: Node)
+## hex maps: a hex was clicked (info: terrain, cost, river, road, settlement)
+signal hex_clicked(cell: Vector2i, info: Dictionary)
+
+var hex_camera: Camera2D
+var hex_astar: AStar2D
+var _hex_terrain := PackedByteArray()
+var _hex_rivers := PackedByteArray()
+var _hex_roads := PackedByteArray()
 
 
 func _ready() -> void:
@@ -83,6 +91,8 @@ func build_now() -> void:
 	astar = build_astar(map_data)
 	if perspective == "side_view":
 		build_side(map_data)
+	if perspective == "hex":
+		build_hex(map_data)
 	if player_scene:
 		_spawn_player()
 		if perspective == "side_view":
@@ -106,6 +116,11 @@ static func load_map_json(path: String) -> Dictionary:
 func build_tile_set(data: Dictionary, base_dir: String) -> TileSet:
 	var ts := TileSet.new()
 	ts.tile_size = Vector2i(tile_size, tile_size)
+	if perspective == "hex":
+		# odd rows shifted half a hex, rows 3/4 apart – same layout as in MapForge
+		ts.tile_shape = TileSet.TILE_SHAPE_HEXAGON
+		ts.tile_layout = TileSet.TILE_LAYOUT_STACKED
+		ts.tile_offset_axis = TileSet.TILE_OFFSET_AXIS_HORIZONTAL
 	ts.add_custom_data_layer()
 	ts.set_custom_data_layer_name(0, "category")
 	ts.set_custom_data_layer_type(0, TYPE_STRING)
@@ -457,6 +472,128 @@ func _setup_side_player() -> void:
 			c.limit_bottom = int(info.get("height", 0)) * tile_size
 
 
+# ------------------------------------------------------------------ hex maps
+
+## Camera (arrows / WASD, wheel = zoom, right or middle mouse = drag), click = hex_clicked, pathfinding.
+func build_hex(data: Dictionary) -> void:
+	var info: Dictionary = data.get("map", {})
+	var w := int(info.get("width", 0))
+	var h := int(info.get("height", 0))
+	var hex: Dictionary = data.get("hex", {})
+	_hex_terrain = rle_decode(hex.get("terrain", []), w * h)
+	_hex_rivers = rle_decode(hex.get("rivers", []), w * h)
+	_hex_roads = rle_decode(hex.get("roads", []), w * h)
+	hex_astar = build_hex_astar()
+	if player_scene == null:
+		hex_camera = Camera2D.new()
+		hex_camera.name = "HexCamera"
+		hex_camera.position = Vector2((w + 0.5) * tile_size / 2.0, (h * 0.75 + 0.25) * tile_size / 2.0)
+		hex_camera.zoom = Vector2(player_camera_zoom, player_camera_zoom) * 0.5
+		add_child(hex_camera)
+		hex_camera.make_current()
+
+
+func _ground() -> TileMapLayer:
+	return layer_nodes.get("Ground", null)
+
+
+## terrain name of a hex ("grass", "forest", "mountain", "water" …)
+func terrain_at(cell: Vector2i) -> String:
+	var w := int(map_data.get("map", {}).get("width", 0))
+	var i := cell.y * w + cell.x
+	if cell.x < 0 or cell.y < 0 or i >= _hex_terrain.size():
+		return ""
+	return str(map_data.get("hex", {}).get("terrainLegend", {}).get(str(_hex_terrain[i]), ""))
+
+
+## movement cost of a hex (-1 = not walkable); roads make it cheaper
+func move_cost(cell: Vector2i) -> float:
+	var c := float(map_data.get("hex", {}).get("costs", {}).get(terrain_at(cell), -1))
+	var w := int(map_data.get("map", {}).get("width", 0))
+	if c > 0 and _hex_roads.size() > cell.y * w + cell.x and _hex_roads[cell.y * w + cell.x] != 0:
+		c = 0.5
+	return c
+
+
+func hex_info(cell: Vector2i) -> Dictionary:
+	var w := int(map_data.get("map", {}).get("width", 0))
+	var i := cell.y * w + cell.x
+	var town := ""
+	for s in map_data.get("hex", {}).get("settlements", []):
+		if int(s["x"]) == cell.x and int(s["y"]) == cell.y:
+			town = str(s.get("kind", ""))
+	return {
+		"cell": cell,
+		"terrain": terrain_at(cell),
+		"cost": move_cost(cell),
+		"river": i >= 0 and i < _hex_rivers.size() and _hex_rivers[i] != 0,
+		"road": i >= 0 and i < _hex_roads.size() and _hex_roads[i] != 0,
+		"settlement": town,
+	}
+
+
+## AStar2D over all walkable hexes (weight = movement cost), neighbours from the hex TileMapLayer
+func build_hex_astar() -> AStar2D:
+	var astar := AStar2D.new()
+	var ground := _ground()
+	if ground == null:
+		return astar
+	var info: Dictionary = map_data.get("map", {})
+	var w := int(info.get("width", 0))
+	var h := int(info.get("height", 0))
+	for y in range(h):
+		for x in range(w):
+			var cell := Vector2i(x, y)
+			var cost := move_cost(cell)
+			if cost > 0:
+				astar.add_point(y * w + x, ground.map_to_local(cell), cost)
+	for id in astar.get_point_ids():
+		var cell := Vector2i(id % w, id / w)
+		for n in ground.get_surrounding_cells(cell):
+			var nid := n.y * w + n.x
+			if n.x >= 0 and n.y >= 0 and n.x < w and n.y < h and astar.has_point(nid) and not astar.are_points_connected(id, nid):
+				astar.connect_points(id, nid)
+	return astar
+
+
+## cheapest way from one hex to another (list of cells, empty = no way)
+func hex_path(from: Vector2i, to: Vector2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var w := int(map_data.get("map", {}).get("width", 0))
+	if hex_astar == null or not hex_astar.has_point(from.y * w + from.x) or not hex_astar.has_point(to.y * w + to.x):
+		return out
+	for id in hex_astar.get_id_path(from.y * w + from.x, to.y * w + to.x):
+		out.append(Vector2i(id % w, id / w))
+	return out
+
+
+func _process(delta: float) -> void:
+	if hex_camera == null:
+		return
+	var v := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	hex_camera.position += v * 600.0 * delta / hex_camera.zoom.x
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if hex_camera == null:
+		return
+	if event is InputEventMouseButton and event.pressed:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+			hex_camera.zoom = (hex_camera.zoom * 1.1).clamp(Vector2(0.2, 0.2), Vector2(8, 8))
+		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			hex_camera.zoom = (hex_camera.zoom / 1.1).clamp(Vector2(0.2, 0.2), Vector2(8, 8))
+		elif mb.button_index == MOUSE_BUTTON_LEFT and _ground():
+			var cell := _ground().local_to_map(_ground().get_local_mouse_position())
+			var info := hex_info(cell)
+			print("MapForge hex ", cell, ": ", info)
+			hex_clicked.emit(cell, info)
+	elif event is InputEventMouseMotion:
+		var mm := event as InputEventMouseMotion
+		if mm.button_mask & (MOUSE_BUTTON_MASK_RIGHT | MOUSE_BUTTON_MASK_MIDDLE):
+			hex_camera.position -= mm.relative / hex_camera.zoom.x
+
+
 static func rle_decode(rle: Array, size: int) -> PackedByteArray:
 	var out := PackedByteArray()
 	out.resize(size)
@@ -528,6 +665,12 @@ Y-sort
   pillars, wall fronts and cliffs when it stands above their base line and in
   front of them when it stands below.
 - Tall tiles carry TileData.y_sort_origin, objects are positioned at their base line.
+
+Hex-Karten (Hexagonal)
+- TileSet im Hexagon-Modus (jede zweite Reihe versetzt). Kamera: Pfeiltasten/WASD, Mausrad = Zoom,
+  rechte/mittlere Maustaste = ziehen. Klick auf ein Feld → Signal hex_clicked(cell, info).
+- terrain_at(cell), move_cost(cell), hex_info(cell), hex_path(von, nach) (AStar2D über die
+  Bewegungskosten, Straßen sind günstig, Wasser nicht begehbar).
 
 Side-Scroller (Seitenansicht)
 - Aufzüge fahren als AnimatableBody2D (Gruppe "lift") zwischen unten und oben, Tempo und Pause wie in MapForge.

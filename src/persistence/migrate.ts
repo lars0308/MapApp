@@ -4,6 +4,7 @@ import { DEFAULT_MAP, defaultGenerator, defaultTerrain, defaultTerrainSets } fro
 import { DEFAULT_LAYERS, layerFromDef } from '../layers/defaults';
 import { DEMO_AUTOTILE_IDS, createDemoAutotileSets } from '../tilesets/demoAutotiles';
 import { DEMO_SIDE_ID, createDemoSideTileset } from '../tilesets/demoSide';
+import { DEMO_HEX_ID, createDemoHexTileset } from '../tilesets/demoHex';
 
 type LegacyGenerator = GeneratorSettings & { hazards?: number; lava?: boolean; water?: boolean; abyss?: boolean };
 
@@ -50,6 +51,12 @@ export function migrateProject(p: Project): Project {
     const side = createDemoSideTileset(nextGid);
     tilesets = [...tilesets, side];
     nextGid = side.firstGid + side.columns * side.rows;
+  }
+  // hex demo tiles (v2.8)
+  if (!tilesets.some((t) => t.id === DEMO_HEX_ID)) {
+    const hex = createDemoHexTileset(nextGid);
+    tilesets = [...tilesets, hex];
+    nextGid = hex.firstGid + hex.columns * hex.rows;
   }
 
   // layers: y-sort flag + missing default roles at their default position
