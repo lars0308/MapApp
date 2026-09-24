@@ -469,7 +469,7 @@ export interface Project {
   objects: MapObject[];
 }
 
-export type ToolId = 'brush' | 'eraser' | 'fill' | 'rect' | 'pipette' | 'select' | 'move' | 'hand';
+export type ToolId = 'brush' | 'eraser' | 'fill' | 'rect' | 'pipette' | 'select' | 'move' | 'stamp' | 'hand';
 
 export interface Selection {
   x: number;

@@ -14,6 +14,7 @@ export const TOOLS: ToolInfo[] = [
   { id: 'pipette', label: 'Pipette', key: 'I' },
   { id: 'select', label: 'Auswahl', key: 'M' },
   { id: 'move', label: 'Verschieben', key: 'V' },
+  { id: 'stamp', label: 'Stempel (Kopie einsetzen)', key: 'S' },
   { id: 'hand', label: 'Hand', key: 'H' },
 ];
 

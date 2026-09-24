@@ -7,6 +7,7 @@ import { brushCells, floodCells, lineCells, rectCells, rectFromPoints } from './
 import { setRenderer } from './rendererRef';
 import { computeBlocked } from './collision';
 import { applyAutoWalls } from './autoWalls';
+import { pasteClip, stampOrigin } from './clipboard';
 import { OBJECT_DEFS } from '../objects/defs';
 import type { MapObject, Project } from '../types';
 import { TilePools, tilesetSupports } from '../tilesets/tilePools';
@@ -23,7 +24,7 @@ export function objectAt(objects: MapObject[], x: number, y: number): MapObject 
   return best;
 }
 
-type Mode = 'none' | 'paint' | 'pan' | 'pinch' | 'rect' | 'select' | 'tap' | 'moveSel' | 'moveObj';
+type Mode = 'none' | 'paint' | 'pan' | 'pinch' | 'rect' | 'select' | 'tap' | 'moveSel' | 'moveObj' | 'stamp';
 
 interface Pt {
   x: number;
@@ -156,6 +157,8 @@ export function MapCanvas() {
       r.overlay.brushSize = e.brushSize;
       r.overlay.activeTool = e.playtest ? 'hand' : e.tool;
       r.overlay.showSortPoints = e.showSortPoints;
+      if (e.tool !== 'stamp' || !e.clipboard || e.playtest) r.overlay.stamp = null;
+      else if (r.overlay.stamp && r.overlay.stamp.clip !== e.clipboard) r.overlay.stamp = { ...r.overlay.stamp, clip: e.clipboard };
       if (e.showCollision !== !!r.overlay.collision) scheduleCollision();
       r.requestRender();
     };
@@ -200,6 +203,9 @@ export function MapCanvas() {
 
     const setHover = (c: Pt | null) => {
       R().overlay.hover = c;
+      // stamp: the copy follows the pointer (its middle under the pointer)
+      const { tool, clipboard, playtest } = editor();
+      R().overlay.stamp = c && tool === 'stamp' && clipboard && !playtest ? { clip: clipboard, ...stampOrigin(clipboard, c.x, c.y, R().hex) } : null;
       R().requestRender();
       editor().setHover(c && R().inBounds(c.x, c.y) ? c : null);
     };
@@ -302,6 +308,17 @@ export function MapCanvas() {
           mode = 'none';
           return;
         }
+      }
+      if (tool === 'stamp') {
+        if (!editor().clipboard) {
+          editor().toast('Erst mit „Auswahl“ einen Bereich markieren und „Kopieren“ tippen');
+          mode = 'none';
+          return;
+        }
+        // finger / mouse down shows the copy, releasing sets it (drag to place it exactly)
+        mode = 'stamp';
+        setHover(cell);
+        return;
       }
       if (tool === 'move') {
         const sel = editor().selection;
@@ -419,7 +436,17 @@ export function MapCanvas() {
       const { width: W, height: H } = dims();
       const { tool, selectedGid } = editor();
 
-      if (mode === 'moveObj' && movingObject) {
+      if (mode === 'stamp') {
+        const clip = editor().clipboard;
+        if (clip && Math.abs(cell.x) < W * 4) {
+          const o = stampOrigin(clip, cell.x, cell.y, R().hex);
+          // at least a corner of the copy must be on the map
+          if (o.x + clip.w > 0 && o.y + clip.h > 0 && o.x < W && o.y < H) {
+            const n = pasteClip(clip, o.x, o.y);
+            if (!n) editor().toast('Hier ist schon genau das');
+          }
+        }
+      } else if (mode === 'moveObj' && movingObject) {
         if (moveDelta.x || moveDelta.y) store().moveObject(movingObject.id, movingObject.x + moveDelta.x, movingObject.y + moveDelta.y);
         R().objects = store().project.objects;
         R().overlay.objectHighlight = null;

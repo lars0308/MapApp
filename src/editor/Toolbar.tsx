@@ -11,6 +11,7 @@ import { TileThumb } from '../tilesets/TileThumb';
 import { ObjectThumb } from '../objects/ObjectThumb';
 import { rectCells } from './tools';
 import { applyAutoWalls } from './autoWalls';
+import { copySelection, stampFromSelection } from './clipboard';
 
 const TOOL_ICON: Record<ToolId, (p: { size?: number }) => React.ReactElement> = {
   brush: Icon.Brush,
@@ -20,6 +21,7 @@ const TOOL_ICON: Record<ToolId, (p: { size?: number }) => React.ReactElement> = 
   pipette: Icon.Pipette,
   select: Icon.Select,
   move: Icon.Move,
+  stamp: Icon.Stamp,
   hand: Icon.Hand,
 };
 
@@ -198,6 +200,22 @@ export function ActiveTileChip({ onClick }: { onClick?: () => void }) {
 export function SelectionActions() {
   const sel = useEditor((s) => s.selection);
   const tool = useEditor((s) => s.tool);
+  const clip = useEditor((s) => s.clipboard);
+  if (tool === 'stamp')
+    return (
+      <div className="selection-bar stamp-bar">
+        {clip ? (
+          <span className="muted">
+            Stempel {clip.w}×{clip.h} – auf die Karte tippen oder ziehen und loslassen
+          </span>
+        ) : (
+          <span className="muted">Erst mit „Auswahl“ einen Bereich markieren, dann „Stempel“</span>
+        )}
+        <button type="button" className="btn btn-secondary" onClick={() => useEditor.getState().setTool('select')}>
+          Neu auswählen
+        </button>
+      </div>
+    );
   if (!sel || tool !== 'select') return null;
   const apply = (gid: number, label: string) => {
     const s = useProject.getState();
@@ -224,6 +242,15 @@ export function SelectionActions() {
       </button>
       <button type="button" className="btn btn-secondary" onClick={() => apply(0, 'Auswahl leeren')}>
         Leeren
+      </button>
+      <IconButton label="Kopieren (Strg+C)" onClick={() => copySelection()}>
+        <Icon.Copy size={18} />
+      </IconButton>
+      <IconButton label="Ausschneiden (Strg+X) – alle Layer" onClick={() => copySelection(true)}>
+        <Icon.Scissors size={18} />
+      </IconButton>
+      <button type="button" className="btn btn-primary" title="Kopieren und mit dem Stempel woanders einsetzen" onClick={stampFromSelection}>
+        <Icon.Stamp size={16} /> Stempel
       </button>
       <IconButton label="Auswahl aufheben" onClick={() => useEditor.getState().setSelection(null)}>
         <Icon.Close size={18} />

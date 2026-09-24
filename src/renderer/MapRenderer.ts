@@ -34,6 +34,8 @@ export interface Overlay {
   showSortPoints: boolean;
   /** object under the pointer (move tool) */
   objectHighlight: string | null;
+  /** stamp preview: the copied tiles at their target (top-left x, y) */
+  stamp: { clip: { w: number; h: number; layers: { data: Uint32Array }[] }; x: number; y: number } | null;
 }
 
 interface Chunk {
@@ -80,6 +82,7 @@ export class MapRenderer {
     collision: null,
     showSortPoints: false,
     objectHighlight: null,
+    stamp: null,
   };
   objects: MapObject[] = [];
   character: CharacterState | null = null;
@@ -603,7 +606,8 @@ export class MapRenderer {
     if (o.highlight) cells(o.highlight, 'rgba(232,137,176,0.10)', COLORS.accent, [6, 4]);
     if (o.selection) cells(o.selection, 'rgba(232,137,176,0.08)', COLORS.accent, [5, 4]);
     if (o.preview) cells(o.preview, COLORS.accentFill, COLORS.accent);
-    if (o.hover && this.inBounds(o.hover.x, o.hover.y) && o.activeTool !== 'hand') {
+    if (o.stamp) cells({ x: o.stamp.x, y: o.stamp.y, w: o.stamp.clip.w, h: o.stamp.clip.h }, COLORS.accentFill, COLORS.accent, [5, 4]);
+    else if (o.hover && this.inBounds(o.hover.x, o.hover.y) && o.activeTool !== 'hand') {
       const n = o.activeTool === 'brush' || o.activeTool === 'eraser' ? o.brushSize : 1;
       const off = Math.floor((n - 1) / 2);
       cells({ x: o.hover.x - off, y: o.hover.y - off, w: n, h: n }, 'rgba(255,255,255,0.08)', COLORS.accent);
@@ -635,7 +639,22 @@ export class MapRenderer {
       rect(o.selection, null, COLORS.accent, [5, 4]);
     }
     if (o.preview) rect(o.preview, COLORS.accentFill, COLORS.accent);
-    if (o.hover && this.inBounds(o.hover.x, o.hover.y) && o.activeTool !== 'hand') {
+    if (o.stamp) {
+      // copied tiles, a little transparent, where they would land
+      const { clip, x: X, y: Y } = o.stamp;
+      ctx.globalAlpha = 0.7;
+      for (const l of clip.layers)
+        for (let y = 0; y < clip.h; y++)
+          for (let x = 0; x < clip.w; x++) {
+            const g = l.data[y * clip.w + x];
+            if (!g || !this.inBounds(X + x, Y + y)) continue;
+            const dx = sx(X + x);
+            const dy = sy(Y + y);
+            drawGid(ctx, this.table, g, dx, dy, sx(X + x + 1) - dx, sy(Y + y + 1) - dy);
+          }
+      ctx.globalAlpha = 1;
+      rect({ x: X, y: Y, w: clip.w, h: clip.h }, null, COLORS.accent, [5, 4]);
+    } else if (o.hover && this.inBounds(o.hover.x, o.hover.y) && o.activeTool !== 'hand') {
       const n = o.activeTool === 'brush' || o.activeTool === 'eraser' ? o.brushSize : 1;
       const off = Math.floor((n - 1) / 2);
       rect({ x: o.hover.x - off, y: o.hover.y - off, w: n, h: n }, 'rgba(255,255,255,0.06)', COLORS.accent);

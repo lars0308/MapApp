@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ViewKind } from '../profiles';
 import type { ObjectType, Selection, ToolId } from '../types';
+import type { Clip } from '../editor/clipboard';
 
 export type MobilePanel = 'generate' | 'terrain' | 'tiles' | 'layers' | 'export' | 'settings' | null;
 export type ViewMode = 'map' | 'graph';
@@ -37,6 +38,9 @@ interface EditorState {
   /** object brush (null = tiles) */
   selectedObject: ObjectType | null;
   playtest: boolean;
+  /** copied map area (stamp) */
+  clipboard: Clip | null;
+  setClipboard: (c: Clip | null) => void;
   setFlag: (key: 'showCollision' | 'showSortPoints' | 'autoWalls' | 'eraseRect' | 'eraseAllLayers', value: boolean) => void;
   selectObject: (t: ObjectType | null) => void;
   setPlaytest: (v: boolean) => void;
@@ -88,6 +92,8 @@ export const useEditor = create<EditorState>((set, get) => ({
   autoWalls: true,
   selectedObject: null,
   playtest: false,
+  clipboard: null,
+  setClipboard: (clipboard) => set({ clipboard }),
   setFlag: (key, value) => set({ [key]: value } as Partial<EditorState>),
   selectObject: (selectedObject) =>
     set({ selectedObject, tool: selectedObject && get().tool !== 'eraser' && get().tool !== 'move' ? 'brush' : get().tool }),

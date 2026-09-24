@@ -5,6 +5,7 @@ import { viewEvents } from '../store/events';
 import { TOOLS } from './tools';
 import { saveNow } from '../persistence/autosave';
 import { useApp } from '../store/appStore';
+import { copySelection } from './clipboard';
 
 /** Desktop keyboard shortcuts. Mobile uses the visible buttons. */
 export function useShortcuts() {
@@ -28,6 +29,23 @@ export function useShortcuts() {
       if (mod && key === 'y') {
         e.preventDefault();
         project.redo();
+        return;
+      }
+      if (mod && (key === 'c' || key === 'x') && editor.selection) {
+        e.preventDefault();
+        copySelection(key === 'x');
+        return;
+      }
+      if (mod && key === 'v') {
+        e.preventDefault();
+        if (editor.clipboard) editor.setTool('stamp');
+        else editor.toast('Nichts kopiert – erst einen Bereich markieren und kopieren');
+        return;
+      }
+      if ((key === 'delete' || key === 'backspace') && editor.selection) {
+        e.preventDefault();
+        const n = project.clearArea(editor.selection);
+        editor.toast(n ? 'Auswahl gelöscht (alle Layer)' : 'Auswahl war schon leer');
         return;
       }
       if (mod && key === 's') {

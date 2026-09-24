@@ -1666,6 +1666,26 @@ input[type='range']:active::-webkit-slider-thumb {
 }
 .mobile .selection-bar {
   top: 56px;
+  left: 8px;
+  right: 8px;
+  transform: none;
+  flex-wrap: wrap;
+  justify-content: center;
+  white-space: normal;
+  padding: 5px;
+}
+.mobile .selection-bar .muted {
+  flex-basis: 100%;
+  text-align: center;
+}
+.mobile .selection-bar:not(.stamp-bar) .muted {
+  display: none;
+}
+.mobile .selection-bar .btn {
+  padding: 0 9px;
+}
+.mobile .selection-bar .icon-btn {
+  width: 34px;
 }
 .m-tools {
   flex: none;
@@ -1679,6 +1699,7 @@ input[type='range']:active::-webkit-slider-thumb {
 }
 .m-tools .icon-btn {
   width: 46px;
+  max-width: calc((100vw - 8px) / 9);
   height: 44px;
 }
 .m-nav {

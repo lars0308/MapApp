@@ -62,6 +62,19 @@ export const Icon = {
       <path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" />
     </Svg>
   ),
+  Stamp: (p: P) => (
+    <Svg {...p}>
+      <path d="M9.5 4.5h5v4.5l3 3.5h-11l3-3.5z" />
+      <path d="M5 15h14v3H5zM7 21h10" />
+    </Svg>
+  ),
+  Scissors: (p: P) => (
+    <Svg {...p}>
+      <circle cx="6.5" cy="6.5" r="2.5" />
+      <circle cx="6.5" cy="17.5" r="2.5" />
+      <path d="M8.6 8L20 18M8.6 16L20 6" />
+    </Svg>
+  ),
   Play: (p: P) => (
     <Svg {...p}>
       <path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="none" />

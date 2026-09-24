@@ -111,6 +111,8 @@ interface ProjectState {
   setTileMeta: (gids: number[], patch: Partial<TileMeta>) => void;
   /** clear an area on all unlocked layers incl. objects and structure (one undo step) */
   clearArea: (r: { x: number; y: number; w: number; h: number }) => number;
+  /** one undoable change of the whole document (stamp, …) */
+  editDoc: (label: string, fn: (p: Project) => Project) => void;
   /** merge metas into a tileset (automatic assignment, confirm suggestions) */
   mergeTileMetas: (tilesetId: string, tiles: Record<number, TileMeta>) => void;
 
@@ -336,6 +338,7 @@ export const useProject = create<ProjectState>((set, get) => {
         }),
       }), true);
     },
+    editDoc: (label, fn) => docChange(label, fn),
     clearArea: (r) => {
       let cleared = 0;
       docChange('Bereich löschen', (p) => {
