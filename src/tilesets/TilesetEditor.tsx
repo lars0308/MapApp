@@ -194,7 +194,9 @@ export function TilesetEditor({
         <p className="hint">Am schnellsten: Tile antippen, dann ins passende Feld des Raums tippen (Ecken, Wände, Boden, Tür, Wasser) – so weiß MapForge genau, was wohin gehört. Deko und Sonstiges danach unten antippen.</p>
         {marking && (
           <RoomMarker
+            key={upload.tileSize}
             ts={upload}
+            onTileSize={fixedSize ? undefined : (n) => reslice(n)}
             onClose={() => setMarking(false)}
             onApply={(room, clearOthers) => {
               const next = { ...upload, ...applyRoom(upload, room, clearOthers) };

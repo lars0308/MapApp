@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TileCategory, TileMeta, TileRole, TileVariant, Tileset } from '../types';
-import { Button, Segmented } from '../components/ui';
+import { Button, NumberField, Segmented } from '../components/ui';
+import { COMMON_TILE_SIZES } from './slicing';
 import { IconButton } from '../components/ui';
 import { Icon } from '../components/icons';
 import { imageUrl, tileStyle } from './TileThumb';
@@ -228,7 +229,49 @@ export interface RoomResult {
   replaceVariants: boolean;
 }
 
-export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r: RoomResult, clearOthers: boolean) => void; onClose: () => void }) {
+/** tile size of the sheet right in the room builder: the grid has to sit exactly on the tiles */
+function TileSizeField({ ts, onTileSize }: { ts: Tileset; onTileSize: (size: number) => Promise<void> | void }) {
+  const [busy, setBusy] = useState(false);
+  const [free, setFree] = useState(!COMMON_TILE_SIZES.includes(ts.tileSize));
+  const [draft, setDraft] = useState(ts.tileSize);
+  useEffect(() => setDraft(ts.tileSize), [ts.tileSize]);
+  const apply = async (size: number) => {
+    if (size === ts.tileSize || size < 4) return;
+    setBusy(true);
+    try {
+      await onTileSize(size);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="room-size">
+      <Segmented
+        label="Tilegröße"
+        value={free ? 'custom' : String(ts.tileSize)}
+        options={[...COMMON_TILE_SIZES.map((n) => ({ value: String(n), label: `${n} px` })), { value: 'custom', label: 'Frei' }]}
+        onChange={(v) => {
+          if (v === 'custom') return setFree(true);
+          setFree(false);
+          void apply(Number(v));
+        }}
+      />
+      {free && (
+        <div className="room-size-free">
+          <NumberField label="Eigene Tilegröße" value={draft} min={4} max={512} suffix="px" onChange={setDraft} />
+          <button type="button" className="btn btn-secondary" disabled={busy || draft === ts.tileSize} onClick={() => void apply(draft)}>
+            Übernehmen
+          </button>
+        </div>
+      )}
+      <p className="hint">
+        {busy ? 'Schneide neu …' : `Tilegröße: ${ts.tileSize} px (${ts.columns} × ${ts.rows} Tiles).`} Passt das Raster nicht genau auf die Tiles, stell hier die Größe ein – danach neu zuordnen.
+      </p>
+    </div>
+  );
+}
+
+export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; onApply: (r: RoomResult, clearOthers: boolean) => void; onClose: () => void; onTileSize?: (size: number) => Promise<void> | void }) {
   const [mode, setMode] = useState<'frame' | 'pieces'>('pieces');
   const [start, setStart] = useState<{ x: number; y: number } | null>(null);
   const [rect, setRect] = useState<Rect | null>(null);
@@ -435,6 +478,7 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
           </IconButton>
         </header>
         <div className="quick-pick-body">
+          {onTileSize && <TileSizeField ts={ts} onTileSize={onTileSize} />}
           <Segmented
             label="Art"
             value={mode}

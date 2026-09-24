@@ -342,6 +342,7 @@ Wichtige Entscheidungen:
 - Leer gelassene Ränder zeigen blass den Boden der Mitte – genau den nimmt der Generator dort. Du musst also nichts ausfüllen, was dein Tileset nicht hat.
 - „Fehlende Ecken, Wände und Ränder durch Drehen ergänzen“ dreht auch einen Boden-Rand oder eine Boden-Ecke auf die anderen drei Seiten.
 - Der Generator legt Boden-Ecken und -Ränder an jede Wand eines Raums. Moos- und Abnutzungsflecken unterbrechen den Rand nicht mehr.
+- **Tilegröße direkt im Raum-Baukasten:** Oben im Dialog wählst du 16, 32, 48 oder 64 px, oder unter „Frei“ eine eigene Größe. Das Tilesheet wird sofort neu zugeschnitten, und das Raster liegt dann genau auf deinen Tiles. Das gilt beim Hochladen genauso wie unter „Raum bauen“ bei einem Tileset im Projekt.
 - Rand-Tiles zählen nicht als normaler Boden und tauchen deshalb nicht mitten im Raum auf. Neue Rollen: `floor_corner_top_left`, `floor_corner_top_right`, `floor_corner_bottom_left`, `floor_corner_bottom_right`; die KI kennt sie beim Zuordnen.
 
 **Version 3.33 – Figuren mit KI: Charakter, Kreatur oder Objekt aus der Beschreibung**

@@ -561,7 +561,15 @@ function TilesetCard({ ts }: { ts: Tileset }) {
       <p className="hint">Schnellster Weg zu richtigen Wänden: Ecken, Wände und Boden auf einen Raum-Bauplan ziehen (auch gedreht) – oder einen gezeichneten Raum im Tileset einrahmen.</p>
       {marking && (
         <RoomMarker
+          key={ts.tileSize}
           ts={ts}
+          onTileSize={(n) =>
+            useProject
+              .getState()
+              .recutTileset(ts.id, { tileW: n, tileH: n, margin: 0, spacing: 0 })
+              .then(() => toast(`Neu zugeschnitten: ${n} px`, 'success'))
+              .catch((e) => toast(e instanceof Error ? e.message : 'Zuschneiden fehlgeschlagen', 'error'))
+          }
           onClose={() => setMarking(false)}
           onApply={(room, clearOthers) => {
             const next = applyRoom(ts, room, clearOthers);

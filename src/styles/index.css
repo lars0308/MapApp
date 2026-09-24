@@ -6264,3 +6264,21 @@ details.more[open] {
   box-shadow: 0 0 0 3px rgba(232, 137, 176, 0.35);
   animation: agent-pulse 1s ease-in-out infinite;
 }
+
+/* room builder: tile size of the sheet */
+.room-size {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.room-size .hint {
+  margin: 0;
+}
+.room-size-free {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.room-size-free > :first-child {
+  flex: 1 1 auto;
+}
