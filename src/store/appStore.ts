@@ -13,7 +13,7 @@ export const FIGURE_PAGES: FigurePage[] = ['character', 'creature', 'object'];
 /** header tabs – "Figuren" holds the three builders (Charakter / Kreatur / Objekt) */
 export type Tab = 'project' | 'map' | 'figures' | 'settings';
 export const TABS: { id: Tab; label: string; short: string }[] = [
-  { id: 'project', label: 'Projekt', short: 'Projekt' },
+  { id: 'project', label: 'Start', short: 'Start' },
   { id: 'map', label: 'Karte bauen', short: 'Karte' },
   { id: 'figures', label: 'Figuren bauen', short: 'Figuren' },
   { id: 'settings', label: 'Einstellungen', short: 'Einstell.' },
@@ -34,6 +34,9 @@ interface AppState {
   goTo: (page: Page) => void;
   /** header tab: shows the question first when nothing was chosen yet */
   goToTab: (tab: Tab) => void;
+  /** start page „Charakter erstellen“ …: the figure question opens at this kind (new / saved) */
+  askFigure: FigurePage | null;
+  startFigure: (kind: FigurePage) => void;
 }
 
 const KEY_FIG = 'mapforge.figurePage';
@@ -56,6 +59,11 @@ export const useApp = create<AppState>((set, get) => ({
   page: 'project',
   figure: readFig(),
   chosen: { map: false, figures: false },
+  askFigure: null,
+  startFigure: (kind) => {
+    set({ askFigure: kind, chosen: { ...get().chosen, figures: false } });
+    open(kind);
+  },
   setChosen: (c, v) => set({ chosen: { ...get().chosen, [c]: v } }),
   goToTab: (tab) => {
     // tapping the open tab again goes back to its question (other map / other figure)

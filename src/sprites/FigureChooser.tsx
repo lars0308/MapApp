@@ -15,7 +15,12 @@ const KINDS: { id: SpriteKind; label: string; many: string; text: string; icon: 
  * (saved, last edited or a new one).
  */
 export function FigureChooser({ purpose, onPick }: { purpose: 'build' | 'animate'; onPick: (kind: SpriteKind) => void }) {
-  const [kind, setKind] = useState<SpriteKind | null>(null);
+  // start page „Charakter erstellen“ …: straight to that kind
+  const [kind, setKind] = useState<SpriteKind | null>(() => {
+    const k = useApp.getState().askFigure;
+    if (k) useApp.setState({ askFigure: null });
+    return k;
+  });
   if (!kind)
     return (
       <div className="page-inner chooser">

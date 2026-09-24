@@ -3,6 +3,7 @@ import { Logo, LogoMark } from './Logo';
 import { Icon } from './icons';
 import { SaveState } from './SaveState';
 import { GenerateButtons } from './GeneratorPanel';
+import { ExportButton } from '../export/ProjectDialog';
 import { UndoRedo } from '../editor/Toolbar';
 import { TABS, isPlaceholder, tabOf, useApp, type Tab } from '../store/appStore';
 import { useProject } from '../store/projectStore';
@@ -12,7 +13,7 @@ import { getRenderer } from '../editor/rendererRef';
 import { AiBadge } from '../api/AiSection';
 
 const PAGE_ICON: Record<Tab, (p: { size?: number }) => React.ReactElement> = {
-  project: Icon.Folder,
+  project: Icon.Home,
   map: Icon.Map,
   figures: Icon.Person,
   settings: Icon.Gear,
@@ -97,6 +98,7 @@ export function TopBar({ mapActions }: { mapActions?: React.ReactNode }) {
       <div className="topbar-right">
         {page === 'map' && mapActions}
         {page === 'map' && <UndoRedo />}
+        {page === 'map' && <ExportButton />}
         <PlayButton />
         {page === 'map' && <GenerateButtons compact />}
       </div>

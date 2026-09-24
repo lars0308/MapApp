@@ -342,6 +342,15 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.17 – Neue Startseite**
+
+- Der Reiter heißt jetzt **„Start“**:
+  - Oben Logo und „Weiter bearbeiten“ für die offene Karte.
+  - Darunter vier große Karten mit Symbol: **Neue Karte**, **Charakter erstellen**, **Gegner erstellen**, **Objekt erstellen**. Die Figuren-Karten springen direkt zur Auswahl „neu / gespeichert“ der jeweiligen Art.
+  - Darunter **Projekt laden**: zuletzt bearbeitete Karten sowie „Datei öffnen“ für Projektdateien.
+- Sicherung, KI-Verbindung und Optionen sind nur noch unter **Einstellungen**.
+- Name, Speichern und Export (Godot-Paket, PNG, Projektdatei) der Karte sitzen jetzt direkt auf der Karte: Knopf **„Export“** oben, am Handy das Export-Symbol.
+
 **Version 3.16 – Einfacher bedienen**
 
 - **Generieren** baut bei jedem Klick eine neue Karte (neuer Seed). „Gleiche Karte“ baut den gleichen Seed mit geänderten Einstellungen neu.
