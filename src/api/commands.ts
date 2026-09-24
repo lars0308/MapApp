@@ -27,7 +27,7 @@ import { setPlayerSprite } from '../playtest/playerSprite';
 import { figureToObject } from '../objects/fromFigure';
 import { VIEWS, VIEWS4, type SpriteKind, type View } from '../sprites/types';
 import type { GeneratorSettings, Layer, ObjectType, Perspective, Project, TileCategory, TileMeta, TileRole, Tileset } from '../types';
-import { TILE_ROLES } from '../types';
+import { SIDE_THEMES, TILE_ROLES } from '../types';
 import { CATEGORIES } from '../tilesets/categories';
 import { autoAssign, tileLabel } from '../tilesets/autoAssign';
 import { createTilesetFromFile, findEmptyTiles, needsRepack, repackGrid } from '../tilesets/slicing';
@@ -141,7 +141,7 @@ async function renderArea(p: Project, x: number, y: number, w: number, h: number
   const r = new MapRenderer(canvas);
   r.hex = p.map.perspective === 'hex';
   applyIso(r, p);
-  r.backdrop = p.map.perspective === 'side_view' ? (p.generator.side?.style === 'cave' ? 'cave' : 'sky') : 'plain';
+  r.backdrop = p.map.perspective === 'side_view' ? (SIDE_THEMES[p.generator.side?.style ?? 'outdoor'] ?? SIDE_THEMES.outdoor).backdrop : 'plain';
   r.setDocument(p.map.width, p.map.height, p.layers, p.tilesets);
   r.objects = p.objects;
   r.overlay.showGrid = grid;

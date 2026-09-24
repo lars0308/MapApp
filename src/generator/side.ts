@@ -1,4 +1,4 @@
-import {
+import { SIDE_THEMES,
   CELL_HAZARD,
   CELL_ROOM,
   CELL_WALL,
@@ -62,7 +62,9 @@ export function generateSide(input: GenerateInput): GenerateOutput {
 
   const JH = Math.max(1, Math.min(6, Math.round(s.jumpHeight)));
   const JW = Math.max(2, Math.min(8, Math.round(s.jumpWidth)));
-  const cave = s.style === 'cave';
+  // cave and castle: ceiling above and a back wall (indoors)
+  const theme = SIDE_THEMES[s.style] ?? SIDE_THEMES.outdoor;
+  const cave = theme.indoor;
   const n = W * H;
 
   const solid = new Uint8Array(n);
@@ -293,7 +295,7 @@ export function generateSide(input: GenerateInput): GenerateOutput {
 
   // ------------------------------------------------------------------ tiles
   const pools = new TilePools(input.tilesets, 'side_view');
-  const style = cave ? 'cave' : 'grass';
+  const style = theme.tag;
   const prefer = ['side', style];
   const byRole = new Map<LayerRole, Uint32Array>();
   const layerData: Record<string, Uint32Array> = {};
@@ -342,7 +344,7 @@ export function generateSide(input: GenerateInput): GenerateOutput {
 
   // cave back wall behind the whole playable area
   if (cave && backL && backL !== groundL && pools.hasRole('back_wall'))
-    for (let i = 0; i < n; i++) if (!solid[i]) backL[i] = pools.pickRole(rTiles, 'back_wall', ['side']);
+    for (let i = 0; i < n; i++) if (!solid[i]) backL[i] = pools.pickRole(rTiles, 'back_wall', ['side', style]);
   // lifts: the platform stands at the bottom, its rail shows the way up (the lift moves along it)
   for (const l of lifts)
     for (let c = l.x0; c <= l.x1; c++) {
@@ -465,9 +467,9 @@ export function generateSide(input: GenerateInput): GenerateOutput {
   return { result, layerData, objects: [], tileNotice: null };
 }
 
-/** deco of the side set, preferring the style (grass outside, crystals in caves) */
+/** deco of the side set in the theme (grass outside, crystals in caves, snow pines …) */
 function pickDeco(pools: TilePools, rng: Rng, style: string): number {
-  return pools.pickPref(rng, ['deco'], 'side', style === 'cave' ? ['grass'] : ['cave']);
+  return pools.pickPrefs(rng, ['deco'], ['side', style], ['grass', 'cave', 'castle', 'snow', 'sand'].filter((t) => t !== style));
 }
 /** auto-tile role of a solid ground cell from its air neighbours (also used by Auto-Boden) */
 export function groundRole(isSolid: (x: number, y: number) => boolean, c: number, y: number): TileRole {

@@ -336,6 +336,18 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.28 – Seitenansicht: Themen und Hintergrund mit Tiefe**
+
+- **Umgebung der Seitenansicht:** Wald, Höhle, **Burg**, **Schnee** und **Wüste** (Aufbau → Level → Umgebung). Jedes Thema hat eigenen Boden mit allen Kanten, Deko und Hintergrund:
+  - **Wald:** Berge in der Ferne, ziehende Wolken, zwei Hügelreihen
+  - **Schnee:** weiße Gipfel, Schneehügel, Flocken; Deko: verschneite Tannen, Eiskristalle
+  - **Wüste:** Sonne und Dünen; Deko: Kakteen, Knochen
+  - **Burg:** Innenraum mit Decke und Ziegel-Rückwand, dahinter eine Halle mit leuchtenden Fenstern; Deko: Fackeln, Banner
+  - **Höhle:** Tropfsteine im Dunkeln
+- Alle Hintergrund-Ebenen scrollen langsamer als das Level mit (Tiefenwirkung), im Editor und beim Testspielen.
+- **Neues Tileset „Demo Seitenansicht Themen“.** Es kommt automatisch in neue und bestehende Projekte. Die Kachel-Nummern des alten Side-Sets bleiben unverändert.
+- Die KI kennt die Themen (`side.style`: outdoor, cave, castle, snow, desert).
+
 **Version 3.27 – Flüsse und Plateaus**
 
 - **Flüsse** für Außen, Dorf und Insel: Aufbau → „Flüsse“ (keiner, 1 oder 2).

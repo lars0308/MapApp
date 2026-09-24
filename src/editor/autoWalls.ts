@@ -1,4 +1,4 @@
-import { CELL_CORRIDOR, CELL_HAZARD, CELL_ROOM, CELL_VOID, CELL_WALL, lookOf, type TileRole } from '../types';
+import { CELL_CORRIDOR, CELL_HAZARD, CELL_ROOM, CELL_VOID, CELL_WALL, SIDE_THEMES, lookOf, type TileRole } from '../types';
 import { tileOf } from '../tilesets/gid';
 import { useProject } from '../store/projectStore';
 import { TilePools } from '../tilesets/tilePools';
@@ -195,7 +195,7 @@ function applyAutoGround(changed: number[], paintedLayerId: string) {
   const data = groundL.data;
   const solid = (x: number, y: number) => (x < 0 || x >= W || y >= H ? true : y < 0 ? false : isGroundGid(data[y * W + x]));
   const pools = new TilePools(p.tilesets, 'side_view');
-  const style = p.generator.side?.style === 'cave' ? 'cave' : 'grass';
+  const style = (SIDE_THEMES[p.generator.side?.style ?? 'outdoor'] ?? SIDE_THEMES.outdoor).tag;
   // the style of the painted tile wins (grass / cave)
   const paintedTag = metas[tileOf(changed.map((i) => data[i]).find((g) => g) ?? 0)]?.tags.find((t) => t === 'grass' || t === 'cave') ?? style;
   const ring = new Set<number>();

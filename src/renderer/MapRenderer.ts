@@ -108,7 +108,7 @@ export class MapRenderer {
   hiddenGids = new Set<number>();
   movers: { gid: number; x: number; y: number }[] = [];
   /** background behind the tiles: plain, sky with hills (side view outside), dark cave */
-  backdrop: 'plain' | 'sky' | 'cave' = 'plain';
+  backdrop: 'plain' | 'sky' | 'cave' | 'castle' | 'snow' | 'desert' = 'plain';
   onCameraChange?: (cam: Camera) => void;
   /** more listeners for camera moves (minimap) */
   readonly cameraListeners = new Set<() => void>();
@@ -331,44 +331,124 @@ export class MapRenderer {
     return chunk.canvas;
   }
 
-  /** side view: sky gradient with two rows of soft hills (slower parallax), or a dark cave */
+  /**
+   * side view backdrop per theme, in layers that scroll slower than the level (parallax):
+   * Wald – far mountains, clouds, two rows of hills · Schnee – white peaks, snowy hills, flakes ·
+   * Wüste – sun and dunes · Burg – a brick hall with lit windows · Höhle – stalactites in the dark
+   */
   private drawBackdrop(x: number, y: number, w: number, h: number) {
     const { ctx } = this;
-    if (this.backdrop === 'cave') {
+    const z = this.cam.zoom;
+    const grad = (stops: [number, string][]) => {
       const g = ctx.createLinearGradient(0, y, 0, y + h);
-      g.addColorStop(0, '#1b1924');
-      g.addColorStop(1, '#0f0e14');
+      for (const [o, c] of stops) g.addColorStop(o, c);
       ctx.fillStyle = g;
       ctx.fillRect(x, y, w, h);
-      return;
-    }
-    const g = ctx.createLinearGradient(0, y, 0, y + h);
-    g.addColorStop(0, '#5fb4ec');
-    g.addColorStop(0.7, '#b9e2f7');
-    g.addColorStop(1, '#dff3fb');
-    ctx.fillStyle = g;
-    ctx.fillRect(x, y, w, h);
+    };
     ctx.save();
     ctx.beginPath();
     ctx.rect(x, y, w, h);
     ctx.clip();
-    const z = this.cam.zoom;
-    const hills = (color: string, level: number, amp: number, freq: number, parallax: number) => {
+    /** wavy silhouette from the bottom up; parallax = share of the camera movement */
+    const ridge = (color: string, level: number, amp: number, freq: number, parallax: number, sharp = false) => {
       ctx.fillStyle = color;
       ctx.beginPath();
       const base = y + h * level;
       const off = this.cam.x * z * parallax;
       ctx.moveTo(x, y + h);
-      for (let px = 0; px <= w; px += 6) {
+      for (let px = 0; px <= w + 6; px += 6) {
         const t = (px + off) / (z * freq);
-        ctx.lineTo(x + px, base - amp * h * (0.5 + 0.35 * Math.sin(t) + 0.15 * Math.sin(t * 2.3 + 1)));
+        const wave = sharp ? 1 - Math.abs(((t / Math.PI) % 2) - 1) * 0.9 + 0.1 * Math.sin(t * 3.1) : 0.5 + 0.35 * Math.sin(t) + 0.15 * Math.sin(t * 2.3 + 1);
+        ctx.lineTo(x + px, base - amp * h * wave);
       }
       ctx.lineTo(x + w, y + h);
       ctx.closePath();
       ctx.fill();
     };
-    hills('#a9d8c4', 0.62, 0.22, 9, 0.2);
-    hills('#8cc7a6', 0.72, 0.16, 5, 0.45);
+    /** things repeating along the view (clouds, windows, flakes) with parallax */
+    const repeat = (gap: number, parallax: number, draw: (cx: number, k: number) => void) => {
+      const step = gap * z;
+      const off = this.cam.x * z * parallax;
+      const first = Math.floor(off / step) - 1;
+      for (let k = first; k * step - off < w + step; k++) draw(x + k * step - off, k);
+    };
+    const hash = (k: number) => {
+      const v = Math.sin(k * 127.1 + 311.7) * 43758.5453;
+      return v - Math.floor(v);
+    };
+    const cloud = (cx: number, cy: number, r: number, color: string) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      for (const [dx, dy, rr] of [[0, 0, 1], [1.1, 0.25, 0.8], [-1.1, 0.3, 0.75], [0.4, -0.45, 0.7]] as const) ctx.arc(cx + dx * r, cy + dy * r, rr * r, 0, Math.PI * 2);
+      ctx.fill();
+    };
+    switch (this.backdrop) {
+      case 'cave': {
+        grad([[0, '#1b1924'], [1, '#0f0e14']]);
+        // stalactites hanging from the dark, far and near
+        repeat(7, 0.15, (cx, k) => {
+          const len = (0.08 + hash(k) * 0.14) * h;
+          ctx.fillStyle = '#241f31';
+          ctx.beginPath();
+          ctx.moveTo(cx - 1.2 * z, y);
+          ctx.lineTo(cx + 1.2 * z, y);
+          ctx.lineTo(cx + 0.1 * z, y + len);
+          ctx.fill();
+        });
+        ridge('#1f1b2a', 0.9, 0.12, 6, 0.3);
+        break;
+      }
+      case 'castle': {
+        grad([[0, '#1d1b27'], [1, '#2a2736']]);
+        // far hall: pillars and arched windows with warm light
+        repeat(9, 0.25, (cx) => {
+          ctx.fillStyle = '#25232f';
+          ctx.fillRect(cx - 1 * z, y, 2 * z, h);
+          const wy = y + h * 0.25;
+          const ww = 2.4 * z;
+          const wh = 4.5 * z;
+          ctx.fillStyle = '#3a2f2a';
+          ctx.fillRect(cx + 2.8 * z, wy, ww, wh);
+          ctx.fillStyle = 'rgba(255,190,90,0.55)';
+          ctx.fillRect(cx + 3.1 * z, wy + 0.8 * z, ww - 0.6 * z, wh - 1.1 * z);
+          ctx.beginPath();
+          ctx.arc(cx + 2.8 * z + ww / 2, wy + 0.8 * z, (ww - 0.6 * z) / 2, Math.PI, 0);
+          ctx.fill();
+        });
+        break;
+      }
+      case 'snow': {
+        grad([[0, '#9fc3de'], [0.7, '#d9e9f4'], [1, '#eef6fb']]);
+        ridge('#c9dcea', 0.55, 0.35, 12, 0.08, true);
+        ridge('#e4eff7', 0.55, 0.12, 12, 0.08, true);
+        ridge('#dbe9f3', 0.7, 0.16, 7, 0.25);
+        ridge('#eef6fb', 0.8, 0.12, 4.5, 0.45);
+        // snowflakes
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        repeat(3, 0.6, (cx, k) => {
+          for (let n = 0; n < 3; n++) ctx.fillRect(cx + hash(k * 3 + n) * 3 * z, y + hash(k * 7 + n) * h, Math.max(1, z * 0.15), Math.max(1, z * 0.15));
+        });
+        break;
+      }
+      case 'desert': {
+        grad([[0, '#f0a45a'], [0.55, '#f7cf8a'], [1, '#fbe6b8']]);
+        const sunX = x + w * 0.78 - this.cam.x * z * 0.03;
+        ctx.fillStyle = 'rgba(255,245,200,0.9)';
+        ctx.beginPath();
+        ctx.arc(sunX, y + h * 0.22, Math.max(12, h * 0.07), 0, Math.PI * 2);
+        ctx.fill();
+        ridge('#e9b873', 0.68, 0.14, 11, 0.15);
+        ridge('#dea45e', 0.78, 0.12, 6, 0.4);
+        break;
+      }
+      default: {
+        grad([[0, '#5fb4ec'], [0.7, '#b9e2f7'], [1, '#dff3fb']]);
+        ridge('#9fc7e0', 0.58, 0.3, 14, 0.06, true);
+        repeat(18, 0.1, (cx, k) => cloud(cx + hash(k) * 8 * z, y + h * (0.12 + hash(k + 9) * 0.18), (1.2 + hash(k + 3)) * z, 'rgba(255,255,255,0.8)'));
+        ridge('#a9d8c4', 0.62, 0.22, 9, 0.2);
+        ridge('#8cc7a6', 0.72, 0.16, 5, 0.45);
+      }
+    }
     ctx.restore();
   }
 

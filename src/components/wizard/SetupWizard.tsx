@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GeneratorSettings, MapSettings, Perspective, ProjectMode, RoomShape, SpecialRoomType, TerrainSet, Tileset } from '../../types';
-import { PERSPECTIVES } from '../../types';
+import { PERSPECTIVES, SIDE_THEMES } from '../../types';
 import { DEFAULT_MAP, defaultGenerator, defaultTerrainSets } from '../../generator/presets';
 import { TerrainFields } from '../TerrainFields';
 import { PERSPECTIVE_INFO, requiredRooms } from '../../generator/perspective';
@@ -602,7 +602,7 @@ function Summary({ draft, library, onName, onFixRooms }: { draft: Draft; library
   ];
   const sd = resolveSide(gen.side);
   const sideRows: [string, string][] = [
-    ['Umgebung', sd.style === 'cave' ? 'Höhle' : 'Draußen'],
+    ['Umgebung', (SIDE_THEMES[sd.style] ?? SIDE_THEMES.outdoor).label],
     ['Sprung', `${sd.jumpHeight} hoch · ${sd.jumpWidth} weit`],
     ['Gelände', `Hügel ${sd.hills} % · Gruben ${sd.gaps} % · Plattformen ${sd.platforms} %${sd.ladders ? ' · Leitern' : ''}`],
     ['Gefahren', [sd.hazards.abyss && 'Abgrund', sd.hazards.water && 'Wasser', sd.hazards.lava && 'Lava', sd.hazards.spikes && 'Stacheln'].filter(Boolean).join(', ')],

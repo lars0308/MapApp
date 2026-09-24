@@ -6,6 +6,7 @@ import { DEMO_AUTOTILE_IDS, createDemoAutotileSets } from '../tilesets/demoAutot
 import { DEMO_SIDE_ID, createDemoSideTileset } from '../tilesets/demoSide';
 import { DEMO_HEX_ID, createDemoHexTileset } from '../tilesets/demoHex';
 import { DEMO_NATURE_ID, createDemoNatureTileset } from '../tilesets/demoNature';
+import { DEMO_SIDE_THEMES_ID, createDemoSideThemesTileset } from '../tilesets/demoSideThemes';
 
 type LegacyGenerator = GeneratorSettings & { hazards?: number; lava?: boolean; water?: boolean; abyss?: boolean };
 
@@ -77,6 +78,12 @@ export function migrateProject(p: Project): Project {
     const nature = createDemoNatureTileset(nextGid);
     tilesets = [...tilesets, nature];
     nextGid = nature.firstGid + nature.columns * nature.rows;
+  }
+  // side-scroller themes castle / snow / desert (v3.28)
+  if (!tilesets.some((t) => t.id === DEMO_SIDE_THEMES_ID)) {
+    const themes = createDemoSideThemesTileset(nextGid);
+    tilesets = [...tilesets, themes];
+    nextGid = themes.firstGid + themes.columns * themes.rows;
   }
 
   // layers: y-sort flag + missing default roles at their default position

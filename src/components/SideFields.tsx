@@ -1,6 +1,6 @@
-import type { SideSettings } from '../types';
+import { SIDE_THEMES, type SideSettings, type SideStyle } from '../types';
 import { defaultSide } from '../generator/presets';
-import { Chip, NumberField, Section, Segmented, Slider, Toggle } from './ui';
+import { Chip, NumberField, Section, Slider, Toggle } from './ui';
 
 /** stored side settings merged with the defaults (older projects have none) */
 export function resolveSide(side: Partial<SideSettings> | undefined): SideSettings {
@@ -36,15 +36,13 @@ export function SideFields({
       <Section title="Level">
         <div className="field">
           <label>Umgebung</label>
-          <Segmented
-            label="Umgebung"
-            value={side.style}
-            options={[
-              { value: 'outdoor', label: 'Draußen' },
-              { value: 'cave', label: 'Höhle' },
-            ]}
-            onChange={(style) => onChange({ style })}
-          />
+          <div className="chips" role="radiogroup" aria-label="Umgebung">
+            {(Object.keys(SIDE_THEMES) as SideStyle[]).map((k) => (
+              <Chip key={k} active={side.style === k} onClick={() => onChange({ style: k })}>
+                {SIDE_THEMES[k].label}
+              </Chip>
+            ))}
+          </div>
         </div>
         <div className="grid-2">
           <NumberField label="Sprunghöhe" value={side.jumpHeight} min={1} max={6} suffix="Tiles" onChange={(v) => onChange({ jumpHeight: v })} />

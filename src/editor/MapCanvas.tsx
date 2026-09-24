@@ -11,7 +11,7 @@ import { applyAutoEdges, applyAutoWalls } from './autoWalls';
 import { pasteClip, stampOrigin } from './clipboard';
 import { tileOf, transformOf, withTransform } from '../tilesets/gid';
 import { objectDef } from '../objects/defs';
-import type { MapObject, Project } from '../types';
+import { SIDE_THEMES, type MapObject, type Project } from '../types';
 import { TilePools, tilesetSupports } from '../tilesets/tilePools';
 import { Rng } from '../generator/rng';
 
@@ -584,9 +584,9 @@ export function MapCanvas() {
 }
 
 /** side-scroller maps get a sky (outside) or a dark cave behind the tiles */
-function backdropOf(p: Project): 'plain' | 'sky' | 'cave' {
+function backdropOf(p: Project): MapRenderer['backdrop'] {
   if (p.map.perspective !== 'side_view') return 'plain';
-  return p.generator.side?.style === 'cave' ? 'cave' : 'sky';
+  return (SIDE_THEMES[p.generator.side?.style ?? 'outdoor'] ?? SIDE_THEMES.outdoor).backdrop;
 }
 
 /** the selected tile should belong to the map's view (grass hex, grass ground, floor) */

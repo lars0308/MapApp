@@ -8,7 +8,7 @@ import { build, type D, type Def } from './demoAutotiles';
 
 const T = 16;
 
-interface Pal {
+export interface Pal {
   base: string;
   light: string;
   dark: string;
@@ -83,7 +83,7 @@ function ground(d: D, p: Pal, cover: typeof GRASS, e: Edge) {
   }
 }
 
-function groundDefs(p: Pal, cover: typeof GRASS, tag: string): Def[] {
+export function groundDefs(p: Pal, cover: typeof GRASS, tag: string): Def[] {
   const tags = ['side', tag];
   const g = (role: Def['role'], e: Edge, weight = 100): Def => ({ role, category: 'wallTop', tags, weight, draw: (d) => ground(d, p, cover, e) });
   return [

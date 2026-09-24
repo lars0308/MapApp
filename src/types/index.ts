@@ -321,9 +321,19 @@ export interface HexSettings {
 }
 
 /** Settings of the side-scroller generator. Heights / widths are in tiles. */
+export type SideStyle = 'outdoor' | 'cave' | 'castle' | 'snow' | 'desert';
+/** side-view theme → tile tag of its ground / deco, sky or roof, backdrop picture */
+export const SIDE_THEMES: Record<SideStyle, { label: string; tag: string; indoor: boolean; backdrop: 'sky' | 'cave' | 'castle' | 'snow' | 'desert' }> = {
+  outdoor: { label: 'Wald', tag: 'grass', indoor: false, backdrop: 'sky' },
+  cave: { label: 'Höhle', tag: 'cave', indoor: true, backdrop: 'cave' },
+  castle: { label: 'Burg', tag: 'castle', indoor: true, backdrop: 'castle' },
+  snow: { label: 'Schnee', tag: 'snow', indoor: false, backdrop: 'snow' },
+  desert: { label: 'Wüste', tag: 'sand', indoor: false, backdrop: 'desert' },
+};
+
 export interface SideSettings {
-  /** outdoor: sky above, cave: ceiling and back wall */
-  style: 'outdoor' | 'cave';
+  /** theme: outdoor / snow / desert have a sky, cave / castle a ceiling and a back wall */
+  style: SideStyle;
   /** how far the player can jump (up / across) – the level never asks for more */
   jumpHeight: number;
   jumpWidth: number;

@@ -38,7 +38,7 @@ Bedeutung wichtiger Werte:
 - population.enemies / population.loot 0–100; decoDensity, floorVariation, obstacleDensity 0–100; objects.trees/rocks/arches 0–100.
 - specials: Spezialräume (start, end, boss, treasure, secret, merchant, quest, arena, puzzle) an/aus – genug Räume dafür einplanen.
 - look: softEdges (runde Wege/Ufer), floorPatches, smartDeco, smoothRooms – normalerweise alle true lassen.
-- side (Seitenansicht): style, hills, gaps, platforms, ladders, lifts, hazards, enemies, loot.
+- side (Seitenansicht): style (outdoor = Wald, cave = Höhle, castle = Burg, snow = Schnee, desert = Wüste), hills, gaps, platforms, ladders, lifts, hazards, enemies, loot.
 - hex (Hex-Weltkarte): shape continent|islands, climate temperate|hot|cold, water, mountains, forests, rivers, towns, players, roads, resources.
 - seed nicht setzen.
 
