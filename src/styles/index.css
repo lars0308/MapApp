@@ -5735,6 +5735,23 @@ body.is-resizing-y * {
   image-rendering: pixelated;
   pointer-events: auto;
 }
+/* empty floor edge: the plain floor shows through faintly, the label on top */
+.room-slot {
+  position: relative;
+}
+.room-slot-tile.is-ghost {
+  opacity: 0.35;
+}
+.room-slot-label {
+  position: absolute;
+  inset: auto 2px 2px;
+  padding: 1px 2px;
+  border-radius: 3px;
+  background: rgba(10, 10, 16, 0.7);
+  color: var(--text-2);
+  font-size: 9px;
+  line-height: 1.1;
+}
 .room-tools {
   display: flex;
   flex-wrap: wrap;

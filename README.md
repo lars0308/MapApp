@@ -336,6 +336,14 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.34 – Boden-Ränder im Raum-Baukasten**
+
+- **„Raum bauen → Raum füllen“ hat jetzt eigene Felder für den Boden:** Mitte, Rand oben, unten, links, rechts und die vier Boden-Ecken. So kannst du Tiles mit Schattenkante an der Wand oder mit Randverzierung genau dort einsetzen, wo sie hingehören.
+- Leer gelassene Ränder zeigen blass den Boden der Mitte – genau den nimmt der Generator dort. Du musst also nichts ausfüllen, was dein Tileset nicht hat.
+- „Fehlende Ecken, Wände und Ränder durch Drehen ergänzen“ dreht auch einen Boden-Rand oder eine Boden-Ecke auf die anderen drei Seiten.
+- Der Generator legt Boden-Ecken und -Ränder an jede Wand eines Raums. Moos- und Abnutzungsflecken unterbrechen den Rand nicht mehr.
+- Rand-Tiles zählen nicht als normaler Boden und tauchen deshalb nicht mitten im Raum auf. Neue Rollen: `floor_corner_top_left`, `floor_corner_top_right`, `floor_corner_bottom_left`, `floor_corner_bottom_right`; die KI kennt sie beim Zuordnen.
+
 **Version 3.33 – Figuren mit KI: Charakter, Kreatur oder Objekt aus der Beschreibung**
 
 - **„Beschreibe dein Spiel“ auf der Startseite baut jetzt auch Figuren.** Schreib zum Beispiel „Ritter in silberner Rüstung mit rotem Umhang“, „Grüner Schleim-Boss mit Krone“ oder „Alte Schatztruhe mit Goldbeschlägen“, gern mit Referenzbild. Die KI erkennt, dass du eine Figur willst, öffnet den Figuren-Baukasten und zeichnet sie dort live: Bauteile als Basis, eigene Farben, eigene Pixel für jedes Detail. Sie schaut sich das Ergebnis mehrmals an und bessert nach. Danach liegt die Figur in der Galerie.

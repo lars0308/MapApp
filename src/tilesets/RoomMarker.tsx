@@ -35,6 +35,21 @@ const CATEGORY_OF: Partial<Record<TileRole, TileCategory>> = {
   door: 'door',
   water: 'water',
 };
+/** floor edges and corners: role only (no category, so they never show up in the middle of a room) */
+const FLOOR_RING: TileRole[] = [
+  'floor_edge_top',
+  'floor_edge_bottom',
+  'floor_edge_left',
+  'floor_edge_right',
+  'floor_corner_top_left',
+  'floor_corner_top_right',
+  'floor_corner_bottom_left',
+  'floor_corner_bottom_right',
+];
+/** roles the room builder manages */
+const managed = (role: TileRole | undefined) => !!role && (!!CATEGORY_OF[role] || FLOOR_RING.includes(role));
+/** empty floor edge / corner: the generator uses the plain floor there */
+const ringFallback = (role: TileRole): TileRole | null => (FLOOR_RING.includes(role) ? 'floor_center' : null);
 
 /** "Teile zuordnen": slots besides the room board */
 const EXTRA_SLOTS: { role: TileRole; label: string }[] = [
@@ -56,11 +71,22 @@ const SLOT_LABEL: Partial<Record<TileRole, string>> = {
   wall_right: 'Wand rechts',
   wall_front: 'Front',
   wall_front_upper: 'Front oben',
-  floor_center: 'Boden',
+  floor_center: 'Boden Mitte',
+  floor_edge_top: 'Boden oben',
+  floor_edge_bottom: 'Boden unten',
+  floor_edge_left: 'Boden links',
+  floor_edge_right: 'Boden rechts',
+  floor_corner_top_left: 'Boden ┌',
+  floor_corner_top_right: 'Boden ┐',
+  floor_corner_bottom_left: 'Boden └',
+  floor_corner_bottom_right: 'Boden ┘',
 };
 
-/** role of the cell (x, y) inside the framed room; `front` = rows of wall face below the top edge */
-export function roomRole(r: Rect, x: number, y: number, front: number): TileRole {
+/**
+ * role of the cell (x, y) inside the framed room; `front` = rows of wall face below the top edge.
+ * `edges`: the outer ring of the floor gets its own roles (floor edge top / left … and floor corners)
+ */
+export function roomRole(r: Rect, x: number, y: number, front: number, edges = false): TileRole {
   const left = x === r.x0;
   const right = x === r.x1;
   const top = y === r.y0;
@@ -76,6 +102,19 @@ export function roomRole(r: Rect, x: number, y: number, front: number): TileRole
   // 3/4 view: the rows under the top edge are the wall face (the lowest one touches the floor)
   const row = y - r.y0;
   if (row <= front) return row === front ? 'wall_front' : 'wall_front_upper';
+  if (!edges) return 'floor_center';
+  const fl = x === r.x0 + 1;
+  const fr = x === r.x1 - 1;
+  const ft = y === r.y0 + front + 1;
+  const fb = y === r.y1 - 1;
+  if (ft && fl) return 'floor_corner_top_left';
+  if (ft && fr) return 'floor_corner_top_right';
+  if (fb && fl) return 'floor_corner_bottom_left';
+  if (fb && fr) return 'floor_corner_bottom_right';
+  if (ft) return 'floor_edge_top';
+  if (fb) return 'floor_edge_bottom';
+  if (fl) return 'floor_edge_left';
+  if (fr) return 'floor_edge_right';
   return 'floor_center';
 }
 
@@ -101,6 +140,8 @@ const CYCLES: TileRole[][] = [
   ['corner_top_left', 'corner_top_right', 'corner_bottom_right', 'corner_bottom_left'],
   ['wall_top', 'wall_right', 'wall_bottom', 'wall_left'],
   ['inner_corner_top_left', 'inner_corner_top_right', 'inner_corner_bottom_right', 'inner_corner_bottom_left'],
+  ['floor_edge_top', 'floor_edge_right', 'floor_edge_bottom', 'floor_edge_left'],
+  ['floor_corner_top_left', 'floor_corner_top_right', 'floor_corner_bottom_right', 'floor_corner_bottom_left'],
 ];
 
 /** empty slots of a cycle filled with turned copies of a filled one */
@@ -140,8 +181,10 @@ function SampleRoom({ ts, pieces, front }: { ts: Tileset; pieces: Pieces; front:
       const r: Rect = { x0: 0, y0: 0, x1: W - 1, y1: H - 1 };
       for (let y = 0; y < H; y++)
         for (let x = 0; x < W; x++) {
-          const role = roomRole(r, x, y, front);
-          const list = pieces[role] ?? (role === 'wall_front_upper' ? pieces.wall_front : undefined);
+          const role = roomRole(r, x, y, front, true);
+          const fb = ringFallback(role);
+          const own = pieces[role];
+          const list = own?.length ? own : role === 'wall_front_upper' ? pieces.wall_front : fb ? pieces[fb] : undefined;
           if (!list?.length) {
             g.fillStyle = 'rgba(232,111,111,0.35)';
             g.fillRect(x * T + 1, y * T + 1, T - 2, T - 2);
@@ -194,7 +237,7 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
   // builder: role → pieces (starts with the tileset's confirmed roles and its turned tiles)
   const [pieces, setPieces] = useState<Pieces>(() => {
     const out: Pieces = {};
-    for (const [k, m] of Object.entries(ts.tiles)) if (!m.auto && m.role && CATEGORY_OF[m.role]) (out[m.role] ??= []).push({ i: Number(k), t: 0 });
+    for (const [k, m] of Object.entries(ts.tiles)) if (!m.auto && managed(m.role)) (out[m.role!] ??= []).push({ i: Number(k), t: 0 });
     for (const v of ts.variants ?? []) (out[v.role] ??= []).push({ i: v.index, t: v.transform });
     return out;
   });
@@ -323,12 +366,24 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
         {Array.from({ length: 5 * (5 + front) }, (_, k) => {
           const x = k % 5;
           const y = Math.floor(k / 5);
-          const role = roomRole(board, x, y, front);
+          const role = roomRole(board, x, y, front, true);
           const list = pieces[role] ?? [];
           const p = list[(x + y) % Math.max(1, list.length)];
+          // empty floor edge: shows the plain floor faintly (that is what the generator will use)
+          const fb = ringFallback(role);
+          const ghost = !p && fb ? (pieces[fb] ?? [])[0] : undefined;
           return (
             <button key={k} type="button" data-role={role} className={`room-slot${role === slot ? ' is-active' : ''}${list.length ? ' is-set' : ''}`} title={SLOT_LABEL[role]} onClick={() => drop(role)} style={{ width: slotPx, height: slotPx }}>
-              {p ? <span className="room-slot-tile" data-role={role} style={{ ...tileStyle(ts, p.i, slotPx), ...turnStyle(p.t) }} /> : <span data-role={role}>{SLOT_LABEL[role]}</span>}
+              {p ? (
+                <span className="room-slot-tile" data-role={role} style={{ ...tileStyle(ts, p.i, slotPx), ...turnStyle(p.t) }} />
+              ) : ghost ? (
+                <>
+                  <span className="room-slot-tile is-ghost" data-role={role} style={{ ...tileStyle(ts, ghost.i, slotPx), ...turnStyle(ghost.t) }} />
+                  <span className="room-slot-label" data-role={role}>{SLOT_LABEL[role]}</span>
+                </>
+              ) : (
+                <span data-role={role}>{SLOT_LABEL[role]}</span>
+              )}
             </button>
           );
         })}
@@ -360,7 +415,7 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
         </button>
       </div>
       <button type="button" className="btn btn-secondary room-complete" onClick={() => setPieces(completeByTurning(pieces))}>
-        Fehlende Ecken und Wände durch Drehen ergänzen
+        Fehlende Ecken, Wände und Ränder durch Drehen ergänzen
       </button>
     </div>
   );
@@ -392,7 +447,7 @@ export function RoomMarker({ ts, onApply, onClose }: { ts: Tileset; onApply: (r:
           <p className="hint">
             {mode === 'frame'
               ? 'Ist im Tileset ein Raum gezeichnet? Rahmen darüberziehen: die äußeren Ecken werden Ecken, die Ränder Wände, das Innere Boden. Am Handy: erst eine Ecke antippen, dann die gegenüberliegende.'
-              : '1. Tile im Tileset antippen. 2. Ins Feld des Raums tippen, wo es hingehört (Ecke, Wand, Boden, Tür, Wasser …). Ziehen geht auch. Mit Drehen / Spiegeln passt du das gewählte Feld an – eine Ecke reicht, „durch Drehen ergänzen“ setzt die anderen drei. Mehrere Tiles pro Feld = Varianten.'}
+              : '1. Tile im Tileset antippen. 2. Ins Feld des Raums tippen, wo es hingehört (Ecke, Wand, Tür, Wasser …). Der Boden hat eigene Felder für Mitte, Rand oben, unten, links, rechts und die vier Boden-Ecken – leer bleibende Ränder nehmen den Boden der Mitte. Ziehen geht auch. Mit Drehen / Spiegeln passt du das gewählte Feld an – eine Ecke oder ein Rand reicht, „durch Drehen ergänzen“ setzt die anderen drei. Mehrere Tiles pro Feld = Varianten.'}
           </p>
           <div className={mode === 'pieces' && wide ? 'room-split' : undefined}>
             {sheet}
@@ -441,7 +496,7 @@ export function applyRoom(ts: Pick<Tileset, 'tiles' | 'variants'>, r: RoomResult
   for (const [k, m] of Object.entries(ts.tiles)) {
     if (clearOthers && m.auto) continue;
     // builder: roles it manages are replaced as a whole
-    if (r.replaceVariants && m.role && CATEGORY_OF[m.role] && !m.auto) continue;
+    if (r.replaceVariants && managed(m.role) && !m.auto) continue;
     tiles[Number(k)] = m;
   }
   const variants = r.replaceVariants ? r.variants : [...(clearOthers ? [] : ts.variants ?? []), ...r.variants];

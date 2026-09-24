@@ -375,13 +375,19 @@ export function generate(input: GenerateInput): GenerateOutput {
   const floorTile = (i: number) => {
     // outdoor: light meadow in the clearings, darker ground under the trees
     if (outdoor) return pools.pickRole(rTiles, 'floor_center', ['grass', climate, ...(forest[i] && rTiles.chance(0.5) ? ['dark'] : [])], [...(forest[i] ? [] : ['dark']), ...otherClimates]);
+    // edge-aware floor when the tileset provides edge roles (before wear / moss, so the rim stays whole)
+    const up = !walk(i - W);
+    const down = !walk(i + W);
+    const left = !walk(i - 1);
+    const right = !walk(i + 1);
+    const corner: TileRole | null = up && left ? 'floor_corner_top_left' : up && right ? 'floor_corner_top_right' : down && left ? 'floor_corner_bottom_left' : down && right ? 'floor_corner_bottom_right' : null;
+    if (corner && pools.hasRole(corner)) return pools.pickRole(rTiles, corner, [tagAt(i)]);
+    const edge: TileRole | null = up ? 'floor_edge_top' : down ? 'floor_edge_bottom' : left ? 'floor_edge_left' : right ? 'floor_edge_right' : null;
+    if (edge && pools.hasRole(edge)) return pools.pickRole(rTiles, edge, [tagAt(i)]);
     if (!look.floorPatches) {
       // classic: every tile rolls its own variant
       if (pools.has('floorVariant') && rTiles.chance(variation)) return pools.pick(rTiles, ['floorVariant', 'floor']);
     } else if (pools.has('floorVariant') && variation > 0 && mossAt(i)) return pools.pick(rTiles, ['floorVariant', 'floor']);
-    // edge-aware floor when the tileset provides edge roles
-    const edge: TileRole | null = !walk(i - W) ? 'floor_edge_top' : !walk(i + W) ? 'floor_edge_bottom' : !walk(i - 1) ? 'floor_edge_left' : !walk(i + 1) ? 'floor_edge_right' : null;
-    if (edge && pools.hasRole(edge)) return pools.pickRole(rTiles, edge, [tagAt(i)]);
     if (!look.floorPatches) return pools.pickPref(rTiles, ['floor'], tagAt(i));
     // worn patches: cracked and dark slabs together; elsewhere clean floor with a rare crack
     if (wear[i] > 0.64 - variation * 0.1) return pools.pickPrefs(rTiles, ['floor'], [tagAt(i), rTiles.chance(0.6) ? 'broken' : 'dark']);
