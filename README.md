@@ -342,6 +342,14 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.12 – KI arbeitet auch, wenn MapForge zu ist**
+
+- „KI von überall“: Ist keine MapForge-App offen, führt der Vermittler den Befehl in **MapForge in der Cloud** aus. Das ist die eigene App in einem unsichtbaren Browser auf Vercel, `api/cloud.js`. Die KI arbeitet dort an denselben Karten. Jeder Befehl dauert in der Cloud ein paar Sekunden länger, weil der Browser erst starten muss.
+- Beim nächsten Öffnen der App (mit eingeschaltetem „KI von überall“) werden die Karten der KI übernommen. Sie stehen unter *Karte → Gespeicherte Karten* mit dem Abzeichen „KI“. Die App lädt umgekehrt deine Karten und Figuren hoch, damit die KI sie auch bei geschlossener App kennt. Bei derselben Karte gewinnt die neuere Fassung.
+- Exporte (ZIP) aus der Cloud kommen als Download-Link (7 Tage gültig).
+- Schalter aus oder „Neue Adresse erzeugen“ stoppt auch die Cloud.
+- Technik: Tabellen `cloud_projects`, `cloud_meta` und `cloud_tickets` sowie der Bucket `mapforge-exports` im Supabase-Projekt. Die Endpunkte `<Adresse>/store` gehören zur Edge Function. Ein Einmal-Ticket pro Befehl sorgt dafür, dass der Cloud-Browser nur für echte Aufrufe startet.
+
 **Version 3.11 – KI legt Karten an, du siehst sie**
 
 - Jede Karte, die die KI mit `new_map` anlegt, ist ein eigenes gespeichertes Projekt. Sie steht unter *Karte → Gespeicherte Karten* und auf der Startseite mit dem Abzeichen **KI**. Eine Meldung sagt, welche Karte angelegt wurde. Offene Listen aktualisieren sich sofort.

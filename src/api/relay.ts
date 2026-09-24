@@ -67,11 +67,18 @@ export const useRelay = create<RelayState>((set, get) => ({
     set({ enabled, error: null });
     save(get());
     void connect();
+    // the cloud follows the switch
+    void setCloud(get(), enabled);
   },
   newCode: () => {
+    // the old address stops working in the cloud too
+    void setCloud(get(), false);
     set({ code: makeCode() });
     save(get());
-    if (get().enabled) void connect();
+    if (get().enabled) {
+      void connect();
+      void setCloud(get(), true);
+    }
   },
   setServer: (url, key) => {
     set({ url: url.trim(), key: key.trim() });
@@ -84,9 +91,19 @@ export const useRelay = create<RelayState>((set, get) => ({
 export function relayAddress(s: Pick<RelayState, 'url' | 'code'> = useRelay.getState()): string {
   return s.url ? `${s.url.replace(/\/$/, '')}/functions/v1/mapforge-mcp/${s.code}` : '';
 }
+/** switch the cloud workspace of a code on / off */
+async function setCloud(s: Pick<RelayState, 'url' | 'code'>, enabled: boolean) {
+  if (!s.url) return;
+  try {
+    await fetch(`${relayAddress(s)}/store`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled }) });
+  } catch {
+    // offline: the next sync is not affected
+  }
+}
 export const relayConfigured = () => !!(useRelay.getState().url && useRelay.getState().key);
 
 let client: SupabaseClient | null = null;
+const canceled = new Set<string>();
 let channel: RealtimeChannel | null = null;
 
 /** a file (ZIP) cannot travel to a remote AI – it is saved on this device instead */
@@ -110,8 +127,15 @@ async function connect() {
   client ??= createClient(s.url, s.key, { auth: { persistSession: false } });
   const ch = client.channel(`mapforge-${s.code}`, { config: { broadcast: { self: false } } });
   channel = ch;
+  ch.on('broadcast', { event: 'cancel' }, ({ payload }) => {
+    canceled.add(String((payload as { id: string }).id));
+  });
   ch.on('broadcast', { event: 'call' }, async ({ payload }) => {
     const { id, command, args } = payload as { id: string; command: string; args: Record<string, unknown> };
+    // "I am here" at once – without it the relay runs the command in the cloud instead
+    await ch.send({ type: 'broadcast', event: 'ack', payload: { id } });
+    await new Promise((r) => setTimeout(r, 0));
+    if (canceled.delete(id)) return; // answered too late (sleeping tab): the cloud does it
     useRelay.setState({ last: command, count: useRelay.getState().count + 1 });
     // __spec: the relay asks for the current command list
     const text = JSON.stringify(command === '__spec' ? { ok: true, data: spec } : localise(await runCommand(command, args ?? {})));
@@ -123,9 +147,99 @@ async function connect() {
     if (status === 'SUBSCRIBED') {
       useRelay.setState({ status: 'connected', error: null });
       useEditor.getState().toast('KI von überall bereit – die KI kann jetzt in dieser App arbeiten', 'success');
+      void syncCloud();
     } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') useRelay.setState({ status: 'connecting', error: `Keine Verbindung zum Vermittler – Internet prüfen, es wird weiter versucht${err?.message ? ` (${err.message})` : ''}.` });
     else if (status === 'CLOSED' && useRelay.getState().enabled) useRelay.setState({ status: 'connecting' });
   });
+}
+
+/* ------------------------------------------------------------------ cloud workspace sync
+ * While no MapForge tab is open, the AI works in MapForge in the cloud (api/cloud.js) on the
+ * workspace of the pairing code. The app brings the AI's maps here and sends its own maps (and
+ * figures) there, so both sides see the same maps. Newest version of a map wins. */
+
+const SYNC_KEY = 'mapforge.relay.sync';
+interface SyncState {
+  code: string;
+  /** newest cloud change already taken */
+  pulled: number;
+  /** map id → updatedAt known to be in the cloud */
+  sent: Record<string, number>;
+  /** figures etc. last sent */
+  localSig: string;
+}
+const readSync = (code: string): SyncState => {
+  try {
+    const s = JSON.parse(localStorage.getItem(SYNC_KEY) ?? 'null') as SyncState | null;
+    if (s?.code === code) return s;
+  } catch {
+    // ignore
+  }
+  return { code, pulled: 0, sent: {}, localSig: '' };
+};
+const writeSync = (s: SyncState) => {
+  try {
+    localStorage.setItem(SYNC_KEY, JSON.stringify(s));
+  } catch {
+    // not stored
+  }
+};
+
+let syncing = false;
+export async function syncCloud(): Promise<void> {
+  const r = useRelay.getState();
+  if (syncing || !r.enabled || !r.url) return;
+  syncing = true;
+  try {
+    const base = `${relayAddress(r)}/store`;
+    const st = readSync(r.code);
+    const [{ listProjects, loadProject, saveProject }, { deserializeProject, serializeProject }, { localEntries }, { useProject }] = await Promise.all([
+      import('../persistence/db'),
+      import('../persistence/projectFile'),
+      import('../persistence/backup'),
+      import('../store/projectStore'),
+    ]);
+    // 1. the AI's maps from the cloud
+    const res = await fetch(`${base}?since=${st.pulled}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const got = (await res.json()) as { projects: { id: string; updated_at: number; data: string }[] };
+    let added = 0;
+    for (const c of got.projects ?? []) {
+      st.pulled = Math.max(st.pulled, c.updated_at);
+      st.sent[c.id] = c.updated_at;
+      const have = await loadProject(c.id);
+      if (have && have.updatedAt >= c.updated_at) continue;
+      const p = deserializeProject(c.data, true);
+      await saveProject(p);
+      added++;
+      // the open map changed in the cloud: show the new version
+      if (useProject.getState().project.id === p.id) useProject.getState().loadProject(p);
+    }
+    if (added) useEditor.getState().toast(`${added} Karte(n) von der KI aus der Cloud übernommen – unter Karte → „Gespeicherte Karten“`, 'success');
+    // 2. own maps (new or changed) to the cloud, one per request
+    for (const s of await listProjects()) {
+      if (st.sent[s.id] === s.updatedAt) continue;
+      const p = await loadProject(s.id);
+      // an empty start project is nothing to work on
+      if (!p || (p.mode === 'generate' && !p.result && !p.objects.length && p.layers.every((l) => !l.data.some(Boolean)))) continue;
+      const body = JSON.stringify({ projects: [{ id: p.id, name: p.name, ai: p.createdBy === 'ai', updated_at: p.updatedAt, data: serializeProject(p) }] });
+      const put = await fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+      if (!put.ok) throw new Error(`HTTP ${put.status}`);
+      st.sent[s.id] = s.updatedAt;
+    }
+    // 3. figures and builder state (so the AI in the cloud knows them)
+    const local = localEntries();
+    const sig = `${Object.keys(local).length}:${Object.values(local).reduce((n, v) => n + v.length, 0)}:${JSON.stringify(local).slice(-200)}`;
+    if (sig !== st.localSig) {
+      const put = await fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projects: [], local, current: useProject.getState().project.id }) });
+      if (put.ok) st.localSig = sig;
+    }
+    writeSync(st);
+  } catch (e) {
+    console.warn('MapForge: Cloud-Abgleich fehlgeschlagen', e);
+  } finally {
+    syncing = false;
+  }
 }
 
 let started = false;
@@ -133,8 +247,14 @@ export function startRelay() {
   if (started) return;
   started = true;
   if (useRelay.getState().enabled) void connect();
-  // phones pause background tabs: reconnect when the app comes back
+  // phones pause background tabs: reconnect when the app comes back (and fetch what the AI did meanwhile)
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && useRelay.getState().enabled && useRelay.getState().status !== 'connected') void connect();
+    if (!useRelay.getState().enabled) return;
+    if (document.visibilityState === 'visible' && useRelay.getState().status !== 'connected') void connect();
+    else void syncCloud();
   });
+  // keep the cloud copy fresh while the app is open
+  setInterval(() => {
+    if (useRelay.getState().status === 'connected') void syncCloud();
+  }, 120_000);
 }

@@ -28,6 +28,12 @@ Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI 
 - Die Edge Function (v2) fragt `tools/list` live bei der App ab (`__spec`), neue Befehle brauchen kein Redeploy; die mitgelieferte spec.json ist nur Rückfall (deployt ist eine gekürzte Fassung).
 - Noch nicht Ende-zu-Ende getestet (Sandbox blockt supabase.co) – erster echter Test durch den Nutzer.
 
+## KI ohne offene App (Version 3.12)
+- Die Edge Function wartet 3 s auf ein „ack“ der App. Ohne Antwort ruft sie `POST https://map-app-omega-five.vercel.app/api/cloud` auf, mit Code, Befehl und Einmal-Ticket.
+- `api/_runner.js`: Arbeitsstand von `<fn>/<code>/store` holen (Ticket prüfen) → Chromium (@sparticuz/chromium + puppeteer-core) → `/?cloud=1` → `window.mapforge.cloud.load` → `run` → `cloud.save` → Änderungen zurückschreiben.
+- App-Seite: `src/api/cloud.ts`. Der Abgleich läuft über `syncCloud()` in `src/api/relay.ts`: beim Verbinden, beim Zurückkehren in die App und alle 2 Minuten.
+- Figuren gehen nur von der App in die Cloud. Was die KI in der Cloud an Figuren ändert, wird beim nächsten Upload der App überschrieben.
+
 ## Gegner & Beute (Version 3.5)
 - Generator: `populate()` in `src/generator/index.ts` (Einstellung `generator.population {enemies, loot}`), Truhen als Objekte. Testspiel-Kampf: `src/playtest/combat.ts` (Gegner, Truhen, HUD-Store), eingebunden in `controller.ts` (`renderer.playItems`). Side-Scroller hat noch keinen Kampf im App-Testspiel.
 

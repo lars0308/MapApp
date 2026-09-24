@@ -81,7 +81,7 @@ export function RelaySection() {
         <div>
           <h3 id="relay-title">KI von überall (auch am Handy)</h3>
           <p>
-            Die KI arbeitet in <b>dieser</b> App – egal ob am Handy, Tablet oder PC, und egal wo die KI läuft (z. B. Claude in der App oder auf claude.ai). Sie ruft eine Adresse im Internet auf, die ihre Befehle an diese App weitergibt.
+            Die KI arbeitet mit MapForge – egal wo sie läuft (z. B. Claude in der App oder auf claude.ai). Ist diese App offen, arbeitet sie hier und du siehst live zu. Ist die App zu, arbeitet sie in <b>MapForge in der Cloud</b> an denselben Karten – beim nächsten Öffnen findest du alles unter <i>Karte → Gespeicherte Karten</i> (Abzeichen „KI“).
           </p>
         </div>
       </div>
@@ -105,11 +105,11 @@ export function RelaySection() {
             </div>
           </label>
           <p className="hint">
-            In Claude: <b>Einstellungen → Connectors → Eigenen Connector hinzufügen</b> und diese Adresse einfügen. Die Adresse ist wie ein Passwort – wer sie hat, kann diese App steuern, solange der Schalter an ist.{' '}
+            In Claude: <b>Einstellungen → Connectors → Eigenen Connector hinzufügen</b> und diese Adresse einfügen. Die Adresse ist wie ein Passwort – wer sie hat, kann mit deinen Karten arbeiten, solange der Schalter an ist (auch in der Cloud).{' '}
             <button type="button" className="link-btn" onClick={r.newCode}>
               Neue Adresse erzeugen
             </button>{' '}
-            (die alte hört dann auf zu funktionieren). Die App muss offen sein, während die KI arbeitet; exportierte ZIP-Dateien landen auf diesem Gerät.
+            (die alte hört dann auf zu funktionieren). Deine Karten werden dafür mit der Cloud abgeglichen. Exportierte ZIP-Dateien landen auf diesem Gerät, wenn die App offen ist, sonst gibt die KI dir einen Download-Link.
           </p>
         </>
       )}

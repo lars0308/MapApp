@@ -10,7 +10,7 @@ const FORMAT = 'mapforge-backup';
 const PREFIX = 'mapforge.';
 const KEY_LAST = 'mapforge.lastBackup';
 /** browser-only view settings that should not travel to another device */
-const SKIP = new Set(['mapforge.desktopLayout.v1', 'mapforge.lastError', KEY_LAST]);
+const SKIP = new Set(['mapforge.desktopLayout.v1', 'mapforge.lastError', KEY_LAST, 'mapforge.ai', 'mapforge.relay', 'mapforge.relay.sync']);
 
 interface BackupFile {
   format: typeof FORMAT;
@@ -27,7 +27,7 @@ export interface BackupInfo {
   figures: number;
 }
 
-function localEntries(): Record<string, string> {
+export function localEntries(): Record<string, string> {
   const out: Record<string, string> = {};
   try {
     for (let i = 0; i < localStorage.length; i++) {

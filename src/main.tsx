@@ -18,11 +18,12 @@ import { detectTileSize } from './tilesets/slicing';
 import { slicePieces } from './tilesets/pieces';
 import { ErrorBoundary, rememberError, takeLastError } from './components/ErrorBoundary';
 import { startAiBridge } from './api/bridge';
-import { startRelay } from './api/relay';
+import { startRelay, syncCloud } from './api/relay';
+import { cloudLoad, cloudSave, isCloud } from './api/cloud';
 import { setCustomObjects } from './objects/defs';
 
 // small debugging handle (used by automated browser tests)
-(window as unknown as Record<string, unknown>).__MAPFORGE__ = { project: useProject, editor: useEditor, view: viewEvents, playtest, computeBlocked, metaTable, renderer: getRenderer, autoAssign, learning, detectTileSize, slicePieces, sprites: useSprites, spriteParts: DEMO_PARTS, composeView, app: useApp, anim: { animsFor, buildSheet }, sidePhysics: { buildSideMap, stepSide, newBody, jumpSpeed, liftRow } };
+(window as unknown as Record<string, unknown>).__MAPFORGE__ = { project: useProject, editor: useEditor, view: viewEvents, playtest, computeBlocked, metaTable, renderer: getRenderer, autoAssign, learning, detectTileSize, slicePieces, sprites: useSprites, spriteParts: DEMO_PARTS, composeView, app: useApp, syncCloud, anim: { animsFor, buildSheet }, sidePhysics: { buildSideMap, stepSide, newBody, jumpSpeed, liftRow } };
 
 // errors outside React rendering (event handlers, promises) become a visible message instead of silence
 const report = (area: string, err: unknown) => {
@@ -45,7 +46,8 @@ useProject.subscribe((s) => setCustomObjects(s.project.customObjects));
 
 // AI connection (MCP server on this computer) – only active when switched on
 startAiBridge();
-startRelay();
+if (isCloud) Object.assign((window as unknown as { mapforge: object }).mapforge, { cloud: { load: cloudLoad, save: cloudSave } });
+else startRelay();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -55,7 +57,7 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+if ('serviceWorker' in navigator && import.meta.env.PROD && !isCloud) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {
       /* offline support is optional */
