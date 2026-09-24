@@ -5,7 +5,7 @@ import { useEditor } from '../store/editorStore';
 import { useApp } from '../store/appStore';
 import { saveNow } from '../persistence/autosave';
 import { readFileAsDataUrl } from '../utils/download';
-import { askPlan, buildFromPlan } from '../api/describe';
+import { askPlan, buildFromPlan, setReference } from '../api/describe';
 
 const EXAMPLES = [
   'Kleine Insel mit Dorf und Hafen, viel Wald im Süden, für ein gemütliches RPG',
@@ -43,6 +43,8 @@ export function DescribeCard() {
       await saveNow();
       const plan = await askPlan({ text, image: image ?? undefined, tileset: tileset?.dataUrl });
       const done = await buildFromPlan(plan, tileset ?? undefined, setBusy);
+      // the project keeps description + picture: "Mit KI anpassen" shows them to the AI again
+      await setReference({ text, image });
       toast([done.summary || 'Karte erstellt', ...done.tips.map((t) => `Tipp: ${t}`)].join(' '), 'success');
       goTo('map');
       setText('');

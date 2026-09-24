@@ -231,7 +231,7 @@ export function generate(input: GenerateInput): GenerateOutput {
   // forest cells are no place for room objects
   if (outdoor) for (let i = 0; i < W * H; i++) if (forest[i]) octx.occupied[i] = 1;
   // village: houses at the clearings, a well in the start clearing
-  const houses: MapObject[] = s.layout === 'village' ? placeHouses(octx, forest, placed, specials, W, root.fork(131)) : [];
+  const houses: MapObject[] = s.layout === 'village' || (outdoor && s.houses) ? placeHouses(octx, forest, placed, specials, W, root.fork(131)) : [];
   const objects = [...houses, ...placeObjects(octx, placed, (id) => specials.get(id) ?? 'normal', s, rObjects)];
 
   // small obstacles (single tiles) in room interiors

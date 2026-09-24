@@ -7,6 +7,8 @@ import { OBJECT_DEFS, OBJECT_TYPES, atlasVersion, customObjectDefs, onAtlasChang
 import { ObjectThumb } from '../objects/ObjectThumb';
 import { tileBlocks } from '../editor/collision';
 import { PERSPECTIVE_INFO } from '../generator/perspective';
+import { tilesetSupports } from './tilePools';
+import { aiAssignTiles } from '../api/describe';
 import { CATEGORIES, CATEGORY_LABEL, SUGGESTED_TAGS } from './categories';
 import { TileThumb } from './TileThumb';
 import { AssignSummary, TileLabel, confirmedMetas, suggestMetas } from './TileLabel';
@@ -49,12 +51,18 @@ interface PaletteItem {
   gid: number;
 }
 
+/** demo sets without a view list are top-down family tiles – not for side-scroller or hex maps */
+function demoFits(ts: Tileset, perspective: Perspective) {
+  if (ts.perspectives?.length) return tilesetSupports(ts, perspective);
+  return perspective !== 'side_view' && perspective !== 'hex';
+}
+
 function Palette() {
   const allTilesets = useProject((s) => s.project.tilesets);
   const perspective = useProject((s) => s.project.map.perspective);
   // tiles drawn for this view first; demo tiles of other views (e.g. dungeon walls in a side-scroller) hidden
   const tilesets = useMemo(() => {
-    const rank = (ts: Tileset) => (ts.perspectives?.includes(perspective) ? 0 : !ts.perspectives?.length ? 1 : 2);
+    const rank = (ts: Tileset) => (ts.perspectives?.includes(perspective) ? 0 : ts.source === 'demo' ? (demoFits(ts, perspective) ? 1 : 2) : tilesetSupports(ts, perspective) ? 1 : 2);
     return allTilesets.filter((ts) => !(ts.source === 'demo' && rank(ts) === 2)).sort((a, b) => rank(a) - rank(b));
   }, [allTilesets, perspective]);
   const selectedGid = useEditor((s) => s.selectedGid);
@@ -352,16 +360,29 @@ export function TileInspector({ gids, tilesets: draftTilesets, onMeta }: { gids:
 
 function TilesetManager() {
   const tilesets = useProject((s) => s.project.tilesets);
+  const perspective = useProject((s) => s.project.map.perspective);
   const [adding, setAdding] = useState(false);
+  // only what fits this map; demo sets for other views (side-scroller, hex …) stay folded away
+  const fits = tilesets.filter((ts) => ts.source === 'upload' || demoFits(ts, perspective));
+  const others = tilesets.filter((ts) => !fits.includes(ts));
   return (
     <div className="tileset-manager">
       <Button variant="primary" block icon={<Icon.Plus size={18} />} onClick={() => setAdding(true)}>
         Tileset hinzufügen
       </Button>
       {adding && <TilesetDialog onClose={() => setAdding(false)} />}
-      {tilesets.map((ts) => (
+      {fits.map((ts) => (
         <TilesetCard key={ts.id} ts={ts} />
       ))}
+      {others.length > 0 && (
+        <details className="more tileset-others">
+          <summary>Für andere Ansichten ({others.length})</summary>
+          <p className="hint">Diese Tilesets passen nicht zu {PERSPECTIVE_INFO[perspective].label} und werden hier nicht verwendet.</p>
+          {others.map((ts) => (
+            <TilesetCard key={ts.id} ts={ts} />
+          ))}
+        </details>
+      )}
       {!tilesets.length && <p className="empty-note">Keine Tilesets vorhanden.</p>}
     </div>
   );
@@ -491,7 +512,7 @@ function TilesetCard({ ts }: { ts: Tileset }) {
   const count = ts.columns * ts.rows - ts.emptyTiles.length;
   const categorized = Object.values(ts.tiles).filter((m) => m.category).length;
   const perspective = useProject((s) => s.project.map.perspective);
-  const supportsCurrent = !ts.perspectives?.length || ts.perspectives.includes(perspective);
+  const supportsCurrent = tilesetSupports(ts, perspective);
 
   return (
     <div className={`tileset-card${ts.active ? '' : ' is-inactive'}`}>
@@ -552,6 +573,23 @@ function TilesetCard({ ts }: { ts: Tileset }) {
           void learnFrom({ ...ts, tiles: { ...ts.tiles, ...confirmed } });
         }}
       />
+      {ts.source === 'upload' && (
+        <Button
+          variant="secondary"
+          block
+          icon={<Icon.Spark size={16} />}
+          disabled={detecting}
+          onClick={() => {
+            setDetecting(true);
+            void aiAssignTiles(ts.id)
+              .then(({ count, summary }) => toast(`${summary ? `${summary} ` : ''}Die KI hat ${count} Tiles zugeordnet – bitte prüfen und bestätigen, dann neu generieren.`, 'success'))
+              .catch((e) => toast(e instanceof Error ? e.message : 'KI-Zuordnung fehlgeschlagen', 'error'))
+              .finally(() => setDetecting(false));
+          }}
+        >
+          {detecting ? 'Die KI schaut sich die Tiles an …' : 'Mit KI zuordnen'}
+        </Button>
+      )}
       <div className="field">
         <label>Geeignet für</label>
         <div className="chips">

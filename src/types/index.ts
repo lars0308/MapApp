@@ -285,6 +285,8 @@ export interface GeneratorSettings {
   objects: { trees: number; rocks: number; arches: number; pillars: boolean };
   /** room layout: built rooms (default) or natural caves */
   layout?: 'rooms' | 'cave' | 'outdoor' | 'village' | 'island';
+  /** outdoor / island: houses at the clearings like in the village (village always has them) */
+  houses?: boolean;
   /** caves: 0 = smooth, 100 = very ragged with niches and pillars */
   caveRoughness?: number;
   /** look of the generated map (all on when missing) */
@@ -519,6 +521,8 @@ export interface Project {
   mode: ProjectMode;
   /** created by an AI over the KI-Verbindung (shown as a badge in the project lists) */
   createdBy?: 'ai';
+  /** what the map should become: description + reference picture (small JPEG) – the AI sees it on every request */
+  reference?: { text?: string; image?: string };
   /** answers from the setup wizard (view, genre, effort) – see profiles/ */
   profile?: GameProfile;
   id: string;

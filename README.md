@@ -336,6 +336,21 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.24 – KI passt Karten an, ordnet Tiles zu, Referenzbild bleibt im Projekt**
+
+- **Referenzbild und Beschreibung werden im Projekt gespeichert** (`project.reference`). Die KI sieht beides bei jeder späteren Anfrage.
+- **Aufbau → „Mit KI anpassen“**, in allen Kartenarten, auch Seitenansicht und Hex:
+  - Du schreibst, was anders werden soll, zum Beispiel „mehr Wasser, Boss näher am Start“.
+  - Die KI bekommt ein Bild der aktuellen Karte, das Referenzbild und die Projektbeschreibung und ändert gezielt die Einstellungen.
+  - Das Referenzbild lässt sich dort hinzufügen, ändern oder entfernen.
+- **„Mit KI zuordnen“** bei eigenen Tilesets (Tiles → Tilesets):
+  - Die KI bekommt nummerierte Kontaktbögen der Kacheln (bis 256 Kacheln) und sagt, was Boden, Wand, Wasser, Tür oder Deko ist.
+  - Die Vorschläge sind als „automatisch“ markiert und werden wie gewohnt bestätigt.
+  - Beim Erstellen über die Startseite passiert das automatisch.
+- **Häuser auch bei „Außen“ und „Insel“:** neuer Schalter „Häuser“. Die KI setzt ihn, wenn du zum Beispiel „Insel mit Dorf“ beschreibst.
+- **Tiles → Tilesets zeigt nur, was zur Ansicht passt.** Demo-Sets anderer Ansichten (Seitenansicht, Hex …) liegen eingeklappt unter „Für andere Ansichten“. Auch die Palette blendet sie aus.
+- **Server:** `api/describe.js` hat die Modi `plan`, `refine` und `tiles`, alles über das Vercel AI Gateway.
+
 **Version 3.23 – „Beschreibe dein Spiel“: Karten mit KI planen**
 
 - **Neues Feld auf der Startseite:** Du beschreibst in eigenen Worten, was für ein Spiel und welche Karte du willst, zum Beispiel „kleine Insel mit Dorf, viel Wald, gemütliches RPG“. Optional kommen dazu:

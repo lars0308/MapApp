@@ -16,6 +16,7 @@ import { TerrainFields } from './TerrainFields';
 import { TerrainSets } from './TerrainPanel';
 import { SideFields, resolveSide } from './SideFields';
 import { HexFields, resolveHex } from './HexFields';
+import { AiRefineCard } from './AiRefineCard';
 
 export function SeedField() {
   const seed = useProject((s) => s.project.generator.seed);
@@ -171,6 +172,7 @@ export function GeneratorPanel() {
 
   return (
     <div className="panel-scroll">
+      <AiRefineCard />
       <MapSection />
 
       <Section title="Aufbau">
@@ -183,6 +185,7 @@ export function GeneratorPanel() {
           ))}
         </div>
         {natural && <Slider label="Zerklüftung" value={g.caveRoughness ?? (g.layout === 'cave' ? 60 : 45)} unit=" %" hint={['Glatt', 'Zerklüftet']} onChange={(v) => update({ caveRoughness: v })} />}
+        {(g.layout === 'outdoor' || g.layout === 'island') && <Toggle label="Häuser" description="Häuser an den Lichtungen, wie im Dorf" checked={!!g.houses} onChange={(houses) => update({ houses })} />}
         {(g.layout === 'outdoor' || g.layout === 'village' || g.layout === 'island') && <p className="hint">Braucht Gras-Böden (Tag „grass“) – die Demo-Tiles haben welche.</p>}
         <div className="field">
           <label>Stil (setzt die Werte unten)</label>
@@ -355,6 +358,7 @@ function SidePanel() {
   const set = (patch: Partial<SideSettings>) => update({ side: { ...side, ...patch } });
   return (
     <div className="panel-scroll">
+      <AiRefineCard />
       <p className="hint side-intro">Das Level läuft von links (Start) nach rechts (Ziel). Es wird nur so gebaut, dass alles mit der eingestellten Sprunghöhe und -weite schaffbar ist.</p>
       <Section title="Schwierigkeit">
         <div className="chips">
@@ -390,6 +394,7 @@ function HexPanel() {
   const hex = resolveHex(g.hex);
   return (
     <div className="panel-scroll">
+      <AiRefineCard />
       <p className="hint side-intro">Weltkarte aus Sechsecken: Gelände nach Höhe, Feuchtigkeit und Klima, Flüsse fließen bergab ins Meer, Straßen verbinden die Siedlungen. Alles lässt sich danach übermalen.</p>
       <MapSection />
       <HexFields hex={hex} onChange={(patch) => update({ hex: { ...hex, ...patch } })} />

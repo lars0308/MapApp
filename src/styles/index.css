@@ -6157,3 +6157,30 @@ details.more[open] {
     grid-template-columns: 1fr;
   }
 }
+
+/* Aufbau → Mit KI anpassen */
+.ai-ref {
+  position: relative;
+  display: flex;
+  margin-bottom: 8px;
+}
+.ai-ref .icon-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  border-radius: 50%;
+  background: var(--surface-4);
+}
+.ai-ref-text {
+  margin: 0 0 8px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.section .describe-text {
+  margin-bottom: 8px;
+}
