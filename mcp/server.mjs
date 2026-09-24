@@ -159,6 +159,8 @@ const server = http.createServer(async (req, res) => {
 });
 
 const wss = new WebSocketServer({ server });
+// the ws server repeats the http server's errors (port busy is handled below)
+wss.on('error', () => {});
 wss.on('connection', (sock, req) => {
   // only pages from this computer (localhost / file) or known MapForge hosts may connect – any
   // website could otherwise try to reach the port

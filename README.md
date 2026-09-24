@@ -342,6 +342,11 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.10 – Generator im Hintergrund**
+
+- Der Generator läuft in einem Web Worker. Die App bleibt beim Generieren großer Karten bedienbar: Bei 256×256 blockiert der Hauptthread höchstens etwa 20 ms, vorher waren es am Handy 1–2 s. Kann der Browser keinen Worker starten, läuft der Generator wie bisher direkt.
+- MCP-Server: Ein zweiter Start (z. B. ein zweiter KI-Client) stürzt nicht mehr ab, wenn der Port schon belegt ist. Er leitet dann an den laufenden Server weiter.
+
 **Version 3.9 – Tilesets mit Rand, Abstand und nicht-quadratischen Tiles**
 
 - Tiles → *Tilesets* → Karte → **Eigene Maße, Rand und Abstand**: Tile-Breite und -Höhe (auch nicht quadratisch), Rand um das ganze Bild und Abstand zwischen den Tiles, wie in Tiled. **Neu zuschneiden** schneidet immer aus dem Originalbild, die Einstellung lässt sich also jederzeit wieder ändern. Nicht-quadratische Tiles werden auf quadratische gebracht: waagerecht mittig, unten bündig. Palette, Generator und Godot-Export sehen danach ein normales Raster.

@@ -4,7 +4,8 @@ import { CELL_VOID } from '../types';
 import type { GeneratorSettings, Layer, LayerRole, MapObject, MapSettings, Project, ProjectMode, TerrainSet, TileMeta, Tileset, CustomObject, GridCut } from '../types';
 import { DEFAULT_MAP, PRESETS, defaultGenerator, defaultTerrainSets } from '../generator/presets';
 import { randomSeed } from '../generator/rng';
-import { emptyResult, generate } from '../generator';
+import { emptyResult } from '../generator';
+import { generateAsync } from '../generator/runner';
 import { createDemoTileset } from '../tilesets/demoTileset';
 import { createDemoAutotileSets } from '../tilesets/demoAutotiles';
 import { createDemoSideTileset } from '../tilesets/demoSide';
@@ -283,11 +284,9 @@ export const useProject = create<ProjectState>((set, get) => {
       if (get().generating) return;
       if (opts.newSeed) get().updateGenerator({ seed: randomSeed() });
       set({ generating: true });
-      // let the UI paint the busy state first
-      await new Promise((r) => setTimeout(r, 16));
       try {
         const p = get().project;
-        const out = generate({ settings: p.generator, map: p.map, tilesets: p.tilesets, layers: p.layers, terrains: p.terrains });
+        const out = await generateAsync({ settings: p.generator, map: p.map, tilesets: p.tilesets, layers: p.layers, terrains: p.terrains });
         docChange('Generieren', (p) => ({
           ...p,
           layers: p.layers.map((l) => (out.layerData[l.id] ? { ...l, data: out.layerData[l.id] } : l)),
