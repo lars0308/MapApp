@@ -19,6 +19,11 @@ const ROCK = { top: '#8e9aa6', face: '#6f7b88', dark: '#566270', light: '#a9b4bf
 function field(mask: number, x: number, y: number, wobble: number): number {
   const u = (x + 0.5) / T;
   const v = (y + 0.5) / T;
+  // two opposite corners (river bend on the diagonal): one band through the middle, no pinched saddle
+  if (mask === 5 || mask === 10) {
+    const along = mask === 5 ? Math.abs(u - v) : Math.abs(u + v - 1);
+    return Math.max(field(mask === 5 ? 1 : 2, x, y, wobble), field(mask === 5 ? 4 : 8, x, y, wobble), 0.86 - along * 1.25);
+  }
   const tl = mask & 1 ? 1 : 0;
   const tr = mask & 2 ? 1 : 0;
   const br = mask & 4 ? 1 : 0;
@@ -120,6 +125,15 @@ function cliffFace(d: D, bottom: boolean) {
   if (bottom) d.rect(0, T - 3, T, 3, ROCK.dark).rect(0, T - 1, T, 1, 'rgba(20,50,20,0.55)');
 }
 
+function steps(d: D) {
+  meadow(d, 'plain');
+  for (let k = 0; k < 4; k++) {
+    const y = 1 + k * 4;
+    d.rect(2, y, 12, 3, k % 2 ? ROCK.face : ROCK.top).rect(2, y, 12, 1, ROCK.light).rect(2, y + 3, 12, 1, ROCK.dark);
+  }
+  d.rect(1, 0, 1, T, GRASS.deep).rect(14, 0, 1, T, GRASS.deep);
+}
+
 function bush(d: D, berries: boolean) {
   const c = (x: number, y: number, r: number, col: string) => {
     for (let yy = -r; yy <= r; yy++) for (let xx = -r; xx <= r; xx++) if (xx * xx + yy * yy <= r * r + r) d.px(x + xx, y + yy, col);
@@ -208,6 +222,8 @@ function defs(): Def[] {
   out.push({ role: 'shore', tags: ['water', 'stone', 'c0'], collision: true, draw: (d) => water(d, 0, 0, POOL) });
   // full stone-rimmed pool (c15) with glints
   out.push({ role: 'shore', tags: ['water', 'stone', 'c15'], weight: 60, collision: true, draw: (d) => water(d, 15, 2, POOL) });
+  // v3.27, appended: grassy stone steps up a plateau (outdoors)
+  out.push({ category: 'stairs', role: 'stairs', tags: ['grass'], collision: false, draw: (d) => steps(d) });
   return out;
 }
 

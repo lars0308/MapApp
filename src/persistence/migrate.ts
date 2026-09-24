@@ -62,7 +62,8 @@ export function migrateProject(p: Project): Project {
   // summer nature tiles with soft path / shore edges (v3.21); v3.22 appended stone pool shores –
   // the set grows in place when nothing comes after it (same gids for the old tiles)
   const oldNature = tilesets.find((t) => t.id === DEMO_NATURE_ID);
-  if (oldNature && !Object.values(oldNature.tiles).some((m) => m.role === 'shore' && m.tags.includes('stone'))) {
+  // v3.27 appended grassy stairs – same in-place growth
+  if (oldNature && (!Object.values(oldNature.tiles).some((m) => m.role === 'shore' && m.tags.includes('stone')) || !Object.values(oldNature.tiles).some((m) => m.role === 'stairs'))) {
     const fresh = createDemoNatureTileset(oldNature.firstGid);
     const oldEnd = oldNature.firstGid + oldNature.columns * oldNature.rows;
     const freshEnd = fresh.firstGid + fresh.columns * fresh.rows;

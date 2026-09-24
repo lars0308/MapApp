@@ -285,6 +285,8 @@ export interface GeneratorSettings {
   objects: { trees: number; rocks: number; arches: number; pillars: boolean };
   /** room layout: built rooms (default) or natural caves */
   layout?: 'rooms' | 'cave' | 'outdoor' | 'village' | 'island';
+  /** outdoor / village / island: rivers from edge to edge (0–3), bridges where paths cross */
+  rivers?: number;
   /** outdoor / island: houses at the clearings like in the village (village always has them) */
   houses?: boolean;
   /** caves: 0 = smooth, 100 = very ragged with niches and pillars */

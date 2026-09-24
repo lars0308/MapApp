@@ -336,6 +336,21 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.27 – Flüsse und Plateaus**
+
+- **Flüsse** für Außen, Dorf und Insel: Aufbau → „Flüsse“ (keiner, 1 oder 2).
+  - Der Fluss windet sich von Kartenrand zu Kartenrand durch den Wald, auf der Insel von der Mitte zur Küste.
+  - Er ist 3 Felder breit und hat Ufer mit Strand.
+  - Wo ein Weg kreuzt, entsteht eine Brücke. Schneidet er eine Lichtung, prüft der Generator, ob noch alles erreichbar ist, und setzt dort sonst ebenfalls Brücken.
+  - Die KI kennt die Einstellung (`rivers`).
+- **Plateaus entstehen zuverlässig**, in Räumen, Höhlen und Lichtungen:
+  - Der Generator durchsucht jetzt jeden Raum vollständig und probiert auch kleinere Größen.
+  - Der Rand ums Plateau darf auch Weg sein.
+  - Vorher entstand bei natürlichen Rändern oft gar keins.
+  - Draußen führen Stufen aus Stein im Gras hinauf, statt einer Dungeon-Treppe.
+- **Diagonale Ufer und Wege** (zum Beispiel Flussbiegungen) laufen als durchgehendes Band, ohne weißen Rhombus in der Mitte.
+- **Behoben:** Die Flusssuche hat Distanzen als 32-Bit-Zahlen gespeichert und dadurch nie einen Weg gefunden.
+
 **Version 3.26 – KI günstiger**
 
 - **Prompt-Caching** über das Vercel AI Gateway: Werkzeuge, Anweisungen und der bisherige Verlauf werden zwischengespeichert. Jeder weitere Schritt zahlt dafür nur ein Zehntel des Eingabepreises.

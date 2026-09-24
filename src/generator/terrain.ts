@@ -328,44 +328,57 @@ export interface Plateau {
 function placePlateau(ctx: Ctx, room: PlacedRoom, perspective: Perspective): Plateau | null {
   const { g, t, rng } = ctx;
   const faceRows = PERSPECTIVE_INFO[perspective].faceRows;
-  const pw = rng.int(4, Math.min(8, room.w - 4));
-  const ph = rng.int(3, Math.min(5, Math.floor(room.h / 2)));
-  if (pw < 4 || ph < 3) return null;
-  for (let attempt = 0; attempt < 12; attempt++) {
-    const x0 = rng.int(room.x + 1, room.x + room.w - pw - 1);
-    const y0 = rng.int(room.y + 1, room.y + Math.max(1, room.h - ph - faceRows - 2));
-    const x1 = x0 + pw - 1;
-    const y1 = y0 + ph - 1;
-    const yBottom = y1 + faceRows;
-    let ok = true;
-    for (let y = y0 - 1; y <= yBottom + 1 && ok; y++)
-      for (let x = x0 - 1; x <= x1 + 1; x++) {
-        const i = y * g.W + x;
-        if (y < 0 || x < 0 || x >= g.W || y >= g.H || g.cells[i] !== CELL_ROOM || t.terrain[i] !== T_NONE || t.reserved.has(i)) {
-          ok = false;
-          break;
+  // the wished size first, then smaller ones: natural clearings and odd room shapes leave little room
+  const want: [number, number] = [rng.int(4, Math.max(4, Math.min(8, room.w - 4))), rng.int(3, Math.max(3, Math.min(5, Math.floor(room.h / 2))))];
+  const sizes: [number, number][] = [want, [5, 4], [4, 3]].filter(([w, h], k, all) => w <= room.w - 2 && h + faceRows <= room.h - 2 && all.findIndex(([a, b]) => a === w && b === h) === k) as [number, number][];
+  const inRoom = (i: number) => g.cells[i] === CELL_ROOM && t.terrain[i] === T_NONE && !t.reserved.has(i);
+  // the ring around it only has to be walkable ground (room or path), so the cliff never touches a wall
+  const around = (i: number) => (g.cells[i] === CELL_ROOM || g.cells[i] === CELL_CORRIDOR) && t.terrain[i] === T_NONE;
+  for (const [pw, ph] of sizes) {
+    // every position inside the room, in random order (natural clearings / caves have ragged edges,
+    // a few random tries rarely hit a spot that fits)
+    const spots: [number, number][] = [];
+    for (let y = room.y; y <= room.y + room.h - ph - faceRows; y++) for (let x = room.x; x <= room.x + room.w - pw; x++) spots.push([x, y]);
+    rng.shuffle(spots);
+    for (const [x0, y0] of spots.slice(0, 300)) {
+      const x1 = x0 + pw - 1;
+      const y1 = y0 + ph - 1;
+      const yBottom = y1 + faceRows;
+      let ok = true;
+      for (let y = y0 - 1; y <= yBottom + 1 && ok; y++)
+        for (let x = x0 - 1; x <= x1 + 1; x++) {
+          if (y < 0 || x < 0 || x >= g.W || y >= g.H) {
+            ok = false;
+            break;
+          }
+          const i = y * g.W + x;
+          const ring = y === y0 - 1 || y === yBottom + 1 || x === x0 - 1 || x === x1 + 1;
+          if (!(ring ? around(i) : inRoom(i))) {
+            ok = false;
+            break;
+          }
         }
+      if (!ok) continue;
+      const stairsX = rng.int(x0 + 1, x1 - 1);
+      const touched: number[] = [];
+      const set = (i: number, code: number, h: number) => {
+        touched.push(i);
+        t.terrain[i] = code;
+        t.heights[i] = h;
+      };
+      for (let y = y0; y <= y1; y++)
+        for (let x = x0; x <= x1; x++) {
+          const rim = y === y0 || x === x0 || x === x1 || (faceRows === 0 && y === y1);
+          const stairs = faceRows === 0 && y === y1 && x === stairsX;
+          set(y * g.W + x, stairs ? T_STAIRS : rim ? T_CLIFF : T_PLATEAU, 1);
+        }
+      for (let y = y1 + 1; y <= yBottom; y++) for (let x = x0; x <= x1; x++) set(y * g.W + x, x === stairsX ? T_STAIRS : T_CLIFF, 0);
+      const inner = (y0 + 1) * g.W + x0 + 1;
+      if (valid(ctx, [inner])) return { x0, y0, x1, y1, stairsX, faceRows };
+      for (const i of touched) {
+        t.terrain[i] = T_NONE;
+        t.heights[i] = 0;
       }
-    if (!ok) continue;
-    const stairsX = rng.int(x0 + 1, x1 - 1);
-    const touched: number[] = [];
-    const set = (i: number, code: number, h: number) => {
-      touched.push(i);
-      t.terrain[i] = code;
-      t.heights[i] = h;
-    };
-    for (let y = y0; y <= y1; y++)
-      for (let x = x0; x <= x1; x++) {
-        const rim = y === y0 || x === x0 || x === x1 || (faceRows === 0 && y === y1);
-        const stairs = faceRows === 0 && y === y1 && x === stairsX;
-        set(y * g.W + x, stairs ? T_STAIRS : rim ? T_CLIFF : T_PLATEAU, 1);
-      }
-    for (let y = y1 + 1; y <= yBottom; y++) for (let x = x0; x <= x1; x++) set(y * g.W + x, x === stairsX ? T_STAIRS : T_CLIFF, 0);
-    const inner = (y0 + 1) * g.W + x0 + 1;
-    if (valid(ctx, [inner])) return { x0, y0, x1, y1, stairsX, faceRows };
-    for (const i of touched) {
-      t.terrain[i] = T_NONE;
-      t.heights[i] = 0;
     }
   }
   return null;
@@ -410,7 +423,7 @@ export function placeTerrain(
   const plateaus: Plateau[] = [];
   if (s.cliffs.enabled && s.cliffs.amount > 0) {
     const count = Math.round((s.cliffs.amount / 100) * rooms.length * 0.6);
-    const big = rng.shuffle(rooms.filter((r) => r.w >= 9 && r.h >= 8 && r.id !== startRoom));
+    const big = rng.shuffle(rooms.filter((r) => r.w >= 7 && r.h >= 6 && r.id !== startRoom));
     for (const r of big) {
       if (plateaus.length >= count) break;
       const p = placePlateau(ctx, r, perspective);

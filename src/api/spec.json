@@ -115,7 +115,7 @@
     },
     {
       "name": "set_generator",
-      "description": "Change generator settings (deep merge of `patch`, same shape as get_generator). regenerate=true generates right away. layout: rooms | cave | outdoor (forest clearings + dirt paths) | village (outdoor + houses + well) | island (land in the sea with beaches); caveRoughness 0-100; look {softEdges, floorPatches, smartDeco, smoothRooms} (all true by default).",
+      "description": "Change generator settings (deep merge of `patch`, same shape as get_generator). regenerate=true generates right away. layout: rooms | cave | outdoor (forest clearings + dirt paths) | village (outdoor + houses + well) | island (land in the sea with beaches); houses (true: houses also for outdoor/island); rivers 0-2 (outdoor layouts, bridges over paths); caveRoughness 0-100; look {softEdges, floorPatches, smartDeco, smoothRooms} (all true by default).",
       "input": {
         "type": "object",
         "properties": {

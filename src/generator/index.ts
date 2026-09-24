@@ -45,6 +45,7 @@ import { isWalkable } from './nav';
 import { generateSide } from './side';
 import { generateHex } from './hexgen';
 import { cavify } from './cave';
+import { carveRivers } from './river';
 
 export interface GenerateInput {
   settings: GeneratorSettings;
@@ -194,6 +195,11 @@ export function generate(input: GenerateInput): GenerateOutput {
         const i = y * W + x;
         if (forest[i] && (sea(i - 1) || sea(i + 1) || sea(i - W) || sea(i + W) || sea(i - W - 1) || sea(i - W + 1) || sea(i + W - 1) || sea(i + W + 1))) forest[i] = 0;
       }
+  }
+  // rivers through the forest, bridges where paths cross
+  if (outdoor && (s.rivers ?? 0) > 0) {
+    const made = carveRivers(W, H, grid.cells, forest, ts, Math.min(3, s.rivers ?? 0), root.fork(181), placed.map((r) => r.cy * W + r.cx), s.layout === 'island');
+    if (made < (s.rivers ?? 0)) warnings.push(`Nur ${made} von ${s.rivers} Flüssen haben einen Weg durch den Wald gefunden.`);
   }
 
   // 11: walls + auto-tile roles (fronts/caps in 3/4 views), shadow + floor masks
@@ -455,7 +461,7 @@ export function generate(input: GenerateInput): GenerateOutput {
         let prefer: string[] | undefined;
         const onTop = y <= p.y1;
         if (ts.terrain[i] === T_STAIRS) {
-          if (detailL) detailL[i] = pools.pickRole(rTiles, 'stairs');
+          if (detailL) detailL[i] = pools.pickRole(rTiles, 'stairs', outdoor ? ['grass'] : undefined, outdoor ? undefined : ['grass']);
           continue;
         }
         if (onTop) {
