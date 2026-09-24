@@ -342,6 +342,13 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.18 – Figuren-Abgleich mit der Cloud ohne Verluste**
+
+- Figuren, Galerie, eigene Teile und Paletten werden mit dem Cloud-Arbeitsstand der KI jetzt per **Drei-Wege-Abgleich** synchronisiert. Grundlage ist der Stand beim letzten Abgleich:
+  - Nur in der Cloud geändert (die KI hat gebaut): Die Änderung kommt in die App. Es erscheint die Meldung „Figuren-Änderungen der KI übernommen“.
+  - Nur in der App geändert: Die Änderung geht in die Cloud.
+  - Auf beiden Seiten geändert: Die Galerie wird zusammengeführt, keine Figur geht verloren. Bei allem anderen gewinnt dein Gerät.
+
 **Version 3.17 – Neue Startseite**
 
 - Der Reiter heißt jetzt **„Start“**:

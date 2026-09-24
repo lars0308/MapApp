@@ -165,8 +165,10 @@ interface SyncState {
   pulled: number;
   /** map id → updatedAt known to be in the cloud */
   sent: Record<string, number>;
-  /** figures etc. last sent */
-  localSig: string;
+  /** figures etc.: hash per stored entry at the last sync (base of the three-way merge) */
+  localHashes?: Record<string, string>;
+  /** older versions */
+  localSig?: string;
 }
 const readSync = (code: string): SyncState => {
   try {
@@ -175,7 +177,7 @@ const readSync = (code: string): SyncState => {
   } catch {
     // ignore
   }
-  return { code, pulled: 0, sent: {}, localSig: '' };
+  return { code, pulled: 0, sent: {}, localHashes: {} };
 };
 const writeSync = (s: SyncState) => {
   try {
@@ -184,6 +186,28 @@ const writeSync = (s: SyncState) => {
     // not stored
   }
 };
+
+const GALLERY_KEY = 'mapforge.sprite.gallery.v1';
+
+/** short content hash (FNV-1a + length) – only to see whether an entry changed */
+function hashText(v: string | undefined): string {
+  if (v === undefined) return '';
+  let h = 0x811c9dc5;
+  for (let i = 0; i < v.length; i++) h = Math.imul(h ^ v.charCodeAt(i), 0x01000193);
+  return `${v.length}:${(h >>> 0).toString(36)}`;
+}
+
+/** gallery changed on both sides: keep every figure (same id → this device's version) */
+function mergeGallery(local: string | undefined, cloud: string): string {
+  try {
+    const mine = JSON.parse(local ?? '[]') as { doc: { id: string } }[];
+    const theirs = JSON.parse(cloud) as { doc: { id: string } }[];
+    const ids = new Set(mine.map((g) => g.doc.id));
+    return JSON.stringify([...mine, ...theirs.filter((g) => !ids.has(g.doc.id))]);
+  } catch {
+    return local ?? cloud;
+  }
+}
 
 let syncing = false;
 export async function syncCloud(): Promise<void> {
@@ -227,13 +251,40 @@ export async function syncCloud(): Promise<void> {
       if (!put.ok) throw new Error(`HTTP ${put.status}`);
       st.sent[s.id] = s.updatedAt;
     }
-    // 3. figures and builder state (so the AI in the cloud knows them)
+    // 3. figures and builder state (gallery, parts, palettes, open figures): three-way merge with
+    //    the state of the last sync – changed only in the cloud (the AI) → here, changed only here →
+    //    there, changed on both sides → the gallery is merged, otherwise this device wins
+    const cloud = (got as { local?: Record<string, string> }).local ?? {};
     const local = localEntries();
-    const sig = `${Object.keys(local).length}:${Object.values(local).reduce((n, v) => n + v.length, 0)}:${JSON.stringify(local).slice(-200)}`;
-    if (sig !== st.localSig) {
-      const put = await fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projects: [], local, current: useProject.getState().project.id }) });
-      if (put.ok) st.localSig = sig;
+    const baseHashes = st.localHashes ?? {};
+    const merged: Record<string, string> = { ...local };
+    let fromCloud = 0;
+    for (const key of new Set([...Object.keys(local), ...Object.keys(cloud)])) {
+      const lv = local[key];
+      const cv = cloud[key];
+      if (lv === cv || cv === undefined) continue;
+      const localChanged = hashText(lv) !== (baseHashes[key] ?? '');
+      const cloudChanged = hashText(cv) !== (baseHashes[key] ?? '');
+      if (cloudChanged && !localChanged) {
+        merged[key] = cv;
+        fromCloud++;
+      } else if (cloudChanged && key === GALLERY_KEY) {
+        merged[key] = mergeGallery(lv, cv);
+        if (merged[key] !== lv) fromCloud++;
+      }
     }
+    if (fromCloud) {
+      for (const [k, v] of Object.entries(merged)) if (local[k] !== v) localStorage.setItem(k, v);
+      const { reloadSpritesFromStorage } = await import('../sprites/store');
+      reloadSpritesFromStorage();
+      useEditor.getState().toast('Figuren-Änderungen der KI übernommen', 'success');
+    }
+    const hashes = Object.fromEntries(Object.entries(merged).map(([k, v]) => [k, hashText(v)]));
+    const cloudSame = Object.keys(merged).length === Object.keys(cloud).length && Object.entries(merged).every(([k, v]) => cloud[k] === v);
+    if (!cloudSame) {
+      const put = await fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projects: [], local: merged, current: useProject.getState().project.id }) });
+      if (put.ok) st.localHashes = hashes;
+    } else st.localHashes = hashes;
     writeSync(st);
   } catch (e) {
     console.warn('MapForge: Cloud-Abgleich fehlgeschlagen', e);

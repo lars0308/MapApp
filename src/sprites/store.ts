@@ -921,3 +921,14 @@ export const useSprites = create<SpriteState>((set, get) => {
     },
   };
 });
+
+/** the cloud sync changed stored figures, gallery, parts or palettes: read everything again */
+export function reloadSpritesFromStorage() {
+  useSprites.setState({
+    gallery: read<GalleryEntry[]>(KEY_GALLERY, []),
+    userParts: read<UserPart[]>(KEY_PARTS, []),
+    palettes: read<DrawPalette[]>(KEY_PALETTES, []),
+    loaded: { character: false, object: false, creature: false },
+  });
+  for (const k of ['character', 'creature', 'object'] as SpriteKind[]) void useSprites.getState().load(k);
+}
