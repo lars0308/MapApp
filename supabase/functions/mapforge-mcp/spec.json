@@ -162,7 +162,7 @@
     },
     {
       "name": "tileset_add",
-      "description": "Add an own tileset from a PNG (url or base64). Clean grids are cut as they are, sheets of separate pieces (gaps, different sizes, AI-generated sheets) are cut into their pieces automatically; then every tile gets an automatic suggestion (floor, wall, corner …). tile_size forces a plain grid of that size.",
+      "description": "Add an own tileset from a PNG (url or base64). Clean grids are cut as they are, sheets of separate pieces (gaps, different sizes, AI-generated sheets) are cut into their pieces automatically; then every tile gets an automatic suggestion (floor, wall, corner …). tile_size forces a plain grid of that size. For sheets with gaps set tile_width / tile_height (non-square allowed), margin (border around the sheet) and spacing (gap between tiles) like in Tiled – the sheet is repacked into a tight square grid.",
       "input": {
         "type": "object",
         "properties": {
@@ -195,6 +195,28 @@
               ]
             },
             "description": "map kinds the tileset is drawn for (empty = all)"
+          },
+          "tile_width": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 512
+          },
+          "tile_height": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 512
+          },
+          "margin": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 256,
+            "description": "px around the whole sheet"
+          },
+          "spacing": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 256,
+            "description": "px between two tiles"
           }
         }
       }
@@ -305,6 +327,54 @@
                 "hex"
               ]
             }
+          }
+        },
+        "required": [
+          "tileset"
+        ]
+      }
+    },
+    {
+      "name": "tileset_recut",
+      "description": "Cut a tileset anew from its original image: tile size, non-square tiles, margin and spacing. Placed tiles of this tileset are removed (the gids change); assignments are suggested again.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "tileset": {
+            "type": "string",
+            "description": "Tileset id or name (see tileset_list)"
+          },
+          "tile_size": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 512,
+            "description": "square tiles"
+          },
+          "tile_width": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 512
+          },
+          "tile_height": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 512
+          },
+          "margin": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 256,
+            "description": "px around the whole sheet"
+          },
+          "spacing": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 256,
+            "description": "px between two tiles"
+          },
+          "auto_assign": {
+            "type": "boolean",
+            "description": "new automatic suggestions afterwards (default true)"
           }
         },
         "required": [

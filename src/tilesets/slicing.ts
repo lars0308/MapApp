@@ -1,4 +1,4 @@
-import type { TileMeta, Tileset } from '../types';
+import type { GridCut, TileMeta, Tileset } from '../types';
 import { loadImage } from '../utils/image';
 import { uid } from '../utils/id';
 import { slicePieces } from './pieces';
@@ -90,6 +90,40 @@ export async function detectTileSize(dataUrl: string, preferred: number): Promis
     }
   }
   return { size: guessTileSize(w, h, preferred), confident: false };
+}
+
+/** tiles along one axis for a cut (the last tile needs no spacing after it) */
+export function cutCount(size: number, tile: number, margin: number, spacing: number): number {
+  return Math.max(0, Math.floor((size - margin + spacing) / (tile + spacing)));
+}
+
+/** a cut that needs repacking (anything but a plain square grid) */
+export const needsRepack = (c: GridCut) => c.margin > 0 || c.spacing > 0 || c.tileW !== c.tileH;
+
+/**
+ * Cuts a sheet with margin, spacing and/or non-square tiles into a tight grid of square tiles
+ * (edge = the larger side; narrower tiles are centred, shorter ones stand on the bottom edge, like
+ * objects on the ground). Everything after that – palette, generator, Godot export – sees a plain grid.
+ */
+export async function repackGrid(dataUrl: string, cut: GridCut): Promise<{ dataUrl: string; tileSize: number; width: number; height: number }> {
+  const img = await loadImage(dataUrl);
+  const { tileW, tileH, margin, spacing } = cut;
+  const cols = cutCount(img.naturalWidth, tileW, margin, spacing);
+  const rows = cutCount(img.naturalHeight, tileH, margin, spacing);
+  if (!cols || !rows) throw new Error(`Bei ${tileW}×${tileH} px mit Rand ${margin} px passt kein Tile ins Bild (${img.naturalWidth}×${img.naturalHeight} px)`);
+  if (cols * rows > MAX_GRID_TILES) throw new Error(`${cols * rows} Tiles – zu viele; größere Tiles wählen`);
+  const size = Math.max(tileW, tileH);
+  const canvas = document.createElement('canvas');
+  canvas.width = cols * size;
+  canvas.height = rows * size;
+  const ctx = canvas.getContext('2d')!;
+  ctx.imageSmoothingEnabled = false;
+  const ox = Math.floor((size - tileW) / 2);
+  const oy = size - tileH;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      ctx.drawImage(img, margin + c * (tileW + spacing), margin + r * (tileH + spacing), tileW, tileH, c * size + ox, r * size + oy, tileW, tileH);
+  return { dataUrl: canvas.toDataURL('image/png'), tileSize: size, width: canvas.width, height: canvas.height };
 }
 
 /** more tiles than this from one image is no tileset but a picture cut into crumbs */

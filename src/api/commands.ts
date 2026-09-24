@@ -29,7 +29,7 @@ import type { GeneratorSettings, Layer, ObjectType, Perspective, Project, TileCa
 import { TILE_ROLES } from '../types';
 import { CATEGORIES } from '../tilesets/categories';
 import { autoAssign, tileLabel } from '../tilesets/autoAssign';
-import { createTilesetFromFile, findEmptyTiles } from '../tilesets/slicing';
+import { createTilesetFromFile, findEmptyTiles, needsRepack, repackGrid } from '../tilesets/slicing';
 import { confirmedMetas, suggestMetas } from '../tilesets/TileLabel';
 import { learnFrom } from '../tilesets/learning';
 import { uid } from '../utils/id';
@@ -306,8 +306,16 @@ const H: Record<string, Handler> = {
     const name = str(a.name, 'name', String(a.url ?? 'KI-Tileset').split('/').pop()!.replace(/\.[^.]+$/, '') || 'KI-Tileset');
     let ts: Tileset;
     let note: string;
-    if (a.tile_size) {
-      const size = int(a.tile_size, 'tile_size');
+    const cut = a.tile_width || a.tile_height || a.margin || a.spacing
+      ? { tileW: int(a.tile_width ?? a.tile_size, 'tile_width'), tileH: int(a.tile_height ?? a.tile_width ?? a.tile_size, 'tile_height'), margin: int(a.margin, 'margin', 0), spacing: int(a.spacing, 'spacing', 0) }
+      : null;
+    if (cut && needsRepack(cut)) {
+      const packed = await repackGrid(dataUrl, cut);
+      const { columns, rows, empty } = await findEmptyTiles(packed.dataUrl, packed.tileSize);
+      ts = { id: uid('ts'), name, source: 'upload', dataUrl: packed.dataUrl, imageWidth: packed.width, imageHeight: packed.height, tileSize: packed.tileSize, columns, rows, firstGid: s.project.nextGid, active: true, tiles: {}, emptyTiles: empty, perspectives: [], sourceDataUrl: dataUrl, cut };
+      note = `${cut.tileW}×${cut.tileH} px, Rand ${cut.margin}, Abstand ${cut.spacing} → ${packed.tileSize}-px-Raster`;
+    } else if (a.tile_size || cut) {
+      const size = int(a.tile_size ?? a.tile_width, 'tile_size');
       const img = await loadImage(dataUrl);
       const { columns, rows, empty } = await findEmptyTiles(dataUrl, size);
       if (columns * rows > 1500) fail(`${columns * rows} Tiles bei ${size} px – zu viele; größere tile_size wählen oder ohne tile_size (Teile-Erkennung)`);
@@ -407,6 +415,19 @@ const H: Record<string, Handler> = {
     if (Array.isArray(a.perspectives)) patch.perspectives = a.perspectives as Perspective[];
     useProject.getState().updateTileset(ts.id, patch);
     return { data: { id: ts.id, ...patch } };
+  },
+
+  tileset_recut: async (a) => {
+    const ts = findTileset(P(), a.tileset);
+    const cur = ts.cut ?? { tileW: ts.tileSize, tileH: ts.tileSize, margin: 0, spacing: 0 };
+    const tileW = int(a.tile_width ?? a.tile_size, 'tile_width', cur.tileW);
+    const cut = { tileW, tileH: int(a.tile_height ?? a.tile_size, 'tile_height', a.tile_width !== undefined && a.tile_height === undefined ? tileW : cur.tileH), margin: int(a.margin, 'margin', cur.margin), spacing: int(a.spacing, 'spacing', cur.spacing) };
+    await useProject.getState().recutTileset(ts.id, cut);
+    const s = useProject.getState();
+    const t = P().tilesets.find((x) => x.id === ts.id)!;
+    if (a.auto_assign !== false) s.mergeTileMetas(t.id, await autoAssign(t));
+    const now = P().tilesets.find((x) => x.id === ts.id)!;
+    return { text: `„${now.name}“ neu zugeschnitten: ${now.columns * now.rows - now.emptyTiles.length} Tiles à ${now.tileSize} px. Platzierte Tiles dieses Tilesets wurden entfernt.`, data: { id: now.id, gids: [now.firstGid, now.firstGid + now.columns * now.rows - 1], tileSize: now.tileSize, cut } };
   },
 
   tileset_remove: (a) => {

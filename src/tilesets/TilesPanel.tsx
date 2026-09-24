@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import type { Perspective, TileCategory, TileMeta, TileRole, Tileset } from '../types';
@@ -374,15 +374,70 @@ function TilesetManager() {
   );
 }
 
+/** tile size, and for sheets with gaps: tile width / height, margin and spacing (cut anew from the original) */
+function GridCutFields({ ts }: { ts: Tileset }) {
+  const recut = useProject((s) => s.recutTileset);
+  const toast = useEditor((s) => s.toast);
+  const cur = ts.cut ?? { tileW: ts.tileSize, tileH: ts.tileSize, margin: 0, spacing: 0 };
+  const [open, setOpen] = useState(!!ts.cut);
+  const [draft, setDraft] = useState(cur);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setDraft(ts.cut ?? { tileW: ts.tileSize, tileH: ts.tileSize, margin: 0, spacing: 0 }), [ts.cut, ts.tileSize]);
+  const square = !ts.cut;
+  const custom = !square || !COMMON_TILE_SIZES.includes(ts.tileSize);
+  const changed = draft.tileW !== cur.tileW || draft.tileH !== cur.tileH || draft.margin !== cur.margin || draft.spacing !== cur.spacing;
+  const apply = (c: typeof cur) => {
+    setBusy(true);
+    recut(ts.id, c)
+      .then(() => toast('Neu zugeschnitten – Tiles bitte neu zuordnen (Automatisch zuordnen)', 'success'))
+      .catch((e) => toast(e instanceof Error ? e.message : 'Zuschneiden fehlgeschlagen', 'error'))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <>
+      <div className="field">
+        <label>Tilegröße</label>
+        <Segmented
+          label="Tilegröße"
+          value={custom ? 'custom' : String(ts.tileSize)}
+          options={[...COMMON_TILE_SIZES.map((s) => ({ value: String(s), label: String(s) })), { value: 'custom', label: 'Frei' }]}
+          onChange={(v) => {
+            if (v !== 'custom') apply({ tileW: Number(v), tileH: Number(v), margin: 0, spacing: 0 });
+            else setOpen(true);
+          }}
+        />
+      </div>
+      <button type="button" className="link-btn" onClick={() => setOpen(!open)}>
+        {open ? '▾' : '▸'} Eigene Maße, Rand und Abstand
+      </button>
+      {open && (
+        <div className="grid-2">
+          <NumberField label="Tile-Breite" value={draft.tileW} min={4} max={512} suffix="px" onChange={(v) => setDraft({ ...draft, tileW: v })} />
+          <NumberField label="Tile-Höhe" value={draft.tileH} min={4} max={512} suffix="px" onChange={(v) => setDraft({ ...draft, tileH: v })} />
+          <NumberField label="Rand" value={draft.margin} min={0} max={256} suffix="px" onChange={(v) => setDraft({ ...draft, margin: v })} />
+          <NumberField label="Abstand" value={draft.spacing} min={0} max={256} suffix="px" onChange={(v) => setDraft({ ...draft, spacing: v })} />
+        </div>
+      )}
+      {open && (
+        <Button variant="secondary" block disabled={!changed || busy} onClick={() => apply(draft)}>
+          {busy ? 'Schneide …' : 'Neu zuschneiden'}
+        </Button>
+      )}
+      <p className="hint">
+        {open ? 'Rand = leerer Streifen um das ganze Bild, Abstand = Lücke zwischen zwei Tiles (wie in Tiled). Nicht quadratische Tiles werden auf quadratische gebracht (unten bündig). ' : ''}
+        Beim Ändern wird neu zugeschnitten; platzierte Tiles dieses Tilesets werden entfernt (Rückgängig möglich).
+      </p>
+    </>
+  );
+}
+
 function TilesetCard({ ts }: { ts: Tileset }) {
   const toast = useEditor((s) => s.toast);
   const mergeTileMetas = useProject((s) => s.mergeTileMetas);
   const [detecting, setDetecting] = useState(false);
   const updateTileset = useProject((s) => s.updateTileset);
   const removeTileset = useProject((s) => s.removeTileset);
-  const setTilesetTileSize = useProject((s) => s.setTilesetTileSize);
   const [confirm, setConfirm] = useState(false);
-  const custom = !COMMON_TILE_SIZES.includes(ts.tileSize);
   const count = ts.columns * ts.rows - ts.emptyTiles.length;
   const categorized = Object.values(ts.tiles).filter((m) => m.category).length;
   const perspective = useProject((s) => s.project.map.perspective);
@@ -447,20 +502,7 @@ function TilesetCard({ ts }: { ts: Tileset }) {
         </div>
         <p className="hint">Der Generator nutzt nur Tilesets, die zur Perspektive der Map passen.</p>
       </div>
-      <div className="field">
-        <label>Tilegröße</label>
-        <Segmented
-          label="Tilegröße"
-          value={custom ? 'custom' : String(ts.tileSize)}
-          options={[...COMMON_TILE_SIZES.map((s) => ({ value: String(s), label: String(s) })), { value: 'custom', label: 'Frei' }]}
-          onChange={(v) => {
-            if (v !== 'custom') void setTilesetTileSize(ts.id, Number(v));
-            else if (!custom) void setTilesetTileSize(ts.id, 24);
-          }}
-        />
-      </div>
-      {custom && <NumberField label="Freie Tilegröße" value={ts.tileSize} min={4} max={512} suffix="px" onChange={(v) => void setTilesetTileSize(ts.id, v)} />}
-      <p className="hint">Beim Ändern wird neu zugeschnitten; platzierte Tiles dieses Tilesets werden entfernt (Rückgängig möglich).</p>
+      <GridCutFields ts={ts} />
       <div className="tileset-actions">
         <Button
           variant="secondary"

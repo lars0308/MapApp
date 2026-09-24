@@ -155,6 +155,18 @@ export interface Tileset {
   emptyTiles: number[];
   /** Perspectives this tileset is drawn for (empty = all). */
   perspectives: Perspective[];
+  /** original image when the sheet was cut with margin / spacing / non-square tiles (dataUrl is the tight grid) */
+  sourceDataUrl?: string;
+  /** how sourceDataUrl was cut */
+  cut?: GridCut;
+}
+
+/** grid of a tileset image: tile size (may be non-square), margin around the sheet, spacing between tiles */
+export interface GridCut {
+  tileW: number;
+  tileH: number;
+  margin: number;
+  spacing: number;
 }
 
 export type LayerRole =

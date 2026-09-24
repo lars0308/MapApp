@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { profileFromPerspective, type GameProfile } from '../profiles';
 import { CELL_VOID } from '../types';
-import type { GeneratorSettings, Layer, LayerRole, MapObject, MapSettings, Project, ProjectMode, TerrainSet, TileMeta, Tileset, CustomObject } from '../types';
+import type { GeneratorSettings, Layer, LayerRole, MapObject, MapSettings, Project, ProjectMode, TerrainSet, TileMeta, Tileset, CustomObject, GridCut } from '../types';
 import { DEFAULT_MAP, PRESETS, defaultGenerator, defaultTerrainSets } from '../generator/presets';
 import { randomSeed } from '../generator/rng';
 import { emptyResult, generate } from '../generator';
@@ -9,7 +9,8 @@ import { createDemoTileset } from '../tilesets/demoTileset';
 import { createDemoAutotileSets } from '../tilesets/demoAutotiles';
 import { createDemoSideTileset } from '../tilesets/demoSide';
 import { createDemoHexTileset } from '../tilesets/demoHex';
-import { applyTileMeta, findEmptyTiles } from '../tilesets/slicing';
+import { applyTileMeta, findEmptyTiles, needsRepack, repackGrid } from '../tilesets/slicing';
+import { loadImage } from '../utils/image';
 import { libraryToProjectTilesets, withTerrainsFor } from '../tilesets/library';
 import { learnFrom } from '../tilesets/learning';
 import type { LibraryTileset } from '../persistence/db';
@@ -108,6 +109,8 @@ interface ProjectState {
   removeTileset: (id: string) => void;
   updateTileset: (id: string, patch: Partial<Pick<Tileset, 'name' | 'active' | 'perspectives'>>) => void;
   setTilesetTileSize: (id: string, size: number) => Promise<void>;
+  /** cut the tileset image anew (tile size, non-square tiles, margin, spacing); placed tiles of it are removed */
+  recutTileset: (id: string, cut: GridCut) => Promise<void>;
   setTileMeta: (gids: number[], patch: Partial<TileMeta>) => void;
   /** clear an area on all unlocked layers incl. objects and structure (one undo step) */
   clearArea: (r: { x: number; y: number; w: number; h: number }) => number;
@@ -325,17 +328,49 @@ export const useProject = create<ProjectState>((set, get) => {
       const p = get().project;
       touch({ ...p, tilesets: p.tilesets.map((t) => (t.id === id ? { ...t, ...patch } : t)) });
     },
-    setTilesetTileSize: async (id, size) => {
+    setTilesetTileSize: (id, size) => get().recutTileset(id, { tileW: size, tileH: size, margin: 0, spacing: 0 }),
+    recutTileset: async (id, cut) => {
       const ts = get().project.tilesets.find((t) => t.id === id);
-      if (!ts || size < 4 || size === ts.tileSize) return;
-      const { columns, rows, empty } = await findEmptyTiles(ts.dataUrl, size);
+      if (!ts || cut.tileW < 4 || cut.tileH < 4 || cut.margin < 0 || cut.spacing < 0) return;
+      const cur = ts.cut ?? { tileW: ts.tileSize, tileH: ts.tileSize, margin: 0, spacing: 0 };
+      if (cur.tileW === cut.tileW && cur.tileH === cut.tileH && cur.margin === cut.margin && cur.spacing === cut.spacing) return;
+      // always cut from the original image, so a cut can be changed again
+      const source = ts.sourceDataUrl ?? ts.dataUrl;
+      let dataUrl = source;
+      let tileSize = cut.tileW;
+      let size: { imageWidth: number; imageHeight: number } | null = null;
+      if (needsRepack(cut)) {
+        const packed = await repackGrid(source, cut);
+        dataUrl = packed.dataUrl;
+        tileSize = packed.tileSize;
+        size = { imageWidth: packed.width, imageHeight: packed.height };
+      } else if (ts.sourceDataUrl) {
+        const img = await loadImage(source);
+        size = { imageWidth: img.naturalWidth, imageHeight: img.naturalHeight };
+      }
+      const { columns, rows, empty } = await findEmptyTiles(dataUrl, tileSize);
       const lo = ts.firstGid;
       const hi = ts.firstGid + ts.columns * ts.rows;
-      docChange('Tilegröße ändern', (p) => ({
+      const plain = !needsRepack(cut);
+      docChange('Tileset neu zuschneiden', (p) => ({
         ...p,
         nextGid: p.nextGid + columns * rows,
         tilesets: p.tilesets.map((t) =>
-          t.id === id ? { ...t, tileSize: size, columns, rows, emptyTiles: empty, tiles: {}, firstGid: p.nextGid } : t,
+          t.id === id
+            ? {
+                ...t,
+                ...size,
+                dataUrl,
+                tileSize,
+                columns,
+                rows,
+                emptyTiles: empty,
+                tiles: {},
+                firstGid: p.nextGid,
+                sourceDataUrl: plain ? undefined : source,
+                cut: plain ? undefined : cut,
+              }
+            : t,
         ),
         layers: p.layers.map((l) => {
           const data = l.data.slice();

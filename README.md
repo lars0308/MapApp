@@ -342,6 +342,11 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.9 – Tilesets mit Rand, Abstand und nicht-quadratischen Tiles**
+
+- Tiles → *Tilesets* → Karte → **Eigene Maße, Rand und Abstand**: Tile-Breite und -Höhe (auch nicht quadratisch), Rand um das ganze Bild und Abstand zwischen den Tiles, wie in Tiled. **Neu zuschneiden** schneidet immer aus dem Originalbild, die Einstellung lässt sich also jederzeit wieder ändern. Nicht-quadratische Tiles werden auf quadratische gebracht: waagerecht mittig, unten bündig. Palette, Generator und Godot-Export sehen danach ein normales Raster.
+- KI: `tileset_add` mit `tile_width`, `tile_height`, `margin` und `spacing`. Neu ist `tileset_recut`: schneidet ein vorhandenes Tileset neu zu und setzt danach neue Vorschläge.
+
 **Version 3.8 – Außenbereiche und Dörfer**
 
 - Generator → *Räume* → **Aufbau: Außenbereich** oder **Dorf** (auch im Assistenten). Die Räume werden zu Lichtungen und die Gänge zu Erdwegen. Alles dazwischen ist dichter Wald aus Baum-Objekten; er ist nicht begehbar, die Kollision steht in der Kollisionsebene. Waldboden ist dunkleres Gras. Regler **Zerklüftung** für die Ränder der Lichtungen.

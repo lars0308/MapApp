@@ -35,7 +35,7 @@ Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI 
 6. ~~Außenbereiche und Dörfer~~ erledigt: `generator.layout = 'outdoor' | 'village'`. Das nutzt `cavify` und eine Wald-Maske in `src/generator/index.ts`; Häuser setzt `placeHouses`. Höhlen: `src/generator/cave.ts`.
 7. Echtes isometrisches Rautenraster + Höhenebenen.
 8. Godot-Terrain-Set für Wände; direkter `.tscn`/`.tres`-Export.
-9. Tilesets mit Rand/Abstand, nicht-quadratische Tiles; Generator im Web Worker.
+9. ~~Tilesets mit Rand/Abstand, nicht-quadratische Tiles~~ erledigt: `repackGrid` in `src/tilesets/slicing.ts` und `recutTileset` im Store; das Original liegt in `Tileset.sourceDataUrl` und `Tileset.cut`. Offen: Generator im Web Worker.
 
 ## Tests
 Playwright-Skripte lagen nur im Scratchpad der Sitzung (nicht im Repo). Vorgehen: `npm run build`, `npx vite preview --port 4173`, mit Playwright (Chromium unter `/opt/pw-browsers`) prüfen, Handy 390 px ohne horizontales Scrollen. Beim Start erscheint zuerst eine Auswahlseite (Karte/Figuren fragen erst, was man machen will).
