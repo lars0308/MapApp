@@ -8,9 +8,34 @@ import { D, build, type Def } from './demoAutotiles';
 
 const T = 16;
 
-const GRASS = { base: '#5fae45', light: '#72c052', dark: '#4e9a3a', blade: '#86d162', deep: '#43873a' };
-const DIRT = { base: '#d8b27a', light: '#e5c592', dark: '#bf955e', rim: '#a87d4c', pebble: '#c9a26d' };
-const WATER = { deep: '#3f95cf', base: '#4aa6db', light: '#6cc0ea', foam: '#e6f7ff', sand: '#e4d29a', sandDark: '#cdb877' };
+const SUMMER = {
+  grass: { base: '#5fae45', light: '#72c052', dark: '#4e9a3a', blade: '#86d162', deep: '#43873a' },
+  dirt: { base: '#d8b27a', light: '#e5c592', dark: '#bf955e', rim: '#a87d4c', pebble: '#c9a26d' },
+  water: { deep: '#3f95cf', base: '#4aa6db', light: '#6cc0ea', foam: '#e6f7ff', sand: '#e4d29a', sandDark: '#cdb877' },
+};
+type Palette = typeof SUMMER;
+/** climates of the same set (Außen / Dorf / Insel → Klima): snow with trodden paths and icy shores, sand with an oasis */
+const CLIMATES: Record<'winter' | 'desert', Palette> = {
+  winter: {
+    grass: { base: '#e8f0f6', light: '#ffffff', dark: '#cddcea', blade: '#b7cddf', deep: '#a3bdd3' },
+    dirt: { base: '#b7a58f', light: '#cbbba6', dark: '#9c8a74', rim: '#7f6e5a', pebble: '#a8977f' },
+    water: { deep: '#3d7fb5', base: '#4e93c7', light: '#86bde0', foam: '#f4fbff', sand: '#e2eef6', sandDark: '#c3d6e5' },
+  },
+  desert: {
+    grass: { base: '#e6c98a', light: '#f0d9a4', dark: '#d4b373', blade: '#c9a862', deep: '#bb9a58' },
+    dirt: { base: '#c7a06a', light: '#d6b27e', dark: '#ab8552', rim: '#8e6c3f', pebble: '#b8915c' },
+    water: { deep: '#2f8fa8', base: '#3ea8bf', light: '#6fcfe0', foam: '#e9fbff', sand: '#f3e2b0', sandDark: '#d9c38a' },
+  },
+};
+// the drawing helpers read the palette of the set being built
+let GRASS = SUMMER.grass;
+let DIRT = SUMMER.dirt;
+let WATER = SUMMER.water;
+function usePalette(p: Palette) {
+  GRASS = p.grass;
+  DIRT = p.dirt;
+  WATER = p.water;
+}
 // dungeon / cave pools: darker water with a wet stone rim instead of a beach
 const POOL = { deep: '#1f4f78', base: '#28618f', light: '#3a7cab', foam: '#9fd0ea', sand: '#524b5a', sandDark: '#2d2932' };
 const ROCK = { top: '#8e9aa6', face: '#6f7b88', dark: '#566270', light: '#a9b4bf', line: '#4a5461' };
@@ -105,7 +130,7 @@ function water(d: D, mask: number, sparkle: number, w = WATER) {
 function cliffRim(d: D, sides: { n?: boolean; s?: boolean; w?: boolean; e?: boolean }) {
   meadow(d, 'plain');
   const lip = GRASS.blade;
-  const out = '#2f5f28';
+  const out = GRASS === SUMMER.grass ? '#2f5f28' : GRASS.deep;
   if (sides.n) d.rect(0, 0, T, 1, out).rect(0, 1, T, 1, lip);
   if (sides.s) d.rect(0, T - 1, T, 1, out).rect(0, T - 2, T, 1, GRASS.dark);
   if (sides.w) d.rect(0, 0, 1, T, out).rect(1, 0, 1, T, lip);
@@ -139,12 +164,12 @@ function bush(d: D, berries: boolean) {
     for (let yy = -r; yy <= r; yy++) for (let xx = -r; xx <= r; xx++) if (xx * xx + yy * yy <= r * r + r) d.px(x + xx, y + yy, col);
   };
   d.rect(3, 13, 10, 2, 'rgba(20,50,20,0.35)');
-  c(5, 10, 3, GRASS.deep);
-  c(10, 10, 3, GRASS.deep);
-  c(8, 7, 4, GRASS.dark);
-  c(7, 6, 2, GRASS.base);
-  c(10, 8, 2, GRASS.base);
-  d.px(6, 4, GRASS.blade).px(7, 4, GRASS.blade).px(10, 6, GRASS.blade);
+  c(5, 10, 3, SUMMER.grass.deep);
+  c(10, 10, 3, SUMMER.grass.deep);
+  c(8, 7, 4, SUMMER.grass.dark);
+  c(7, 6, 2, SUMMER.grass.base);
+  c(10, 8, 2, SUMMER.grass.base);
+  d.px(6, 4, SUMMER.grass.blade).px(7, 4, SUMMER.grass.blade).px(10, 6, SUMMER.grass.blade);
   if (berries) d.px(5, 9, '#d8403a').px(10, 10, '#d8403a').px(8, 6, '#d8403a');
 }
 
@@ -172,7 +197,7 @@ function mushrooms(d: D) {
 function reeds(d: D) {
   for (const x of [5, 7, 9, 11]) {
     const h = d.rng.int(5, 8);
-    d.rect(x, 14 - h, 1, h, GRASS.dark).px(x, 13 - h, '#7b5a34');
+    d.rect(x, 14 - h, 1, h, SUMMER.grass.dark).px(x, 13 - h, '#7b5a34');
   }
 }
 
@@ -230,5 +255,83 @@ function defs(): Def[] {
 export const DEMO_NATURE_ID = 'demo_nature';
 
 export function createDemoNatureTileset(firstGid: number): Tileset {
+  usePalette(SUMMER);
   return build(DEMO_NATURE_ID, 'Demo Natur', defs(), ['top_down', 'low_top_down', 'isometric_45', 'isometric'], firstGid, 8101);
+}
+
+/** snowy bush / rock / stump: the summer art with a white cap */
+function snowCap(d: D, x0: number, x1: number, y: number) {
+  for (let x = x0; x <= x1; x++) d.px(x, y + (x % 3 === 0 ? 1 : 0), '#ffffff').px(x, y + 1, '#e4eef6');
+}
+function iceCrystal(d: D) {
+  d.rect(7, 5, 2, 9, '#9fd8f2').rect(4, 9, 2, 5, '#bfe8fa').rect(10, 8, 2, 6, '#bfe8fa').rect(7, 5, 1, 9, '#e6f7ff').rect(4, 14, 9, 1, 'rgba(60,90,120,0.3)');
+}
+function cactus(d: D) {
+  d.rect(4, 14, 8, 1, 'rgba(90,60,20,0.3)');
+  d.rect(7, 3, 3, 11, '#4f9a4c').rect(7, 3, 1, 11, '#6fbf5d');
+  d.rect(3, 7, 2, 4, '#4f9a4c').rect(3, 10, 4, 2, '#4f9a4c');
+  d.rect(12, 5, 2, 4, '#4f9a4c').rect(10, 8, 3, 2, '#4f9a4c');
+}
+function dryBush(d: D) {
+  d.rect(3, 13, 10, 2, 'rgba(90,60,20,0.3)');
+  for (const [x, y] of [[5, 8], [8, 6], [11, 8], [6, 11], [10, 11], [8, 9]]) d.rect(x, y, 2, 3, '#9a8a4a').px(x, y, '#b8a660');
+  d.rect(7, 12, 2, 2, '#6e5a2e');
+}
+function bones(d: D) {
+  d.rect(3, 12, 10, 2, '#efe6cf').rect(2, 11, 2, 4, '#efe6cf').rect(12, 11, 2, 4, '#efe6cf').rect(3, 14, 10, 1, '#c9bda0');
+}
+
+/** winter / desert: same shapes (paths, shores, plateaus, steps) in the climate's colours + its own plants */
+function climateDefs(climate: 'winter' | 'desert'): Def[] {
+  const t = (tags: string[]) => [...tags, climate];
+  const out: Def[] = [
+    { category: 'floor', role: 'floor_center', tags: t(['grass']), weight: 45, draw: (d) => meadow(d, 'plain') },
+    { category: 'floor', role: 'floor_center', tags: t(['grass']), weight: 30, draw: (d) => meadow(d, 'blades') },
+    { category: 'floor', role: 'floor_center', tags: t(['grass', 'dark']), weight: 25, draw: (d) => meadow(d, 'dark') },
+    { category: 'floor', role: 'raised_floor', tags: t(['grass']), draw: (d) => meadow(d, 'blades') },
+  ];
+  for (let m = 1; m <= 15; m++) out.push({ category: m === 15 ? 'path' : undefined, role: 'path_edge', tags: t(['dirt', `c${m}`]), collision: false, draw: (d) => dirt(d, m) });
+  for (let m = 0; m <= 15; m++) out.push({ category: m === 15 ? 'water' : undefined, role: 'shore', tags: t(['water', 'sand', `c${m}`]), collision: true, draw: (d) => water(d, m, m === 15 ? 2 : m === 0 ? 0 : 1) });
+  out.push(
+    { category: 'wallTop', role: 'cliff_top', tags: t(['grass']), collision: false, draw: (d) => cliffRim(d, { n: true }) },
+    { category: 'wallTop', role: 'cliff_bottom', tags: t(['grass']), collision: false, draw: (d) => cliffRim(d, { s: true }) },
+    { category: 'wallTop', role: 'cliff_left', tags: t(['grass']), collision: false, draw: (d) => cliffRim(d, { w: true }) },
+    { category: 'wallTop', role: 'cliff_right', tags: t(['grass']), collision: false, draw: (d) => cliffRim(d, { e: true }) },
+    { category: 'wallTop', role: 'cliff_outer_corner', tags: t(['grass', 'left']), collision: false, draw: (d) => cliffRim(d, { n: true, w: true }) },
+    { category: 'wallTop', role: 'cliff_outer_corner', tags: t(['grass', 'right']), collision: false, draw: (d) => cliffRim(d, { n: true, e: true }) },
+    { category: 'wallTop', role: 'cliff_inner_corner', tags: t(['grass', 'left']), collision: false, draw: (d) => cliffRim(d, { s: true, w: true }) },
+    { category: 'wallTop', role: 'cliff_inner_corner', tags: t(['grass', 'right']), collision: false, draw: (d) => cliffRim(d, { s: true, e: true }) },
+    { category: 'wallFront', role: 'cliff_front', tags: t(['grass']), draw: (d) => cliffFace(d, false) },
+    { category: 'wallFront', role: 'cliff_bottom', tags: t(['grass', 'face']), draw: (d) => cliffFace(d, true) },
+    { category: 'stairs', role: 'stairs', tags: t(['grass']), collision: false, draw: (d) => steps(d) },
+  );
+  const deco = (tags: string[], weight: number, draw: (d: D) => void): Def => ({ category: 'deco', tags: t(['grass', ...tags]), weight, collision: false, draw });
+  if (climate === 'winter')
+    out.push(
+      deco(['bush'], 40, (d) => (bush(d, false), snowCap(d, 4, 12, 3))),
+      deco(['stone'], 25, (d) => (rock(d, false), snowCap(d, 6, 10, 9))),
+      deco(['stone'], 10, (d) => (rock(d, true), snowCap(d, 4, 12, 6))),
+      deco(['wood'], 10, (d) => (stump(d), snowCap(d, 5, 11, 6))),
+      deco(['ice'], 12, iceCrystal),
+      deco(['reeds'], 8, reeds),
+    );
+  else
+    out.push(
+      deco(['bush'], 35, dryBush),
+      deco(['cactus'], 30, cactus),
+      deco(['stone'], 25, (d) => rock(d, false)),
+      deco(['stone'], 10, (d) => rock(d, true)),
+      deco(['bones'], 8, bones),
+      deco(['reeds'], 10, reeds),
+    );
+  return out;
+}
+
+export const DEMO_NATURE_CLIMATE_IDS = { winter: 'demo_nature_winter', desert: 'demo_nature_desert' } as const;
+
+export function createDemoNatureClimateTileset(climate: 'winter' | 'desert', firstGid: number): Tileset {
+  usePalette(CLIMATES[climate]);
+  const ts = build(DEMO_NATURE_CLIMATE_IDS[climate], climate === 'winter' ? 'Demo Natur Winter' : 'Demo Natur Wüste', climateDefs(climate), ['top_down', 'low_top_down', 'isometric_45', 'isometric'], firstGid, climate === 'winter' ? 8301 : 8401);
+  usePalette(SUMMER);
+  return ts;
 }

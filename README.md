@@ -336,6 +336,16 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.30 – Klima: Sommer, Winter, Wüste**
+
+- **Aufbau → Klima** für Außen, Dorf und Insel:
+  - **Sommer:** Wiese, Laubbäume
+  - **Winter:** Schnee, festgetretene Wege, Wasser mit Eisrand, verschneite Tannen, Büsche und Felsen mit Schneehaube, Eiskristalle
+  - **Wüste:** Sand, Oasen-Wasser, Palmen, Kakteen, trockene Büsche, Knochen
+- **Zwei neue Tilesets** „Demo Natur Winter“ und „Demo Natur Wüste“ mit allen Formen des Sommer-Sets: runde Wege und Ufer, Plateaus mit Klippen, Stufen, Pfützen. Sie kommen automatisch in neue und bestehende Projekte. Das Sommer-Set bleibt Kachel für Kachel gleich.
+- **Neue Objekte:** Schneetanne und Palme, auch für `place_object`.
+- Die KI kennt das Klima (`climate`).
+
 **Version 3.29 – Ausstattung für Dorf und Dungeon**
 
 - **Neues Tileset „Demo Ausstattung“**, automatisch in neuen und bestehenden Projekten:

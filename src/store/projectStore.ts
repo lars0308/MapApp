@@ -10,7 +10,7 @@ import { createDemoTileset } from '../tilesets/demoTileset';
 import { createDemoAutotileSets } from '../tilesets/demoAutotiles';
 import { createDemoSideTileset } from '../tilesets/demoSide';
 import { createDemoHexTileset } from '../tilesets/demoHex';
-import { createDemoNatureTileset } from '../tilesets/demoNature';
+import { createDemoNatureClimateTileset, createDemoNatureTileset } from '../tilesets/demoNature';
 import { createDemoSideThemesTileset } from '../tilesets/demoSideThemes';
 import { createDemoPropsTileset } from '../tilesets/demoProps';
 import { applyTileMeta, findEmptyTiles, needsRepack, repackGrid } from '../tilesets/slicing';
@@ -53,6 +53,10 @@ export function createProject(
   auto.push({ ...createDemoSideThemesTileset(natureTs.firstGid + natureTs.columns * natureTs.rows), active: demoActive });
   const themesTs = auto[auto.length - 1];
   auto.push({ ...createDemoPropsTileset(themesTs.firstGid + themesTs.columns * themesTs.rows), active: demoActive });
+  for (const climate of ['winter', 'desert'] as const) {
+    const prev = auto[auto.length - 1];
+    auto.push({ ...createDemoNatureClimateTileset(climate, prev.firstGid + prev.columns * prev.rows), active: demoActive });
+  }
   const last = auto[auto.length - 1];
   const own = libraryToProjectTilesets(opts.library ?? [], last.firstGid + last.columns * last.rows);
   const side = map.perspective === 'side_view';

@@ -34,6 +34,8 @@ export const OBJECT_DEFS: Record<BuiltinObjectType, ObjectDef> = {
   // village: the roof row is drawn over characters walking behind the house
   house: { type: 'house', label: 'Haus', w: 3, h: 3, sx: 0, sy: 3, collision: [[0, 0], [1, 0], [2, 0], [0, -1], [1, -1], [2, -1]], overheadRows: 1, ySort: true, godotType: 'house' },
   well: { type: 'well', label: 'Brunnen', w: 1, h: 2, sx: 3, sy: 3, collision: [[0, 0]], overheadRows: 0, ySort: true, godotType: 'well' },
+  pine: { type: 'pine', label: 'Schneetanne', w: 2, h: 3, sx: 4, sy: 3, collision: [[0, 0], [1, 0]], overheadRows: 0, ySort: true, godotType: 'tree' },
+  palm: { type: 'palm', label: 'Palme', w: 2, h: 3, sx: 6, sy: 3, collision: [[0, 0], [1, 0]], overheadRows: 0, ySort: true, godotType: 'tree' },
 };
 
 export const OBJECT_TYPES = Object.keys(OBJECT_DEFS) as BuiltinObjectType[];
@@ -310,6 +312,38 @@ function drawBuiltin(): HTMLCanvasElement {
     rect(ox + 6, oy + 10, 1, 1, '#2a1f2e');
     rect(ox + 9, oy + 10, 1, 1, '#2a1f2e');
     rect(ox + 11, oy + 18, 3, 6, '#b0874a');
+  }
+  // snowy pine (2×3 at 4,3): winter forests
+  {
+    const ox = 4 * T;
+    const oy = 3 * T;
+    oval(ox + 16, oy + 44, 10, 3);
+    rect(ox + 14, oy + 36, 4, 8, '#5c3c28');
+    for (let k = 0; k < 5; k++) {
+      const w = 8 + k * 5;
+      const y = oy + 4 + k * 7;
+      for (let r = 0; r < 8; r++) {
+        const ww = Math.round((w * (r + 1)) / 8);
+        rect(ox + 16 - Math.ceil(ww / 2), y + r, ww, 1, r < 2 ? '#f4f9fc' : r < 3 ? '#cfe0ec' : k % 2 ? '#2c6a4c' : '#2f7352');
+      }
+    }
+    rect(ox + 15, oy + 2, 2, 3, '#ffffff');
+  }
+  // palm (2×3 at 6,3): desert oases and islands
+  {
+    const ox = 6 * T;
+    const oy = 3 * T;
+    oval(ox + 16, oy + 44, 9, 3);
+    for (let k = 0; k < 30; k++) rect(ox + 14 + Math.round(Math.sin(k / 8) * 2), oy + 14 + k, 4, 1, k % 4 === 0 ? '#8a6238' : '#a8784a');
+    const frond = (dx: number, dy: number) => {
+      for (let t = 0; t <= 12; t++) {
+        const x = ox + 16 + Math.round(dx * t);
+        const y = oy + 12 + Math.round(dy * t + (t * t) / 14);
+        rect(x - 1, y, 3, 2, t > 9 ? '#4f9a4c' : '#3f8a3e');
+      }
+    };
+    for (const [dx, dy] of [[-1.1, -0.5], [1.1, -0.5], [-0.9, -0.1], [0.9, -0.1], [-0.3, -0.8], [0.3, -0.8]]) frond(dx, dy);
+    rect(ox + 13, oy + 11, 6, 4, '#6a4a2a');
   }
   return canvas;
 }

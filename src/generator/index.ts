@@ -354,6 +354,9 @@ export function generate(input: GenerateInput): GenerateOutput {
 
   const variation = s.floorVariation / 100;
   const look = lookOf(s);
+  // outdoors: climate of the nature tiles (summer set, winter / desert sets), the others are avoided
+  const climate = outdoor ? (s.climate ?? 'summer') : 'summer';
+  const otherClimates = ['summer', 'winter', 'desert'].filter((c) => c !== climate);
   const collisionGid = pools.pickTagged(rTiles, 'special', 'collision');
   const block = (i: number) => {
     if (colL && collisionGid) colL[i] = collisionGid;
@@ -371,7 +374,7 @@ export function generate(input: GenerateInput): GenerateOutput {
   const mossAt = (i: number) => moss[i] + (nearWall(i) ? 0.14 : 0) > 0.8 - variation * 0.35;
   const floorTile = (i: number) => {
     // outdoor: light meadow in the clearings, darker ground under the trees
-    if (outdoor) return pools.pickRole(rTiles, 'floor_center', ['grass', 'summer', ...(forest[i] && rTiles.chance(0.5) ? ['dark'] : [])], forest[i] ? undefined : ['dark']);
+    if (outdoor) return pools.pickRole(rTiles, 'floor_center', ['grass', climate, ...(forest[i] && rTiles.chance(0.5) ? ['dark'] : [])], [...(forest[i] ? [] : ['dark']), ...otherClimates]);
     if (!look.floorPatches) {
       // classic: every tile rolls its own variant
       if (pools.has('floorVariant') && rTiles.chance(variation)) return pools.pick(rTiles, ['floorVariant', 'floor']);
@@ -430,12 +433,12 @@ export function generate(input: GenerateInput): GenerateOutput {
     if (floorL && shore >= 0) {
       // meadow below, water with beach and foam on top
       floorL[i] = floorTile(i);
-      const gid = pools.pickRole(rTiles, 'shore', [`c${shore}`, shoreKind]);
+      const gid = pools.pickRole(rTiles, 'shore', [`c${shore}`, shoreKind, climate], outdoor ? otherClimates : undefined);
       if (detailL) detailL[i] = gid;
     } else if (floorL) {
       if (t === T_WATER || t === T_LAVA || t === T_ABYSS) floorL[i] = liquidTile(i, t);
       else if (t === T_BRIDGE) floorL[i] = liquidTile(i, ts.bridges.get(i)?.under ?? T_ABYSS);
-      else if (ts.heights[i] > 0) floorL[i] = pools.pickRole(rTiles, 'raised_floor', [tagAt(i)]);
+      else if (ts.heights[i] > 0) floorL[i] = pools.pickRole(rTiles, 'raised_floor', outdoor ? [tagAt(i), climate] : [tagAt(i)], outdoor ? otherClimates : undefined);
       else floorL[i] = floorTile(i);
     }
     if (t === T_WATER || t === T_LAVA || t === T_ABYSS) block(i);
@@ -448,7 +451,7 @@ export function generate(input: GenerateInput): GenerateOutput {
     if (t === T_TRANSITION && detailL && pools.hasRole('transition')) detailL[i] = pools.pickRole(rTiles, 'transition');
     if (softPaths && pathL && !waterCell(i) && t !== T_BRIDGE) {
       const m = vertexMask(i % W, (i / W) | 0, pathCell, false, 2);
-      if (m) pathL[i] = pools.pickRole(rTiles, 'path_edge', [`c${m}`]);
+      if (m) pathL[i] = pools.pickRole(rTiles, 'path_edge', [`c${m}`, climate], otherClimates);
     }
     const sh = walls.shadows[i];
     if (sh && shadowL && t !== T_ABYSS) shadowL[i] = pools.pickRole(rTiles, 'shadow', [sh]);
@@ -464,7 +467,7 @@ export function generate(input: GenerateInput): GenerateOutput {
         let prefer: string[] | undefined;
         const onTop = y <= p.y1;
         if (ts.terrain[i] === T_STAIRS) {
-          if (detailL) detailL[i] = pools.pickRole(rTiles, 'stairs', outdoor ? ['grass'] : undefined, outdoor ? undefined : ['grass']);
+          if (detailL) detailL[i] = pools.pickRole(rTiles, 'stairs', outdoor ? ['grass', climate] : undefined, outdoor ? otherClimates : ['grass']);
           continue;
         }
         if (onTop) {
@@ -480,10 +483,10 @@ export function generate(input: GenerateInput): GenerateOutput {
           else if (s2) role = 'cliff_bottom';
           else if (w) role = 'cliff_left';
           else if (e) role = 'cliff_right';
-          if (role && detailL) detailL[i] = pools.pickRole(rTiles, role, outdoor ? [...(prefer ?? []), 'grass'] : prefer, outdoor ? ['face'] : ['face', 'grass']);
+          if (role && detailL) detailL[i] = pools.pickRole(rTiles, role, outdoor ? [...(prefer ?? []), 'grass', climate] : prefer, outdoor ? ['face', ...otherClimates] : ['face', 'grass']);
         } else {
           role = p.faceRows === 2 && y === faceBottom ? 'cliff_bottom' : 'cliff_front';
-          if (frontL) frontL[i] = pools.pickRole(rTiles, role, outdoor ? ['grass', 'face'] : role === 'cliff_bottom' ? ['face'] : undefined, outdoor ? undefined : ['grass']);
+          if (frontL) frontL[i] = pools.pickRole(rTiles, role, outdoor ? ['grass', climate, 'face'] : role === 'cliff_bottom' ? ['face'] : undefined, outdoor ? otherClimates : ['grass']);
         }
         if (ts.terrain[i] === T_CLIFF) block(i);
       }
@@ -565,7 +568,7 @@ export function generate(input: GenerateInput): GenerateOutput {
           }
         if (!fits || tx < 0 || tx + 1 >= W || rForest.chance(0.04)) continue;
         for (let yy = ty - 1; yy <= ty; yy++) for (let xx = tx; xx < tx + 2; xx++) if (xx >= 0 && xx < W) taken[yy * W + xx] = 1;
-        objects.push({ id: `forest_${objects.length}`, type: 'tree', x: tx, y: ty });
+        objects.push({ id: `forest_${objects.length}`, type: treeFor(climate), x: tx, y: ty });
       }
   }
 
@@ -578,7 +581,7 @@ export function generate(input: GenerateInput): GenerateOutput {
       // outdoor: only deco meant for outside (tag grass), no bones in the meadow
       if (!look.smartDeco) {
         // classic: evenly spread
-        if (rDeco.chance(c === CELL_ROOM ? p : p * 0.35)) decoL[i] = outdoor ? pools.pickTagged(rDeco, 'deco', 'grass') : pools.pickPref(rDeco, ['deco'], undefined, ['grass', 'village']);
+        if (rDeco.chance(c === CELL_ROOM ? p : p * 0.35)) decoL[i] = outdoor ? pools.pickPrefs(rDeco, ['deco'], ['grass', climate], otherClimates) : pools.pickPref(rDeco, ['deco'], undefined, ['grass', 'village']);
         continue;
       }
       if (outdoor) {
@@ -596,7 +599,7 @@ export function generate(input: GenerateInput): GenerateOutput {
         const chance = c === CELL_CORRIDOR ? p * 0.2 : woods ? p * 2.4 : wet ? p * 1.6 : p * 0.7;
         if (!rDeco.chance(chance)) continue;
         if (decoL[i - 1] || decoL[i - W]) continue;
-        decoL[i] = pools.pickPrefs(rDeco, ['deco'], ['grass', woods ? 'bush' : wet ? 'reeds' : '']);
+        decoL[i] = pools.pickPrefs(rDeco, ['deco'], ['grass', climate, woods ? 'bush' : wet ? 'reeds' : ''], otherClimates);
         continue;
       }
       // dungeons: deco gathers along the walls and in corners, room centres and corridors stay mostly free
@@ -837,6 +840,9 @@ function populate(
 /** village houses: along the upper part of each clearing, doors facing the open ground */
 /** a field of 4×3 crops beside each house (left or right, level with its front), a fence along the
  *  back and a hay bale or flower bed at the corner; cells get occupied so nothing else lands there */
+/** the forest tree of a climate */
+export const treeFor = (climate: string): MapObject['type'] => (climate === 'winter' ? 'pine' : climate === 'desert' ? 'palm' : 'tree');
+
 function planFields(c: ObjectContext, forest: Uint8Array, houses: MapObject[], W: number, rng: Rng) {
   const { g } = c;
   const out: { crops: number[]; fence: number[]; hay: number }[] = [];

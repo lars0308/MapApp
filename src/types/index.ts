@@ -285,6 +285,8 @@ export interface GeneratorSettings {
   objects: { trees: number; rocks: number; arches: number; pillars: boolean };
   /** room layout: built rooms (default) or natural caves */
   layout?: 'rooms' | 'cave' | 'outdoor' | 'village' | 'island';
+  /** outdoor / village / island: summer meadow, winter snow or desert sand (own tiles and trees) */
+  climate?: 'summer' | 'winter' | 'desert';
   /** outdoor / village / island: rivers from edge to edge (0–3), bridges where paths cross */
   rivers?: number;
   /** outdoor / island: houses at the clearings like in the village (village always has them) */
@@ -385,7 +387,7 @@ export interface TerrainSet {
   active: boolean;
 }
 
-export type BuiltinObjectType = 'tree' | 'pillar' | 'rock' | 'arch' | 'chest' | 'merchant' | 'house' | 'well';
+export type BuiltinObjectType = 'tree' | 'pillar' | 'rock' | 'arch' | 'chest' | 'merchant' | 'house' | 'well' | 'pine' | 'palm';
 /** a built-in object or the id of an own object (CustomObject) */
 export type ObjectType = string;
 

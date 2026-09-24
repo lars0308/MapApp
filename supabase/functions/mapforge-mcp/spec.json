@@ -115,7 +115,7 @@
     },
     {
       "name": "set_generator",
-      "description": "Change generator settings (deep merge of `patch`, same shape as get_generator). regenerate=true generates right away. layout: rooms | cave | outdoor (forest clearings + dirt paths) | village (outdoor + houses + well) | island (land in the sea with beaches); houses (true: houses also for outdoor/island); rivers 0-2 (outdoor layouts, bridges over paths); caveRoughness 0-100; look {softEdges, floorPatches, smartDeco, smoothRooms} (all true by default).",
+      "description": "Change generator settings (deep merge of `patch`, same shape as get_generator). regenerate=true generates right away. layout: rooms | cave | outdoor (forest clearings + dirt paths) | village (outdoor + houses + well) | island (land in the sea with beaches); houses (true: houses also for outdoor/island); rivers 0-2 (outdoor layouts, bridges over paths); climate summer | winter | desert (outdoor layouts); caveRoughness 0-100; look {softEdges, floorPatches, smartDeco, smoothRooms} (all true by default).",
       "input": {
         "type": "object",
         "properties": {
@@ -674,7 +674,7 @@
     },
     {
       "name": "place_object",
-      "description": "Place an object (tree, pillar, rock, arch, chest, merchant). x = left cell of its footprint, y = the row it stands on.",
+      "description": "Place an object (tree, pine, palm, pillar, rock, arch, chest, merchant, house, well, or an own object id from figure_to_map). x = left cell of its footprint, y = the row it stands on.",
       "input": {
         "type": "object",
         "properties": {

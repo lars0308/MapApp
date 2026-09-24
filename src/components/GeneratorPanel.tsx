@@ -186,6 +186,24 @@ export function GeneratorPanel() {
         </div>
         {natural && <Slider label="Zerklüftung" value={g.caveRoughness ?? (g.layout === 'cave' ? 60 : 45)} unit=" %" hint={['Glatt', 'Zerklüftet']} onChange={(v) => update({ caveRoughness: v })} />}
         {(g.layout === 'outdoor' || g.layout === 'village' || g.layout === 'island') && (
+          <div className="field">
+            <label>Klima</label>
+            <div className="chips" role="radiogroup" aria-label="Klima">
+              {(
+                [
+                  ['summer', 'Sommer'],
+                  ['winter', 'Winter'],
+                  ['desert', 'Wüste'],
+                ] as const
+              ).map(([id, label]) => (
+                <Chip key={id} active={(g.climate ?? 'summer') === id} onClick={() => update({ climate: id })}>
+                  {label}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        )}
+        {(g.layout === 'outdoor' || g.layout === 'village' || g.layout === 'island') && (
           <Segmented label="Flüsse" value={String(g.rivers ?? 0)} options={[{ value: '0', label: 'Keine' }, { value: '1', label: '1 Fluss' }, { value: '2', label: '2 Flüsse' }]} onChange={(v) => update({ rivers: Number(v) })} />
         )}
         {(g.layout === 'outdoor' || g.layout === 'island') && <Toggle label="Häuser" description="Häuser an den Lichtungen, wie im Dorf" checked={!!g.houses} onChange={(houses) => update({ houses })} />}

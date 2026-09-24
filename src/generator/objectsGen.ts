@@ -94,7 +94,7 @@ export function placeObjects(
     }
     for (let k = 0, made = 0; k < trees * 6 && made < trees; k++) {
       const [x, y] = rng.pick(cells);
-      if (add('tree', x, y)) made++;
+      if (add(s.climate === 'winter' ? 'pine' : s.climate === 'desert' ? 'palm' : 'tree', x, y)) made++;
     }
   }
   return out;

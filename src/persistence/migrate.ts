@@ -5,7 +5,7 @@ import { DEFAULT_LAYERS, layerFromDef } from '../layers/defaults';
 import { DEMO_AUTOTILE_IDS, createDemoAutotileSets } from '../tilesets/demoAutotiles';
 import { DEMO_SIDE_ID, createDemoSideTileset } from '../tilesets/demoSide';
 import { DEMO_HEX_ID, createDemoHexTileset } from '../tilesets/demoHex';
-import { DEMO_NATURE_ID, createDemoNatureTileset } from '../tilesets/demoNature';
+import { DEMO_NATURE_CLIMATE_IDS, DEMO_NATURE_ID, createDemoNatureClimateTileset, createDemoNatureTileset } from '../tilesets/demoNature';
 import { DEMO_SIDE_THEMES_ID, createDemoSideThemesTileset } from '../tilesets/demoSideThemes';
 import { DEMO_PROPS_ID, createDemoPropsTileset } from '../tilesets/demoProps';
 
@@ -92,6 +92,13 @@ export function migrateProject(p: Project): Project {
     tilesets = [...tilesets, props];
     nextGid = props.firstGid + props.columns * props.rows;
   }
+  // climates for outdoor maps: winter / desert nature sets (v3.30)
+  for (const climate of ['winter', 'desert'] as const)
+    if (!tilesets.some((t) => t.id === DEMO_NATURE_CLIMATE_IDS[climate])) {
+      const set = createDemoNatureClimateTileset(climate, nextGid);
+      tilesets = [...tilesets, set];
+      nextGid = set.firstGid + set.columns * set.rows;
+    }
 
   // layers: y-sort flag + missing default roles at their default position
   const size = map.width * map.height;
