@@ -346,6 +346,13 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 2.7 – Aufzüge im Side-Scroller**
+
+- Neuer Abschnitt **Aufzug**: eine Plattform fährt in einem flachen Schacht zwischen Boden und einer hohen Kante auf und ab (bündig oben und unten, einfach drauflaufen), wartet an beiden Enden 1 s. Schiene im Hintergrund zeigt den Weg. Schalter *Aufzüge* in den Level-Einstellungen.
+- **Eigene Tiles**: Rollen *Aufzug* (`lift`) und *Schiene* (`lift_track`) – wie Leiter, Plattform, Stacheln – lassen sich eigenen Tiles zuweisen. Ein Aufzug fährt entlang der Schienen-Tiles über/unter ihm; ohne Schiene ist er eine normale Plattform.
+- Testspielen: Aufzüge fahren sichtbar, die Figur fährt mit. Godot-Export: AnimatableBody2D mit Tween (gleiches Tempo, gleiche Pausen) – in Godot 4.3 getestet: Figur fährt 10 Tiles mit nach oben.
+- Generator-Fehler behoben: war eine Leiter-/Aufzug-Stufe zu niedrig, entstand ein unerreichbarer Absatz. Alle Test-Levels (mit und ohne Aufzüge) sind per Suche über die echte Physik vom Start bis zum Ziel schaffbar.
+
 **Version 2.6 – erst fragen, dann bauen**
 
 - **Karte**, **Figuren** und **Animieren** fragen zuerst, was gemacht werden soll: Karte → aktuelle weiterbearbeiten, gespeicherte öffnen oder *neue Karte* nach Art (Top-Down, Isometrisch, 2D Side-Scroller – der Assistent startet mit dieser Art). Figuren / Animieren → erst *Charakter, Kreatur oder Objekt*, dann welche(s): zuletzt bearbeitet, gespeichert oder neu (mit Baukasten-Teilen / leer). Den Reiter nochmal antippen oder „Auswahl“ führt zurück zur Frage.

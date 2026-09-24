@@ -4,7 +4,7 @@ import { rleEncode } from '../utils/rle';
 import { safeFileName } from '../utils/download';
 import { GODOT_LAYER_NAME } from '../layers/defaults';
 import { computeBlocked, metaTable, tileBlocks } from '../editor/collision';
-import { GRAVITY, buildSideMap, jumpSpeed } from '../playtest/sidePhysics';
+import { GRAVITY, LIFT_PAUSE, LIFT_SPEED, buildSideMap, jumpSpeed } from '../playtest/sidePhysics';
 import { OBJECT_ATLAS_TILE, OBJECT_DEFS, objectAtlas } from '../objects/defs';
 
 // Map data for Godot 4 (TileMapLayer based, editable after import).
@@ -308,10 +308,11 @@ function sideData(p: Project) {
     }
   const tune = jumpSpeed(p);
   return {
-    note: 'Built by the loader: platforms = one-way StaticBody2D, ladders = Area2D group "ladder", hazards = Area2D group "hazard" (calls hazard_hit() / hurt() on the body), goal = Area2D, signal goal_reached.',
+    note: 'Built by the loader: platforms = one-way StaticBody2D, lifts = AnimatableBody2D (tiles of ObjectsBack at the bottom row move along, tween top ↔ bottom), ladders = Area2D group "ladder", hazards = Area2D group "hazard" (calls hazard_hit() / hurt() on the body), goal = Area2D, signal goal_reached.',
     platforms,
     ladders,
     hazards: mergeRects(m.hazard, W, H),
+    lifts: m.lifts.map((l) => ({ x: l.x0, w: l.x1 - l.x0 + 1, top: l.top, bottom: l.bottom, speed: LIFT_SPEED, pause: LIFT_PAUSE })),
     goal: m.goal,
     physics: {
       gravity: Math.round(GRAVITY * ts),

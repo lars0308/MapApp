@@ -85,6 +85,8 @@ export const ROLE_FALLBACK: Partial<Record<TileRole, RoleFallback>> = {
   ladder: { cats: ['stairs'] },
   spikes: { cats: ['obstacle'] },
   back_wall: { cats: [] },
+  lift: { roles: ['platform'], cats: ['bridge'] },
+  lift_track: { cats: [] },
 };
 
 function pickFrom(rng: Rng, list: PoolTile[], prefer?: string[], avoid?: string[]): number {

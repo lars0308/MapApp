@@ -16,6 +16,34 @@ export interface SideMap {
   hazard: Uint8Array;
   /** goal cell (end room centre) */
   goal: [number, number] | null;
+  /** moving platforms: row of the platform over time (see liftRow) */
+  lifts: Lift[];
+}
+
+/** A lift: platform tiles x0..x1, travels between the rows top and bottom along its rail. */
+export interface Lift {
+  x0: number;
+  x1: number;
+  top: number;
+  bottom: number;
+  /** gid per column (drawn moving in the playtest) */
+  gids: number[];
+}
+
+export const LIFT_SPEED = 3; // tiles per second
+export const LIFT_PAUSE = 1; // seconds at each end
+
+/** row (top edge of the platform) of a lift at time t: starts at the bottom, waits, goes up, waits, down … */
+export function liftRow(l: Lift, t: number): number {
+  const d = l.bottom - l.top;
+  if (d <= 0) return l.bottom;
+  const travel = d / LIFT_SPEED;
+  const period = 2 * (travel + LIFT_PAUSE);
+  const u = ((t % period) + period) % period;
+  if (u < LIFT_PAUSE) return l.bottom;
+  if (u < LIFT_PAUSE + travel) return l.bottom - (u - LIFT_PAUSE) * LIFT_SPEED;
+  if (u < 2 * LIFT_PAUSE + travel) return l.top;
+  return l.top + (u - 2 * LIFT_PAUSE - travel) * LIFT_SPEED;
 }
 
 export interface SideInput {
@@ -41,6 +69,10 @@ export interface SideBody {
   /** seconds of hit flash / respawn blink */
   hurt: number;
   reachedGoal: boolean;
+  /** time in seconds (lifts move with it) */
+  t: number;
+  /** index of the lift the body stands on (-1 = none) */
+  onLift: number;
 }
 
 const HW = 0.3;
@@ -56,6 +88,7 @@ type Kind = 'solid' | 'platform' | 'ladder' | 'hazard' | null;
 function kindOf(m: TileMeta | undefined): Kind {
   if (!m) return null;
   const r = m.role;
+  if (r === 'lift' || r === 'lift_track') return null;
   if (r === 'platform' || r === 'platform_left' || r === 'platform_right') return 'platform';
   if (r === 'ladder') return 'ladder';
   if (r === 'spikes' || r === 'water' || r === 'lava' || m.category === 'water' || m.category === 'lava') return 'hazard';
@@ -69,18 +102,39 @@ export function buildSideMap(p: Project): SideMap {
   const { width: W, height: H } = p.map;
   const metas = metaTable(p);
   const n = W * H;
-  const m: SideMap = { W, H, solid: new Uint8Array(n), platform: new Uint8Array(n), ladder: new Uint8Array(n), hazard: new Uint8Array(n), goal: null };
+  const m: SideMap = { W, H, solid: new Uint8Array(n), platform: new Uint8Array(n), ladder: new Uint8Array(n), hazard: new Uint8Array(n), goal: null, lifts: [] };
+  const liftAt = new Uint32Array(n);
+  const track = new Uint8Array(n);
   const layers = p.layers.filter((l) => CONTENT.has(l.role));
   const collision = p.layers.filter((l) => l.role === 'collision');
   for (let i = 0; i < n; i++) {
     for (const l of layers) {
       const g = l.data[i];
       if (!g) continue;
+      const role = metas[g]?.role;
+      if (role === 'lift') liftAt[i] = g;
+      else if (role === 'lift_track') track[i] = 1;
       const k = kindOf(metas[g]);
       if (k) m[k][i] = 1;
     }
     if (collision.some((l) => l.data[i])) m.solid[i] = 1;
   }
+  // lifts: a row run of lift tiles; it travels along the rail tiles above / below it
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (!liftAt[y * W + x]) continue;
+      let e = x;
+      while (e + 1 < W && liftAt[y * W + e + 1]) e++;
+      let top = y;
+      while (top - 1 >= 0 && track[(top - 1) * W + x]) top--;
+      let bottom = y;
+      while (bottom + 1 < H && track[(bottom + 1) * W + x]) bottom++;
+      const gids: number[] = [];
+      for (let c = x; c <= e; c++) gids.push(liftAt[y * W + c]);
+      if (top === bottom) for (let c = x; c <= e; c++) m.platform[y * W + c] = 1; // no rail: a normal platform
+      else m.lifts.push({ x0: x, x1: e, top, bottom, gids });
+      x = e;
+    }
   const end = p.result?.rooms.find((r) => r.isEnd);
   if (end) m.goal = [end.centerX, end.centerY];
   return m;
@@ -124,13 +178,15 @@ function overlaps(m: SideMap, a: Uint8Array, x: number, y: number, shrink = 0): 
 }
 
 export function newBody(x: number, y: number): SideBody {
-  return { x, y, vx: 0, vy: 0, onGround: false, climbing: false, coyote: 0, jumpHeld: false, jumpCut: false, safe: [x, y], safeTimer: 0, hurt: 0, reachedGoal: false };
+  return { x, y, vx: 0, vy: 0, onGround: false, climbing: false, coyote: 0, jumpHeld: false, jumpCut: false, safe: [x, y], safeTimer: 0, hurt: 0, reachedGoal: false, t: 0, onLift: -1 };
 }
 
 export function stepSide(m: SideMap, b: SideBody, inp: SideInput, dt: number, tune: SideTuning): 'goal' | 'respawn' | null {
   const { jumpV, speed } = tune;
   let event: 'goal' | 'respawn' | null = null;
   b.hurt = Math.max(0, b.hurt - dt);
+  const t0 = b.t;
+  b.t += dt;
   const onLadder = overlaps(m, m.ladder, b.x, b.y, 0.2) || at(m, m.ladder, b.x, b.y + 0.05) === 1;
 
   // ladders: grab with ↑ / ↓, jump off sideways
@@ -177,7 +233,32 @@ export function stepSide(m: SideMap, b: SideBody, inp: SideInput, dt: number, tu
   const oldY = b.y;
   let ny = b.y + b.vy * dt;
   b.onGround = false;
-  if (b.vy >= 0) {
+  const overLift = (l: Lift) => b.x + HW > l.x0 + 0.05 && b.x - HW < l.x1 + 1 - 0.05;
+  // standing on a lift: ride along
+  const ride = b.onLift >= 0 ? m.lifts[b.onLift] : null;
+  b.onLift = -1;
+  if (ride && b.vy >= 0 && !b.climbing && overLift(ride)) {
+    ny = liftRow(ride, b.t);
+    b.vy = 0;
+    b.onGround = true;
+    b.onLift = m.lifts.indexOf(ride);
+  } else if (b.vy >= 0 && !b.climbing) {
+    // landing on a lift (from above, one-way)
+    m.lifts.forEach((l, k) => {
+      if (b.onLift >= 0 || !overLift(l)) return;
+      const r0 = liftRow(l, t0);
+      const r1 = liftRow(l, b.t);
+      if (oldY <= r0 + 0.05 && ny >= r1 - 0.001) {
+        ny = r1;
+        b.vy = 0;
+        b.onGround = true;
+        b.onLift = k;
+      }
+    });
+  }
+  if (b.onLift >= 0) {
+    // solid ground above the lift would squash – ignore, the lift is one-way
+  } else if (b.vy >= 0) {
     // landing on solid ground
     if (overlaps(m, m.solid, b.x, ny)) {
       ny = Math.floor(ny);

@@ -40,7 +40,12 @@ export function migrateProject(p: Project): Project {
     const last = sets[sets.length - 1];
     nextGid = last.firstGid + last.columns * last.rows;
   }
-  // side-scroller demo tiles (v2.5)
+  // side-scroller demo tiles (v2.5); v2.7 added the lift tiles at the end (same size, same ids)
+  const oldSide = tilesets.find((t) => t.id === DEMO_SIDE_ID);
+  if (oldSide && !Object.values(oldSide.tiles).some((m) => m.role === 'lift')) {
+    const fresh = createDemoSideTileset(oldSide.firstGid);
+    if (fresh.columns * fresh.rows <= oldSide.columns * oldSide.rows) tilesets = tilesets.map((t) => (t.id === DEMO_SIDE_ID ? { ...fresh, active: t.active } : t));
+  }
   if (!tilesets.some((t) => t.id === DEMO_SIDE_ID)) {
     const side = createDemoSideTileset(nextGid);
     tilesets = [...tilesets, side];

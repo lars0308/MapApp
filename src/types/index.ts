@@ -112,6 +112,9 @@ export const TILE_ROLES = [
   'ladder',
   'spikes',
   'back_wall',
+  // moving platform (lift / elevator) + its rail: the lift travels along the rail tiles
+  'lift',
+  'lift_track',
 ] as const;
 export type TileRole = (typeof TILE_ROLES)[number];
 
@@ -254,6 +257,8 @@ export interface SideSettings {
   /** 0–100: floating one-way platforms, upper routes with rewards */
   platforms: number;
   ladders: boolean;
+  /** lifts: platforms that go up and down to high ledges */
+  lifts?: boolean;
   /** what lies at the bottom of pits */
   hazards: { water: boolean; lava: boolean; spikes: boolean; abyss: boolean };
   /** 0–100: enemy spawn points on the ground */
@@ -376,7 +381,9 @@ export const T_TRANSITION = 8;
 export const T_PLATFORM = 9;
 export const T_LADDER = 10;
 export const T_SPIKES = 11;
-export const TERRAIN_NAMES = ['ground', 'water', 'lava', 'abyss', 'plateau', 'cliff', 'stairs', 'bridge', 'transition', 'platform', 'ladder', 'spikes'];
+/** side view: path of a lift (moving platform) */
+export const T_LIFT = 12;
+export const TERRAIN_NAMES = ['ground', 'water', 'lava', 'abyss', 'plateau', 'cliff', 'stairs', 'bridge', 'transition', 'platform', 'ladder', 'spikes', 'lift'];
 
 export interface GenerationResult {
   seed: string;

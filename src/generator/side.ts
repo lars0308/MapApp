@@ -3,6 +3,7 @@ import {
   CELL_ROOM,
   CELL_WALL,
   T_LADDER,
+  T_LIFT,
   T_LAVA,
   T_PLATFORM,
   T_SPIKES,
@@ -69,6 +70,8 @@ export function generateSide(input: GenerateInput): GenerateOutput {
   const top = new Int32Array(W).fill(H);
   const plats: Plat[] = [];
   const ladders: { x: number; y0: number; y1: number }[] = [];
+  /** lifts: platform row travels between top and bottom (rows) */
+  const lifts: { x0: number; x1: number; top: number; bottom: number }[] = [];
   const features: Feature[] = [];
   const hazards: Hazard[] = (['abyss', 'water', 'lava', 'spikes'] as Hazard[]).filter((h) => s.hazards[h]);
   if (!hazards.length) hazards.push('abyss');
@@ -117,6 +120,7 @@ export function generateSide(input: GenerateInput): GenerateOutput {
       ['sky', s.platforms * 0.3],
       ['ledge', s.platforms * 0.3],
       ['tower', s.ladders ? 4 + s.hills * 0.12 : 0],
+      ['lift', s.lifts !== false ? 3 + s.hills * 0.1 : 0],
     ];
     return w.filter(([, v]) => v > 0);
   };
@@ -136,6 +140,7 @@ export function generateSide(input: GenerateInput): GenerateOutput {
     if (kind === 'sky' && room < JW * 3 + 6) kind = 'gap';
     if (kind === 'ledge' && room < 12) kind = 'flat';
     if (kind === 'tower' && room < 14) kind = 'step';
+    if (kind === 'lift' && room < 16) kind = 'step';
     if (kind === 'gap' && room < JW + 4) kind = 'flat';
     last = kind;
 
@@ -218,8 +223,12 @@ export function generateSide(input: GenerateInput): GenerateOutput {
       // raised block too high to jump – a ladder leads up
       const rise = rLevel.int(JH + 2, JH + 4);
       const nt = Math.max(minTop, cur - rise);
-      if (cur - nt <= JH) {
-        cur = nt;
+      if (cur - nt <= JH + 1) {
+        // not high enough for a ladder / lift (top of the map): a normal step within the jump
+        cur = Math.max(nt, cur - JH);
+        const len = Math.min(stopAt - x, rLevel.int(3, 6));
+        setTop(x, x + len - 1, cur);
+        x += len;
         continue;
       }
       setTop(x, x + 1, cur);
@@ -228,6 +237,28 @@ export function generateSide(input: GenerateInput): GenerateOutput {
       setTop(x + 2, x + 1 + len, nt);
       if (rLevel.chance(s.loot / 100)) features.push({ type: 'treasure', x0: x + 3, x1: x + len, y: nt - 1 });
       x += 2 + len;
+      cur = nt;
+    } else if (kind === 'lift') {
+      // high ledge – a lift (3 wide) goes up and down next to it
+      const rise = rLevel.int(JH + 3, JH + 7);
+      const nt = Math.max(minTop, cur - rise);
+      if (cur - nt <= JH + 1) {
+        // not high enough for a ladder / lift (top of the map): a normal step within the jump
+        cur = Math.max(nt, cur - JH);
+        const len = Math.min(stopAt - x, rLevel.int(3, 6));
+        setTop(x, x + len - 1, cur);
+        x += len;
+        continue;
+      }
+      // the lift sits in a 1 deep shaft: flush with the ground below and the ledge above
+      const w = 3;
+      setTop(x, x + 1, cur);
+      setTop(x + 2, x + 1 + w, cur + 1);
+      lifts.push({ x0: x + 2, x1: x + 1 + w, top: nt, bottom: cur });
+      const len = Math.min(stopAt - x - 2 - w, rLevel.int(5, 9));
+      setTop(x + 2 + w, x + 1 + w + len, nt);
+      if (rLevel.chance(s.loot / 100)) features.push({ type: 'treasure', x0: x + 3 + w, x1: x + w + len, y: nt - 1 });
+      x += 2 + w + len;
       cur = nt;
     }
   }
@@ -242,12 +273,13 @@ export function generateSide(input: GenerateInput): GenerateOutput {
   for (let y = 0; y < H; y++) solid[y * W] = solid[y * W + W - 1] = 1;
   for (const p of plats) for (let c = p.x0; c <= p.x1; c++) if (!solid[p.y * W + c]) terrain[p.y * W + c] = T_PLATFORM;
   for (const l of ladders) for (let y = l.y0; y <= l.y1; y++) terrain[y * W + l.x] = T_LADDER;
+  for (const l of lifts) for (let y = l.top; y <= l.bottom; y++) for (let c = l.x0; c <= l.x1; c++) terrain[y * W + c] = T_LIFT;
 
   // cave: ceiling that always leaves room to jump
   const ceil = new Int32Array(W).fill(-1);
   if (cave) {
     const need = new Int32Array(W).fill(H);
-    for (let c = 0; c < W; c++) need[c] = Math.min(top[c] >= H ? H - 3 : top[c], ...plats.filter((p) => c >= p.x0 - 1 && c <= p.x1 + 1).map((p) => p.y), ...ladders.filter((l) => l.x === c).map((l) => l.y0));
+    for (let c = 0; c < W; c++) need[c] = Math.min(top[c] >= H ? H - 3 : top[c], ...plats.filter((p) => c >= p.x0 - 1 && c <= p.x1 + 1).map((p) => p.y), ...ladders.filter((l) => l.x === c).map((l) => l.y0), ...lifts.filter((l) => c >= l.x0 - 1 && c <= l.x1 + 1).map((l) => l.top));
     let wave = 0;
     for (let c = 0; c < W; c++) {
       let lo = H;
@@ -311,6 +343,12 @@ export function generateSide(input: GenerateInput): GenerateOutput {
   // cave back wall behind the whole playable area
   if (cave && backL && backL !== groundL && pools.hasRole('back_wall'))
     for (let i = 0; i < n; i++) if (!solid[i]) backL[i] = pools.pickRole(rTiles, 'back_wall', ['side']);
+  // lifts: the platform stands at the bottom, its rail shows the way up (the lift moves along it)
+  for (const l of lifts)
+    for (let c = l.x0; c <= l.x1; c++) {
+      if (propL) propL[l.bottom * W + c] = pools.pickRole(rTiles, 'lift', ['side']);
+      if (backL) for (let y = l.top; y < l.bottom; y++) backL[y * W + c] = pools.pickRole(rTiles, 'lift_track', ['side']);
+    }
 
   // spawns: player, enemies on flat ground, loot, boss; goal marker
   const spawnPoints: SpawnPoint[] = [];

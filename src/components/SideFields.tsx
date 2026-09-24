@@ -58,6 +58,7 @@ export function SideFields({
         <Slider label="Gruben" value={side.gaps} unit=" %" hint={['Selten', 'Oft']} onChange={(v) => onChange({ gaps: v })} />
         <Slider label="Plattformen" value={side.platforms} unit=" %" hint={['Wenige', 'Viele']} onChange={(v) => onChange({ platforms: v })} />
         <Toggle label="Leitern" description="Hohe Stufen mit Leiter nach oben" checked={side.ladders} onChange={(ladders) => onChange({ ladders })} />
+        <Toggle label="Aufzüge" description="Plattformen, die zu hohen Kanten hoch- und runterfahren" checked={side.lifts !== false} onChange={(lifts) => onChange({ lifts })} />
         <div className="field">
           <label>In den Gruben</label>
           <div className="chips">

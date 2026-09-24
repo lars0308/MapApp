@@ -359,11 +359,53 @@ func build_side(data: Dictionary) -> void:
 		var area := _area(root, "Hazard", float(hz["x"]) + 0.1, float(hz["y"]) + 0.3, float(hz["w"]) - 0.2, float(hz["h"]) - 0.3)
 		area.add_to_group("hazard")
 		area.body_entered.connect(_on_hazard)
+	for lf in side.get("lifts", []):
+		_build_lift(root, lf)
 	var goal = side.get("goal", null)
 	if goal != null:
 		var area := _area(root, "Goal", float(goal[0]) - 0.5, float(goal[1]) - 1.0, 2.0, 2.0)
 		area.add_to_group("goal")
 		area.body_entered.connect(_on_goal)
+
+
+## A lift: its tiles move from the map into an AnimatableBody2D that goes up and down (group "lift").
+func _build_lift(parent: Node, lf: Dictionary) -> void:
+	var x := int(lf["x"])
+	var w := int(lf["w"])
+	var top := int(lf["top"])
+	var bottom := int(lf["bottom"])
+	var body := AnimatableBody2D.new()
+	body.name = "Lift"
+	body.add_to_group("lift")
+	parent.add_child(body)
+	var tiles := TileMapLayer.new()
+	tiles.name = "Tiles"
+	tiles.tile_set = tile_set
+	var src_layer: TileMapLayer = layer_nodes.get("ObjectsBack", null)
+	if src_layer:
+		for c in range(x, x + w):
+			var cell := Vector2i(c, bottom)
+			var sid := src_layer.get_cell_source_id(cell)
+			if sid >= 0:
+				tiles.set_cell(cell, sid, src_layer.get_cell_atlas_coords(cell))
+				src_layer.erase_cell(cell)
+	body.add_child(tiles)
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(w * tile_size, 6.0)
+	shape.shape = rect
+	shape.one_way_collision = true
+	shape.position = Vector2((x + w / 2.0) * tile_size, bottom * tile_size + 3.0)
+	body.add_child(shape)
+	var dist := float(bottom - top) * tile_size
+	var travel := float(bottom - top) / float(lf.get("speed", 3.0))
+	var pause := float(lf.get("pause", 1.0))
+	var tw := create_tween().set_loops()
+	tw.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
+	tw.tween_interval(pause)
+	tw.tween_property(body, "position:y", -dist, travel)
+	tw.tween_interval(pause)
+	tw.tween_property(body, "position:y", 0.0, travel)
 
 
 func _area(parent: Node, area_name: String, x: float, y: float, w: float, h: float) -> Area2D:
@@ -488,6 +530,7 @@ Y-sort
 - Tall tiles carry TileData.y_sort_origin, objects are positioned at their base line.
 
 Side-Scroller (Seitenansicht)
+- Aufzüge fahren als AnimatableBody2D (Gruppe "lift") zwischen unten und oben, Tempo und Pause wie in MapForge.
 - Plattformen sind Einweg-Plattformen (von unten durchspringen), Leitern sind Area2D in der
   Gruppe "ladder", Stacheln/Wasser/Lava sind Area2D "hazard" (ruft hazard_hit() / hurt() auf).
 - Die Spielfigur bekommt die Platformer-Steuerung mit denselben Sprungwerten wie in MapForge:

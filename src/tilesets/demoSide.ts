@@ -270,6 +270,31 @@ function defs(): Def[] {
         d.rect(2, 8, 1, 8, WOOD.line).rect(13, 8, 1, 8, WOOD.line);
       },
     },
+    // lift (moving platform) and its rail – appended, so older projects keep their tile ids
+    {
+      role: 'lift',
+      category: 'bridge',
+      tags: side,
+      collision: false,
+      draw: (d) => {
+        d.rect(0, 0, T, 6, METAL.base).rect(0, 0, T, 1, METAL.light).rect(0, 5, T, 1, METAL.line);
+        for (let x = 0; x < T; x += 4) d.rect(x, 2, 2, 2, '#f2c14e');
+        d.rect(6, 6, 4, 3, METAL.dark).rect(7, 9, 2, 1, METAL.line);
+      },
+    },
+    {
+      role: 'lift_track',
+      category: 'deco',
+      tags: ['side', 'track'],
+      collision: false,
+      draw: (d) => {
+        d.ctx.globalAlpha = 0.85;
+        d.rect(3, 0, 2, T, METAL.dark).rect(11, 0, 2, T, METAL.dark);
+        d.rect(3, 0, 1, T, METAL.base).rect(11, 0, 1, T, METAL.base);
+        for (const y of [3, 11]) d.rect(5, y, 6, 1, METAL.line);
+        d.ctx.globalAlpha = 1;
+      },
+    },
   ];
 }
 

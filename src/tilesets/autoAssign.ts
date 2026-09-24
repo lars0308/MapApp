@@ -351,6 +351,8 @@ const ROLE_SHORT: Partial<Record<TileRole, string>> = {
   ladder: 'Leiter',
   spikes: 'Stacheln',
   back_wall: 'Hintergrund',
+  lift: 'Aufzug',
+  lift_track: 'Schiene',
 };
 
 const CATEGORY_SHORT: Record<TileCategory, string> = {

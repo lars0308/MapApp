@@ -44,6 +44,8 @@ const NON_BLOCKING_ROLES = new Set<TileRole>([
   'ladder',
   'spikes',
   'back_wall',
+  'lift',
+  'lift_track',
 ]);
 
 /** Does this tile block movement? Explicit `collision` wins, otherwise role / category decide. */

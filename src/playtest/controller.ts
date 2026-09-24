@@ -4,7 +4,7 @@ import { mapEvents } from '../store/events';
 import { getRenderer } from '../editor/rendererRef';
 import { computeBlocked } from '../editor/collision';
 import type { CharacterState } from '../renderer/character';
-import { buildSideMap, jumpSpeed, newBody, stepSide, type SideBody, type SideMap, type SideTuning } from './sidePhysics';
+import { buildSideMap, jumpSpeed, liftRow, newBody, stepSide, type SideBody, type SideMap, type SideTuning } from './sidePhysics';
 
 // Editor-only playtest: a neutral character walks over the current map.
 // Nothing here is stored in the project or exported.
@@ -134,8 +134,19 @@ function sideTick(dt: number) {
   const r = getRenderer();
   if (r) {
     r.character = body.hurt > 0 && Math.floor(body.hurt * 10) % 2 ? null : char;
+    const t = body.t;
+    r.movers = side.lifts.flatMap((l) => l.gids.map((gid, k) => ({ gid, x: l.x0 + k, y: liftRow(l, t) })));
     r.follow(char.x, char.y - 2);
   }
+}
+
+/** lifts move in the playtest: hide their tiles in place, draw them as movers */
+function showLifts(on: boolean) {
+  const r = getRenderer();
+  if (!r) return;
+  r.hiddenGids = new Set(on && side ? side.lifts.flatMap((l) => l.gids) : []);
+  if (!on) r.movers = [];
+  r.invalidateAll();
 }
 
 function tick(now: number) {
@@ -187,6 +198,7 @@ export function startPlaytest(): boolean {
   }
   char = { x: pos[0], y: pos[1], dir: side ? 'right' : 'down', step: 0, moving: false };
   body = side ? newBody(pos[0], pos[1]) : null;
+  showLifts(true);
   running = true;
   editor.setPlaytest(true);
   const r = getRenderer();
@@ -218,6 +230,7 @@ export function stopPlaytest() {
   joystick.vx = 0;
   joystick.vy = 0;
   joystick.jump = false;
+  showLifts(false);
   body = null;
   window.removeEventListener('keydown', onKey);
   window.removeEventListener('keyup', onKey);

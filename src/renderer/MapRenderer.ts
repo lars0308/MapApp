@@ -82,6 +82,9 @@ export class MapRenderer {
   };
   objects: MapObject[] = [];
   character: CharacterState | null = null;
+  /** tiles not drawn in place (lifts during the playtest – drawn as movers instead) */
+  hiddenGids = new Set<number>();
+  movers: { gid: number; x: number; y: number }[] = [];
   /** background behind the tiles: plain, sky with hills (side view outside), dark cave */
   backdrop: 'plain' | 'sky' | 'cave' = 'plain';
   onCameraChange?: (cam: Camera) => void;
@@ -247,7 +250,7 @@ export class MapRenderer {
       for (let y = cy0; y < y1; y++)
         for (let x = cx0; x < x1; x++) {
           const g = d[y * this.W + x];
-          if (g) drawGid(c, this.table, g, (x - cx0) * ppt, (y - cy0) * ppt, ppt, ppt);
+          if (g && !this.hiddenGids.has(g)) drawGid(c, this.table, g, (x - cx0) * ppt, (y - cy0) * ppt, ppt, ppt);
         }
     }
     chunk.dirty = false;
@@ -336,7 +339,7 @@ export class MapRenderer {
         const dh = sy(y + 1) - dy;
         for (let x = x0; x < x1; x++) {
           const g = d[y * this.W + x];
-          if (!g) continue;
+          if (!g || this.hiddenGids.has(g)) continue;
           const dx = sx(x);
           drawGid(ctx, this.table, g, dx, dy, sx(x + 1) - dx, dh);
         }
@@ -371,6 +374,16 @@ export class MapRenderer {
     }
     const ch = this.character;
     if (ch) items.push({ key: ch.y, draw: () => drawCharacter(ctx, ch, sx, sy, z) });
+    // moving tiles (lifts in the side-scroller playtest)
+    for (const mv of this.movers)
+      items.push({
+        key: mv.y + 0.5,
+        draw: () => {
+          const dx = sx(mv.x);
+          const dy = sy(mv.y);
+          drawGid(ctx, this.table, mv.gid, dx, dy, sx(mv.x + 1) - dx, sy(mv.y + 1) - dy);
+        },
+      });
 
     if (z < this.cachePpt) {
       const cx0 = Math.floor(x0 / CHUNK);
