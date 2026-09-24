@@ -49,7 +49,7 @@ const FIGURES = `
 
 FIGUREN (Charakter, Kreatur, Objekt) – Ziel ist Pixel-Art in sehr hoher Qualität, wie von einem guten Pixel-Artist:
 Ablauf:
-1. figure_new (kind, name, meist size 32) → figure_parts und figure_status lesen (anatomy zeigt, wo Kopf, Rumpf, Arme, Beine bzw. Körper, Augen, Boden liegen).
+1. figure_new (kind, name, meist size 32 – die Teile sind für 32 px gemacht; bei 48/64 zeichne Körper und Details selbst in voller Größe, sonst wirkt die Figur klein im Bild) → figure_parts und figure_status lesen (anatomy zeigt, wo Kopf, Rumpf, Arme, Beine bzw. Körper, Augen, Boden liegen).
 2. Basis wählen. Charaktere: fast immer Teile (Körper, Beine, Füße, Oberteil, Gesicht, Haare, Kopfbedeckung, Waffe, Schild, Rücken) – sie passen in allen Ansichten und animieren sauber. Kreaturen/Objekte: passende Teile, sonst figure_new mit empty und alles selbst zeichnen (Körper in slot body bzw. base, Augen/Mund in eigenen Slots).
 3. Farben mit figure_color: für jeden Kanal eigene 3 Töne [hell, mittel, dunkel] passend zur Beschreibung oder zum Referenzbild.
 4. Mit figure_draw alles ergänzen, was die Teile nicht haben: Wappen, Gürtel, Umhang, Maske, Hörner, Rüstungsplatten, Muster, Glanzlichter, eigene Waffen, ganze Körper. Die richtige slot-Wahl (hat, headx, face, top, back, weapon, offhand, eyes, mouth, horns, body, base, detail …) sorgt dafür, dass Animationen es richtig bewegen.

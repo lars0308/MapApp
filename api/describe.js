@@ -18,7 +18,7 @@ Entscheide zuerst, was er erstellen will:
   "summary": "1 deutscher Satz (du-Form), was du baust",
   "figures": [ { "kind": "character" | "creature" | "object", "name": "kurzer deutscher Name", "brief": "ausführliche Beschreibung für den Pixel-Artist: Form, Proportionen, Kleidung/Material, Farben (gern Hex), Besonderheiten, Stimmung, was vom Referenzbild übernommen wird", "size": 32 | 48 | 64 } ]
 }
-  character = Menschen und menschenähnliche Figuren (Held, Händler, Ork, Skelett-Krieger mit Waffe …), creature = Tiere und Monster (Schleim, Fledermaus, Spinne, Drache …), object = Dinge (Truhe, Fass, Laterne, Baum, Statue …). Größe meist 32, bei großen Bossen/Objekten 48 oder 64. Höchstens 3 Figuren.
+  character = Menschen und menschenähnliche Figuren (Held, Händler, Ork, Skelett-Krieger mit Waffe …), creature = Tiere und Monster (Schleim, Fledermaus, Spinne, Drache …), object = Dinge (Truhe, Fass, Laterne, Baum, Statue …). Größe meist 32 (die Bauteile sind für 32 px gemacht); 48 oder 64 nur für wirklich große Bosse oder Objekte. Höchstens 3 Figuren.
 - Sonst eine Karte bzw. ein Spiel: antworte NUR mit dem Kartenplan unten. Beschreibt der Nutzer darin auch eigene Figuren (Spielfigur, Gegner, Händler), trage sie in "figures" ein (gleiche Form wie oben, dazu "use": "player" für die Spielfigur, sonst "map"), höchstens 2.
 
 Du antwortest NUR mit einem JSON-Objekt (kein Text davor oder danach). Kartenplan:
