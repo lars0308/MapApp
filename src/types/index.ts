@@ -118,6 +118,9 @@ export const TILE_ROLES = [
   // hex maps: rivers and roads connect to their neighbour hexes (tag m<bits>: E=1 SE=2 SW=4 W=8 NW=16 NE=32)
   'hex_river',
   'hex_road',
+  // natural transitions (top-down outdoor): corner-matched overlays, tag c<bits> (TL=1 TR=2 BR=4 BL=8), c15 = full
+  'path_edge',
+  'shore',
 ] as const;
 export type TileRole = (typeof TILE_ROLES)[number];
 
@@ -267,7 +270,7 @@ export interface GeneratorSettings {
   terrain: TerrainSettings;
   objects: { trees: number; rocks: number; arches: number; pillars: boolean };
   /** room layout: built rooms (default) or natural caves */
-  layout?: 'rooms' | 'cave' | 'outdoor' | 'village';
+  layout?: 'rooms' | 'cave' | 'outdoor' | 'village' | 'island';
   /** caves: 0 = smooth, 100 = very ragged with niches and pillars */
   caveRoughness?: number;
   /** enemies and loot placed by room type and distance from the start (0–100, missing = none) */

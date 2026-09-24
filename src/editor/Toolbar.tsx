@@ -10,7 +10,7 @@ import { resolveGid } from '../tilesets/slicing';
 import { TileThumb } from '../tilesets/TileThumb';
 import { ObjectThumb } from '../objects/ObjectThumb';
 import { rectCells } from './tools';
-import { applyAutoWalls } from './autoWalls';
+import { applyAutoEdges, applyAutoWalls } from './autoWalls';
 import { copySelection, stampFromSelection, transformClip } from './clipboard';
 import { describeTransform, mirrorH, rotateCW, withTransform } from '../tilesets/gid';
 
@@ -300,6 +300,7 @@ export function SelectionActions() {
     }
     if (!s.beginStroke(layer.id)) return;
     s.strokeSet(rectCells(sel, p.map.width), gid);
+    applyAutoEdges(s.strokeCells(), layer.id);
     if (useEditor.getState().autoWalls) applyAutoWalls(s.strokeCells(), layer.id);
     s.endStroke(label);
   };

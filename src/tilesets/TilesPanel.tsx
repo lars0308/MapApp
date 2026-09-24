@@ -97,6 +97,7 @@ function Palette() {
         const meta = ts.tiles[i];
         // hex rivers / roads: one tile each – the shape follows the neighbours (Auto-Anschluss)
         if ((meta?.role === 'hex_river' || meta?.role === 'hex_road') && !meta.tags.includes('m0')) continue;
+        if ((meta?.role === 'path_edge' || meta?.role === 'shore') && !meta.tags.includes('c15')) continue;
         if (catFilter === 'none' && (meta?.category || meta?.role)) continue;
         if (catFilter !== 'all' && catFilter !== 'none' && meta?.category !== catFilter) continue;
         if (tagFilter !== 'all' && !meta?.tags.includes(tagFilter)) continue;

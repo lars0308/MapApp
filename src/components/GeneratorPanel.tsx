@@ -166,7 +166,7 @@ export function GeneratorPanel() {
   if (hex) return <HexPanel />;
 
   const roomSize = ROOM_SIZES.find((r) => r.v.roomMinW === g.roomMinW && r.v.roomMaxW === g.roomMaxW && r.v.roomMinH === g.roomMinH && r.v.roomMaxH === g.roomMaxH)?.id ?? 'custom';
-  const natural = g.layout === 'cave' || g.layout === 'outdoor' || g.layout === 'village';
+  const natural = g.layout === 'cave' || g.layout === 'outdoor' || g.layout === 'village' || g.layout === 'island';
 
   return (
     <div className="panel-scroll">
@@ -182,7 +182,7 @@ export function GeneratorPanel() {
           ))}
         </div>
         {natural && <Slider label="Zerklüftung" value={g.caveRoughness ?? (g.layout === 'cave' ? 60 : 45)} unit=" %" hint={['Glatt', 'Zerklüftet']} onChange={(v) => update({ caveRoughness: v })} />}
-        {(g.layout === 'outdoor' || g.layout === 'village') && <p className="hint">Braucht Gras-Böden (Tag „grass“) – die Demo-Tiles haben welche.</p>}
+        {(g.layout === 'outdoor' || g.layout === 'village' || g.layout === 'island') && <p className="hint">Braucht Gras-Böden (Tag „grass“) – die Demo-Tiles haben welche.</p>}
         <div className="field">
           <label>Stil (setzt die Werte unten)</label>
           <div className="chips">
@@ -302,11 +302,12 @@ export function GeneratorPanel() {
   );
 }
 
-const LAYOUTS: { id: 'rooms' | 'cave' | 'outdoor' | 'village'; label: string; text: string }[] = [
+const LAYOUTS: { id: 'rooms' | 'cave' | 'outdoor' | 'village' | 'island'; label: string; text: string }[] = [
   { id: 'rooms', label: 'Räume', text: 'Gebaute Räume und Gänge' },
   { id: 'cave', label: 'Höhle', text: 'Natürliche Kammern' },
   { id: 'outdoor', label: 'Außen', text: 'Lichtungen im Wald' },
   { id: 'village', label: 'Dorf', text: 'Häuser und Brunnen' },
+  { id: 'island', label: 'Insel', text: 'Land im Meer mit Stränden' },
 ];
 
 const SIDE_PRESETS: { id: string; label: string; text: string; side: Partial<SideSettings>; boss?: boolean }[] = [

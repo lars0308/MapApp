@@ -7,7 +7,7 @@ import { DEFAULT_MAP, defaultGenerator } from '../generator/presets';
 import { prepareBuildKit } from '../components/wizard/SetupWizard';
 import { saveNow } from '../persistence/autosave';
 import { listProjects, loadProject } from '../persistence/db';
-import { applyAutoWalls } from '../editor/autoWalls';
+import { applyAutoEdges, applyAutoWalls } from '../editor/autoWalls';
 import { computeBlocked, metaTable } from '../editor/collision';
 import { copyArea, pasteClip, transformClip } from '../editor/clipboard';
 import { floodCells } from '../editor/tools';
@@ -524,6 +524,7 @@ const H: Record<string, Handler> = {
     if (!s.beginStroke(layer.id)) fail('Malen nicht möglich');
     s.strokeSet(cells, withTransform(gid, turnOf(a.rotate, a.mirror)));
     const changed = s.strokeCells().length;
+    applyAutoEdges(s.strokeCells(), layer.id);
     if (a.auto_walls !== false && useEditor.getState().autoWalls) applyAutoWalls(s.strokeCells(), layer.id);
     s.endStroke(gid ? 'KI: Malen' : 'KI: Radieren');
     return { data: { layer: layer.name, changed } };
@@ -540,6 +541,7 @@ const H: Record<string, Handler> = {
     s.beginStroke(layer.id);
     s.strokeSet(floodCells(layer.data, p.map.width, p.map.height, x, y), int(a.gid, 'gid'));
     const changed = s.strokeCells().length;
+    applyAutoEdges(s.strokeCells(), layer.id);
     if (useEditor.getState().autoWalls) applyAutoWalls(s.strokeCells(), layer.id);
     s.endStroke('KI: Füllen');
     return { data: { layer: layer.name, changed } };

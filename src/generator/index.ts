@@ -134,7 +134,7 @@ export function generate(input: GenerateInput): GenerateOutput {
   // natural caves: the same layout, reshaped by a cellular automaton
   const cave = s.layout === 'cave';
   // outdoor / village: clearings and paths get natural edges too, the rest becomes forest
-  const outdoor = s.layout === 'outdoor' || s.layout === 'village';
+  const outdoor = s.layout === 'outdoor' || s.layout === 'village' || s.layout === 'island';
   if (cave || outdoor) {
     cavify(grid, placed, corridors.map((c) => c.path), s.caveRoughness ?? (outdoor ? 45 : 60), root.fork(127));
     computeNearRoom(grid);
@@ -172,6 +172,27 @@ export function generate(input: GenerateInput): GenerateOutput {
         forest[i] = 1;
         grid.cells[i] = CELL_ROOM;
       }
+  // island: the forest towards the map edge sinks into the sea (noisy coast), a strip of open
+  // meadow stays between trees and beach; clearings and paths near the edge become islets / dams
+  if (s.layout === 'island') {
+    const land = makeNoise(W, H, root.fork(173), 9);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        if (!forest[i]) continue;
+        const d = Math.hypot(((x + 0.5) / W) * 2 - 1, ((y + 0.5) / H) * 2 - 1);
+        if (1.15 - d + (land[i] - 0.5) * 0.7 < 0.5 || x < 2 || y < 2 || x >= W - 2 || y >= H - 2) {
+          forest[i] = 0;
+          ts.terrain[i] = T_WATER;
+        }
+      }
+    const sea = (i: number) => ts.terrain[i] === T_WATER;
+    for (let y = 1; y < H - 1; y++)
+      for (let x = 1; x < W - 1; x++) {
+        const i = y * W + x;
+        if (forest[i] && (sea(i - 1) || sea(i + 1) || sea(i - W) || sea(i + W) || sea(i - W - 1) || sea(i - W + 1) || sea(i + W - 1) || sea(i + W + 1))) forest[i] = 0;
+      }
+  }
 
   // 11: walls + auto-tile roles (fronts/caps in 3/4 views), shadow + floor masks
   for (let y = 0; y < H; y++)
@@ -339,7 +360,7 @@ export function generate(input: GenerateInput): GenerateOutput {
   const mossAt = (i: number) => moss[i] + (nearWall(i) ? 0.14 : 0) > 0.8 - variation * 0.35;
   const floorTile = (i: number) => {
     // outdoor: light meadow in the clearings, darker ground under the trees
-    if (outdoor) return pools.pickRole(rTiles, 'floor_center', forest[i] ? ['grass', 'dark'] : ['grass'], forest[i] ? undefined : ['dark']);
+    if (outdoor) return pools.pickRole(rTiles, 'floor_center', ['grass', 'summer', ...(forest[i] && rTiles.chance(0.5) ? ['dark'] : [])], forest[i] ? undefined : ['dark']);
     if (pools.has('floorVariant') && variation > 0 && mossAt(i)) return pools.pick(rTiles, ['floorVariant', 'floor']);
     // edge-aware floor when the tileset provides edge roles
     const edge: TileRole | null = !walk(i - W) ? 'floor_edge_top' : !walk(i + W) ? 'floor_edge_bottom' : !walk(i - 1) ? 'floor_edge_left' : !walk(i + 1) ? 'floor_edge_right' : null;
@@ -348,6 +369,28 @@ export function generate(input: GenerateInput): GenerateOutput {
     if (wear[i] > 0.64 - variation * 0.1) return pools.pickPrefs(rTiles, ['floor'], [tagAt(i), rTiles.chance(0.6) ? 'broken' : 'dark']);
     return pools.pickPrefs(rTiles, ['floor'], [tagAt(i)], rTiles.chance(0.06) ? ['dark'] : ['dark', 'broken']);
   };
+  // soft transitions (outdoor): corner-matched path / shore overlays when a tileset has them.
+  // Path vertices touch at least two path cells (paths keep their width, ends and bends round off);
+  // shore vertices lie between water cells only (the beach stays inside the blocked water cells).
+  const waterCell = (i: number) => ts.terrain[i] === T_WATER || (ts.terrain[i] === T_BRIDGE && ts.bridges.get(i)?.under === T_WATER);
+  const pathCell = (i: number) => grid.cells[i] === CELL_CORRIDOR && !waterCell(i) && ts.terrain[i] !== T_BRIDGE;
+  const vertexMask = (x: number, y: number, on: (i: number) => boolean, all: boolean, min = 1) => {
+    const vert = (vx: number, vy: number) => {
+      let n = 0;
+      let k = 0;
+      for (const [cx, cy] of [[vx - 1, vy - 1], [vx, vy - 1], [vx - 1, vy], [vx, vy]]) {
+        // outside the map counts like the cell itself (edges continue)
+        const inside = cx >= 0 && cy >= 0 && cx < W && cy < H;
+        if (!inside && !all) continue;
+        k++;
+        if (inside ? on(cy * W + cx) : on(y * W + x)) n++;
+      }
+      return all ? n === k : n >= min;
+    };
+    return (vert(x, y) ? 1 : 0) | (vert(x + 1, y) ? 2 : 0) | (vert(x + 1, y + 1) ? 4 : 0) | (vert(x, y + 1) ? 8 : 0);
+  };
+  const softPaths = outdoor && pools.hasRole('path_edge');
+  const softShores = outdoor && pools.hasRole('shore');
   const liquidTile = (i: number, type: number) => {
     if (type === T_ABYSS && pools.hasRole('abyss_edge')) {
       const above = i - W;
@@ -362,7 +405,14 @@ export function generate(input: GenerateInput): GenerateOutput {
     const c = grid.cells[i];
     if (c === CELL_VOID || c === CELL_WALL) continue;
     const t = ts.terrain[i];
-    if (floorL) {
+    // tiny ponds (no vertex between water cells) get the full water tile
+    const shore = softShores && waterCell(i) ? vertexMask(i % W, (i / W) | 0, waterCell, true) || 15 : 0;
+    if (floorL && shore) {
+      // meadow below, water with beach and foam on top
+      floorL[i] = floorTile(i);
+      const gid = pools.pickRole(rTiles, 'shore', [`c${shore}`]);
+      if (detailL) detailL[i] = gid;
+    } else if (floorL) {
       if (t === T_WATER || t === T_LAVA || t === T_ABYSS) floorL[i] = liquidTile(i, t);
       else if (t === T_BRIDGE) floorL[i] = liquidTile(i, ts.bridges.get(i)?.under ?? T_ABYSS);
       else if (ts.heights[i] > 0) floorL[i] = pools.pickRole(rTiles, 'raised_floor', [tagAt(i)]);
@@ -372,10 +422,14 @@ export function generate(input: GenerateInput): GenerateOutput {
     if (t === T_BRIDGE) {
       const b = ts.bridges.get(i)!;
       if (pathL) pathL[i] = pools.pickRole(rTiles, b.role, [b.orient]);
-    } else if (c === CELL_CORRIDOR && pathL && !cave && t !== T_WATER && t !== T_LAVA && t !== T_ABYSS)
+    } else if (c === CELL_CORRIDOR && pathL && !cave && !softPaths && t !== T_WATER && t !== T_LAVA && t !== T_ABYSS)
       // outdoor: dirt paths; dungeons: no dirt; caves: natural floor, no laid paths
       pathL[i] = outdoor ? pools.pickPref(rTiles, ['path'], 'dirt') : pools.pickPref(rTiles, ['path'], undefined, ['dirt']);
     if (t === T_TRANSITION && detailL && pools.hasRole('transition')) detailL[i] = pools.pickRole(rTiles, 'transition');
+    if (softPaths && pathL && !waterCell(i) && t !== T_BRIDGE) {
+      const m = vertexMask(i % W, (i / W) | 0, pathCell, false, 2);
+      if (m) pathL[i] = pools.pickRole(rTiles, 'path_edge', [`c${m}`]);
+    }
     const sh = walls.shadows[i];
     if (sh && shadowL && t !== T_ABYSS) shadowL[i] = pools.pickRole(rTiles, 'shadow', [sh]);
   }
@@ -406,10 +460,10 @@ export function generate(input: GenerateInput): GenerateOutput {
           else if (s2) role = 'cliff_bottom';
           else if (w) role = 'cliff_left';
           else if (e) role = 'cliff_right';
-          if (role && detailL) detailL[i] = pools.pickRole(rTiles, role, prefer);
+          if (role && detailL) detailL[i] = pools.pickRole(rTiles, role, outdoor ? [...(prefer ?? []), 'grass'] : prefer, outdoor ? ['face'] : ['face', 'grass']);
         } else {
           role = p.faceRows === 2 && y === faceBottom ? 'cliff_bottom' : 'cliff_front';
-          if (frontL) frontL[i] = pools.pickRole(rTiles, role);
+          if (frontL) frontL[i] = pools.pickRole(rTiles, role, outdoor ? ['grass', 'face'] : role === 'cliff_bottom' ? ['face'] : undefined, outdoor ? undefined : ['grass']);
         }
         if (ts.terrain[i] === T_CLIFF) block(i);
       }
@@ -474,7 +528,7 @@ export function generate(input: GenerateInput): GenerateOutput {
             const i = yy * W + xx;
             if (!forest[i] || taken[i]) fits = false;
           }
-        if (!fits || rForest.chance(0.04)) continue;
+        if (!fits || tx < 0 || tx + 1 >= W || rForest.chance(0.04)) continue;
         for (let yy = ty - 1; yy <= ty; yy++) for (let xx = tx; xx < tx + 2; xx++) if (xx >= 0 && xx < W) taken[yy * W + xx] = 1;
         objects.push({ id: `forest_${objects.length}`, type: 'tree', x: tx, y: ty });
       }
@@ -488,7 +542,21 @@ export function generate(input: GenerateInput): GenerateOutput {
       if (ts.terrain[i] !== T_NONE && ts.terrain[i] !== T_PLATEAU) continue;
       // outdoor: only deco meant for outside (tag grass), no bones in the meadow
       if (outdoor) {
-        if (rDeco.chance(c === CELL_ROOM ? p : p * 0.35)) decoL[i] = pools.pickTagged(rDeco, 'deco', 'grass');
+        // bushes gather where the forest begins, reeds at the water, stones and flowers on the meadow
+        const x = i % W;
+        const y = (i / W) | 0;
+        let woods = false;
+        let wet = false;
+        for (const j of [i - 1, i + 1, i - W, i + W]) {
+          if (j < 0 || j >= W * H || (j === i - 1 && x === 0) || (j === i + 1 && x === W - 1)) continue;
+          if (forest[j]) woods = true;
+          if (waterCell(j)) wet = true;
+        }
+        if (y === 0 || y === H - 1) woods = false;
+        const chance = c === CELL_CORRIDOR ? p * 0.2 : woods ? p * 2.4 : wet ? p * 1.6 : p * 0.7;
+        if (!rDeco.chance(chance)) continue;
+        if (decoL[i - 1] || decoL[i - W]) continue;
+        decoL[i] = pools.pickPrefs(rDeco, ['deco'], ['grass', woods ? 'bush' : wet ? 'reeds' : '']);
         continue;
       }
       // dungeons: deco gathers along the walls and in corners, room centres and corridors stay mostly free
@@ -499,7 +567,7 @@ export function generate(input: GenerateInput): GenerateOutput {
       // no clutter: never right next to other deco
       if (decoL[i - 1] || decoL[i - W] || decoL[i - W - 1] || decoL[i - W + 1]) continue;
       // candles / lights only against a wall, moss where the floor is mossy
-      decoL[i] = pools.pickPref(rDeco, ['deco'], mossAt(i) ? 'moss' : undefined, near ? undefined : ['light']);
+      decoL[i] = pools.pickPref(rDeco, ['deco'], mossAt(i) ? 'moss' : undefined, near ? ['grass'] : ['light', 'grass']);
     }
   }
 

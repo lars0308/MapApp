@@ -336,6 +336,16 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.21 – Natur mit weichen Übergängen und neue Kartenart „Insel“**
+
+- **Neues Demo-Tileset „Demo Natur“** in hellen Sommerfarben: Wiese mit Blumen und Klee, Erdwege, Wasser mit Strand und Schaumkante, Gras-Klippen mit Felswand, Büsche, Steine, Baumstümpfe, Pilze und Schilf. Es wird automatisch zu neuen und bestehenden Projekten hinzugefügt.
+- **Weiche Übergänge:** Wege und Ufer haben runde, leicht gewellte Ränder statt eckiger Kacheln. Jede Übergangskachel wird aus ihren vier Ecken berechnet (Tags `c1`–`c15`, Rollen `path_edge` und `shore`), deshalb passen Nachbarn immer zusammen.
+- **Auch beim Selbstmalen:** Wer den vollen Erdweg oder das volle Wasser aus der Palette malt, bekommt die runden Ränder automatisch dazu. Beim Radieren passen sich die Ränder wieder an.
+- **Neue Kartenart „Insel“:** Land im Meer mit Stränden, Buchten und kleinen Nebeninseln, darauf Wald, Lichtungen und Wege.
+- **Außen, Dorf und Insel** nutzen die neuen Wege und Ufer. Büsche wachsen am Waldrand, Schilf am Wasser, Steine und Blumen auf der Wiese. Klippen bekommen Gras und eine Felswand statt Dungeon-Stein.
+- **Hellere Bäume und Felsen** mit Umriss, Lichtkante und rundem Schatten.
+- In Dungeons tauchen keine Natur-Deko und keine Gras-Klippen auf.
+
 **Version 3.20 – Schönere Karten**
 
 - **Boden wirkt natürlich:** Abgenutzte und dunkle Platten liegen in zusammenhängenden Flecken statt als einzelne Zufallsfliesen. Moos wächst an den Wänden entlang. Der Regler „Bodenvariation“ steuert, wie viel davon vorkommt.

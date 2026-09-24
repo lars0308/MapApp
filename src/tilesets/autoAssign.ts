@@ -355,6 +355,8 @@ export const ROLE_SHORT: Partial<Record<TileRole, string>> = {
   lift_track: 'Schiene',
   hex_river: 'Fluss',
   hex_road: 'Straße',
+  path_edge: 'Wegrand',
+  shore: 'Ufer',
 };
 
 const CATEGORY_SHORT: Record<TileCategory, string> = {

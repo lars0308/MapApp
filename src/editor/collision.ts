@@ -49,6 +49,7 @@ const NON_BLOCKING_ROLES = new Set<TileRole>([
   'lift_track',
   'hex_river',
   'hex_road',
+  'path_edge',
 ]);
 
 /** Does this tile block movement? Explicit `collision` wins, otherwise role / category decide. */

@@ -277,3 +277,71 @@ function applyAutoHex(changed: number[], paintedLayerId: string) {
   }
   if (cells.length) store.strokeSetLayer(layer.id, cells, gids);
 }
+
+/**
+ * Soft path / shore edges (corner-matched tiles, tag c<bits>): after painting or erasing, the tiles
+ * around the stroke get the shape that matches their neighbours. Full path tiles (c15) are the
+ * painted path, the others its rim; every shore tile is water.
+ */
+export function applyAutoEdges(changed: number[], paintedLayerId: string) {
+  const store = useProject.getState();
+  const p = store.project;
+  const layer = p.layers.find((l) => l.id === paintedLayerId);
+  if (!layer || !changed.length || p.map.perspective === 'hex' || p.map.perspective === 'side_view') return;
+  const W = p.map.width;
+  const H = p.map.height;
+  const metas = metaTable(p);
+  const data = layer.data;
+  const meta = (i: number) => metas[tileOf(data[i])];
+  const roleAtCell = (i: number) => {
+    const r = meta(i)?.role;
+    return r === 'path_edge' || r === 'shore' ? r : null;
+  };
+  // only strokes that involve soft tiles (painted now or around the edit)
+  const ring = new Set<number>();
+  let involved = false;
+  for (const i of changed) {
+    const x = i % W;
+    const y = (i / W) | 0;
+    for (let oy = -1; oy <= 1; oy++)
+      for (let ox = -1; ox <= 1; ox++) {
+        const xx = x + ox;
+        const yy = y + oy;
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+        const j = yy * W + xx;
+        ring.add(j);
+        if (roleAtCell(j)) involved = true;
+      }
+  }
+  if (!involved) return;
+  // full tiles (c15) are what was painted; the other shapes are its rounded rim on the cells around
+  const source = (role: 'path_edge' | 'shore') => (i: number) => roleAtCell(i) === role && !!meta(i)?.tags.includes('c15');
+  const mask = (x: number, y: number, on: (i: number) => boolean) => {
+    const vert = (vx: number, vy: number) => {
+      for (const [cx, cy] of [[vx - 1, vy - 1], [vx, vy - 1], [vx - 1, vy], [vx, vy]]) if (cx >= 0 && cy >= 0 && cx < W && cy < H && on(cy * W + cx)) return true;
+      return false;
+    };
+    return (vert(x, y) ? 1 : 0) | (vert(x + 1, y) ? 2 : 0) | (vert(x + 1, y + 1) ? 4 : 0) | (vert(x, y + 1) ? 8 : 0);
+  };
+  const pools = new TilePools(p.tilesets, p.map.perspective);
+  const cells: number[] = [];
+  const gids: number[] = [];
+  for (const i of ring) {
+    const role = roleAtCell(i);
+    if ((role && meta(i)?.tags.includes('c15')) || (!role && data[i] !== 0)) continue;
+    const x = i % W;
+    const y = (i / W) | 0;
+    // water wins over path where both reach
+    const water = mask(x, y, source('shore'));
+    const path = water ? 0 : mask(x, y, source('path_edge'));
+    const want: 'shore' | 'path_edge' | null = water ? 'shore' : path ? 'path_edge' : null;
+    const m = water || path;
+    let gid = 0;
+    if (want) {
+      if (role === want && meta(i)?.tags.includes(`c${m}`)) continue;
+      gid = pools.pickRole(new Rng(hashSeed(`${want}${i}`)), want, [`c${m}`]);
+    } else if (!role) continue;
+    if (gid !== data[i]) (cells.push(i), gids.push(gid));
+  }
+  if (cells.length) store.strokeSetLayer(layer.id, cells, gids);
+}

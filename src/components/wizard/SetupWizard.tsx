@@ -57,11 +57,12 @@ const MAP_SIZES = [
   { label: 'Groß', n: 96 },
   { label: 'Riesig', n: 160 },
 ];
-const LAYOUTS: { id: 'rooms' | 'cave' | 'outdoor' | 'village'; label: string; text: string }[] = [
+const LAYOUTS: { id: 'rooms' | 'cave' | 'outdoor' | 'village' | 'island'; label: string; text: string }[] = [
   { id: 'rooms', label: 'Räume', text: 'Gebaute Räume und Gänge' },
   { id: 'cave', label: 'Höhle', text: 'Natürliche Kammern' },
   { id: 'outdoor', label: 'Außen', text: 'Lichtungen im Wald' },
   { id: 'village', label: 'Dorf', text: 'Häuser und Brunnen' },
+  { id: 'island', label: 'Insel', text: 'Land im Meer mit Stränden' },
 ];
 
 const SPECIAL_HINT: Record<SpecialRoomType, string> = {

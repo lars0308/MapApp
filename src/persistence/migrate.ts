@@ -5,6 +5,7 @@ import { DEFAULT_LAYERS, layerFromDef } from '../layers/defaults';
 import { DEMO_AUTOTILE_IDS, createDemoAutotileSets } from '../tilesets/demoAutotiles';
 import { DEMO_SIDE_ID, createDemoSideTileset } from '../tilesets/demoSide';
 import { DEMO_HEX_ID, createDemoHexTileset } from '../tilesets/demoHex';
+import { DEMO_NATURE_ID, createDemoNatureTileset } from '../tilesets/demoNature';
 
 type LegacyGenerator = GeneratorSettings & { hazards?: number; lava?: boolean; water?: boolean; abyss?: boolean };
 
@@ -57,6 +58,12 @@ export function migrateProject(p: Project): Project {
     const hex = createDemoHexTileset(nextGid);
     tilesets = [...tilesets, hex];
     nextGid = hex.firstGid + hex.columns * hex.rows;
+  }
+  // summer nature tiles with soft path / shore edges (v3.21)
+  if (!tilesets.some((t) => t.id === DEMO_NATURE_ID)) {
+    const nature = createDemoNatureTileset(nextGid);
+    tilesets = [...tilesets, nature];
+    nextGid = nature.firstGid + nature.columns * nature.rows;
   }
 
   // layers: y-sort flag + missing default roles at their default position

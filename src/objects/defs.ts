@@ -176,17 +176,35 @@ function drawBuiltin(): HTMLCanvasElement {
       for (let x = Math.floor(cx - r); x <= cx + r; x++) if ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= r * r) px(x, y, c);
   };
 
-  // tree (2×3 tiles at 0,0): crown 2×2, trunk + roots in the base row
+  // soft oval ground shadow
+  const oval = (cx: number, cy: number, rx: number, ry: number) => {
+    for (let y = -ry; y <= ry; y++) {
+      const w = Math.round(rx * Math.sqrt(1 - (y / (ry + 0.5)) ** 2));
+      rect(cx - w, cy + y, w * 2, 1, 'rgba(10,30,10,0.32)');
+    }
+  };
+  // tree (2×3 tiles at 0,0): round summer crown 2×2 with outline and light, trunk in the base row
   {
     const ox = 0;
-    rect(ox + 10, 36, 12, 4, 'rgba(0,0,0,0.35)'); // ground shadow
-    rect(ox + 13, 24, 6, 14, '#5a3d27');
-    rect(ox + 13, 24, 2, 14, '#6e4c31');
-    rect(ox + 11, 37, 10, 2, '#4a3220');
-    disc(ox + 16, 15, 13, '#2f4a2c');
-    disc(ox + 14, 13, 11, '#3b5e36');
-    disc(ox + 12, 10, 7, '#4c7442');
-    for (let i = 0; i < 40; i++) px(ox + 4 + rng.int(0, 24), 3 + rng.int(0, 22), rng.pick(['#5b8a4e', '#2a4227', '#44683c']));
+    oval(ox + 16, 38, 11, 3); // ground shadow
+    rect(ox + 13, 24, 6, 14, '#6b4527');
+    rect(ox + 13, 24, 2, 14, '#8a5c34');
+    rect(ox + 17, 24, 2, 14, '#553519');
+    rect(ox + 11, 36, 10, 2, '#553519');
+    disc(ox + 16, 15, 14, '#24481f'); // outline
+    disc(ox + 16, 15, 13, '#3a7a32');
+    disc(ox + 15, 13, 11, '#4a9640');
+    disc(ox + 13, 10, 7, '#5fae4c');
+    disc(ox + 11, 8, 3, '#7cc862');
+    // leaf clusters: small bumps along the crown, darker below
+    for (let i = 0; i < 26; i++) {
+      const a = rng.range(0, Math.PI * 2);
+      const r = rng.range(4, 11);
+      const x = ox + 16 + Math.cos(a) * r;
+      const y = 15 + Math.sin(a) * r;
+      px(Math.floor(x), Math.floor(y), Math.sin(a) > 0.2 ? '#2f6329' : '#6cbb55');
+    }
+    disc(ox + 16, 22, 5, '#336d2d');
   }
   // pillar (1×2 at 2,0)
   {
@@ -203,11 +221,12 @@ function drawBuiltin(): HTMLCanvasElement {
   // big rock (2×2 at 3,0)
   {
     const ox = 3 * T;
-    rect(ox + 3, 26, 26, 5, 'rgba(0,0,0,0.35)');
-    disc(ox + 16, 18, 12, '#575060');
-    disc(ox + 13, 15, 9, '#686071');
-    disc(ox + 11, 12, 5, '#7d7486');
-    for (let i = 0; i < 25; i++) px(ox + 6 + rng.int(0, 20), 8 + rng.int(0, 18), rng.pick(['#4a4452', '#736a7c']));
+    oval(ox + 16, 28, 13, 3);
+    disc(ox + 16, 18, 12, '#4a5461'); // outline
+    disc(ox + 16, 18, 11, '#6f7b88');
+    disc(ox + 14, 15, 8, '#8e9aa6');
+    disc(ox + 12, 12, 4, '#a9b4bf');
+    for (let i = 0; i < 18; i++) px(ox + 7 + rng.int(0, 18), 10 + rng.int(0, 16), rng.pick(['#5c6773', '#7d8995']));
   }
   // arch (3×3 at 5,0): two pillars + beam; top two rows are drawn over characters
   {

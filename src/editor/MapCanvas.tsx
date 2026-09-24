@@ -7,7 +7,7 @@ import { mapEvents, viewEvents } from '../store/events';
 import { brushCells, floodCells, lineCells, rectCells, rectFromPoints } from './tools';
 import { setRenderer } from './rendererRef';
 import { computeBlocked } from './collision';
-import { applyAutoWalls } from './autoWalls';
+import { applyAutoEdges, applyAutoWalls } from './autoWalls';
 import { pasteClip, stampOrigin } from './clipboard';
 import { tileOf, transformOf, withTransform } from '../tilesets/gid';
 import { objectDef } from '../objects/defs';
@@ -244,6 +244,7 @@ export function MapCanvas() {
     /** end a stroke; with "Auto-Wände" the walls around painted ground / doors are re-tiled */
     const finishStroke = (label: string) => {
       const s = store();
+      applyAutoEdges(s.strokeCells(), s.project.activeLayerId);
       if (editor().autoWalls) applyAutoWalls(s.strokeCells(), s.project.activeLayerId);
       s.endStroke(label);
     };
