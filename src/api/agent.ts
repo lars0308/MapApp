@@ -44,6 +44,15 @@ const STEP: Record<string, string> = {
   undo: 'Macht einen Schritt rückgängig',
   redo: 'Stellt einen Schritt wieder her',
   render: 'Prüft das Ergebnis',
+  figure_new: 'Legt eine neue Figur an',
+  figure_parts: 'Schaut sich die Bauteile an',
+  figure_status: 'Schaut sich die Figur an',
+  figure_set_part: 'Setzt ein Bauteil ein',
+  figure_color: 'Wählt die Farben',
+  figure_draw: 'Zeichnet Pixel',
+  figure_grid: 'Liest die Pixel',
+  figure_render: 'Prüft die Figur',
+  figure_save: 'Speichert die Figur',
   figure_to_map: 'Stellt eine Figur auf die Karte',
   figure_use_as_player: 'Macht die Figur zur Spielfigur',
 };
@@ -59,6 +68,8 @@ export const useAgent = create<AgentState>(() => ({ running: false, step: '', st
 export const stopAgent = () => useAgent.setState({ stop: true, step: 'Wird gestoppt …' });
 
 const MAX_TURNS = 20;
+/** figures take more careful steps (draw, look, improve) */
+const MAX_TURNS_FIGURES = 32;
 
 /** Einstellungen → KI: "standard" (Claude Sonnet, gründlich) or "sparsam" (Claude Haiku, about half the price) */
 export type AiMode = 'standard' | 'sparsam';
@@ -97,10 +108,10 @@ function prune(messages: Message[]) {
       }
 }
 
-async function step(messages: Message[]): Promise<{ content: Block[]; stop_reason: string; cost: number }> {
+async function step(messages: Message[], focus?: 'figures'): Promise<{ content: Block[]; stop_reason: string; cost: number }> {
   let r: Response;
   try {
-    r = await fetch('/api/agent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages, mode: aiMode() }) });
+    r = await fetch('/api/agent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages, mode: aiMode(), focus }) });
   } catch {
     throw new Error('Keine Verbindung zum Server – bist du online?');
   }
@@ -114,7 +125,7 @@ async function step(messages: Message[]): Promise<{ content: Block[]; stop_reaso
  * Let the AI build: `task` in words, `images` as references (reference picture, own tileset …).
  * Returns the AI's closing words. Progress in useAgent (banner with a stop button).
  */
-export async function runAgent(task: string, images: { label: string; dataUrl: string }[] = []): Promise<{ text: string; cost: number }> {
+export async function runAgent(task: string, images: { label: string; dataUrl: string }[] = [], opts: { focus?: 'figures' } = {}): Promise<{ text: string; cost: number; stopped: boolean }> {
   if (useAgent.getState().running) throw new Error('Die KI baut gerade schon');
   useAgent.setState({ running: true, step: 'Die KI überlegt …', steps: 0, stop: false });
   const first: Block[] = [];
@@ -124,9 +135,9 @@ export async function runAgent(task: string, images: { label: string; dataUrl: s
   let summary = '';
   let cost = 0;
   try {
-    for (let turn = 0; turn < MAX_TURNS; turn++) {
+    for (let turn = 0; turn < (opts.focus === 'figures' ? MAX_TURNS_FIGURES : MAX_TURNS); turn++) {
       if (useAgent.getState().stop) break;
-      const { content, stop_reason, cost: c } = await step(messages);
+      const { content, stop_reason, cost: c } = await step(messages, opts.focus);
       cost += c;
       messages.push({ role: 'assistant', content });
       summary = content.filter((b): b is Extract<Block, { type: 'text' }> => b.type === 'text').map((b) => b.text).join('\n').trim() || summary;
@@ -146,7 +157,7 @@ export async function runAgent(task: string, images: { label: string; dataUrl: s
           const text = [res.text, res.data !== undefined ? JSON.stringify(res.data) : ''].filter(Boolean).join('\n');
           if (text) parts.push({ type: 'text', text: text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)} … (gekürzt)` : text });
           // pictures cost tokens: maps small (the AI can zoom into an area), tilesets readable
-          if (res.binary?.kind === 'image') parts.push(await imageBlock(`data:${res.binary.mime};base64,${res.binary.base64}`, call.name === 'tileset_render' ? 1100 : 768));
+          if (res.binary?.kind === 'image') parts.push(await imageBlock(`data:${res.binary.mime};base64,${res.binary.base64}`, call.name === 'tileset_render' || call.name === 'figure_render' ? 1100 : 768));
           if (!parts.length) parts.push({ type: 'text', text: 'ok' });
         }
         results.push({ type: 'tool_result', tool_use_id: call.id, content: parts, is_error: !res.ok || undefined });
@@ -155,7 +166,7 @@ export async function runAgent(task: string, images: { label: string; dataUrl: s
       prune(messages);
     }
     await saveNow();
-    return { text: summary, cost };
+    return { text: summary, cost, stopped: useAgent.getState().stop };
   } finally {
     useAgent.setState({ running: false, step: '', stop: false });
   }

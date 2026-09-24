@@ -19,13 +19,14 @@ import { buildGodotPackage } from '../export/actions';
 import { MapRenderer } from '../renderer/MapRenderer';
 import { applyIso } from '../renderer/isoSetup';
 import { loadImage } from '../utils/image';
-import { useSprites, DEMO_PARTS, SLOTS, composeView, partById, toPng } from '../sprites/store';
+import { useSprites, DEMO_PARTS, SLOTS, blank, composeView, fitContext, layerPixels, partById, toPng } from '../sprites/store';
+import { S as DESIGN } from '../sprites/painter';
 import { RAMP_PRESETS, CHANNELS, type Channel, type Ramp } from '../sprites/palette';
 import { animsFor, framesOf, frameSize } from '../sprites/animation';
 import { buildSpriteGodot } from '../sprites/exportSprite';
 import { setPlayerSprite } from '../playtest/playerSprite';
 import { figureToObject } from '../objects/fromFigure';
-import { VIEWS, VIEWS4, type SpriteKind, type View } from '../sprites/types';
+import { VIEWS, VIEWS4, type OtherView, type SpriteDoc, type SpriteKind, type SpriteLayer, type View } from '../sprites/types';
 import type { GeneratorSettings, Layer, ObjectType, Perspective, Project, TileCategory, TileMeta, TileRole, Tileset } from '../types';
 import { SIDE_THEMES, TILE_ROLES } from '../types';
 import { CATEGORIES } from '../tilesets/categories';
@@ -195,6 +196,111 @@ const kindOf = (v: unknown): SpriteKind => {
 async function figureReady(kind: SpriteKind) {
   await useSprites.getState().load(kind);
   return useSprites.getState()[kind].doc;
+}
+
+// ---------------------------------------------------------------- figure pixels (figure_draw / figure_grid)
+
+/** "#rgb", "#rrggbb", "#rrggbbaa" → rgba; "" / "none" / "transparent" → null (erase) */
+function parseColor(v: unknown, key: string): [number, number, number, number] | null {
+  const s = String(v ?? '').trim().toLowerCase();
+  if (!s || s === 'none' || s === 'transparent') return null;
+  let m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(s);
+  if (m) return [parseInt(m[1] + m[1], 16), parseInt(m[2] + m[2], 16), parseInt(m[3] + m[3], 16), 255];
+  m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})?$/.exec(s);
+  if (!m) fail(`palette "${key}": Farbe als #rrggbb`);
+  return [parseInt(m![1], 16), parseInt(m![2], 16), parseInt(m![3], 16), m![4] ? parseInt(m![4], 16) : 255];
+}
+
+const GRID_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&*+=?@^~<>';
+
+/** pixels → rows of characters + palette (cropped to what is drawn) */
+function toGrid(data: Uint8ClampedArray, size: number) {
+  let x0 = size;
+  let y0 = size;
+  let x1 = -1;
+  let y1 = -1;
+  const count = new Map<string, number>();
+  const hexAt = (i: number) => '#' + [data[i], data[i + 1], data[i + 2]].map((v) => v.toString(16).padStart(2, '0')).join('') + (data[i + 3] < 250 ? data[i + 3].toString(16).padStart(2, '0') : '');
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      if (data[i + 3] < 8) continue;
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x);
+      y1 = Math.max(y1, y);
+      const h = hexAt(i);
+      count.set(h, (count.get(h) ?? 0) + 1);
+    }
+  if (x1 < 0) return { x: 0, y: 0, rows: [] as string[], palette: {} as Record<string, string> };
+  const colors = [...count.entries()].sort((a, b) => b[1] - a[1]).map(([h]) => h);
+  const kept = colors.slice(0, GRID_CHARS.length);
+  const rgb = kept.map((h) => [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16)));
+  const charOf = new Map<string, string>();
+  kept.forEach((h, k) => charOf.set(h, GRID_CHARS[k]));
+  // more colours than characters: the rest takes the nearest kept colour
+  const nearest = (h: string) => {
+    const c = [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16));
+    let best = 0;
+    let bd = Infinity;
+    rgb.forEach((r, k) => {
+      const d = (r[0] - c[0]) ** 2 + (r[1] - c[1]) ** 2 + (r[2] - c[2]) ** 2;
+      if (d < bd) (bd = d), (best = k);
+    });
+    return GRID_CHARS[best];
+  };
+  const rows: string[] = [];
+  for (let y = y0; y <= y1; y++) {
+    let row = '';
+    for (let x = x0; x <= x1; x++) {
+      const i = (y * size + x) * 4;
+      if (data[i + 3] < 8) row += '.';
+      else {
+        const h = hexAt(i);
+        row += charOf.get(h) ?? nearest(h);
+      }
+    }
+    rows.push(row);
+  }
+  return { x: x0, y: y0, rows, palette: Object.fromEntries(kept.map((h, k) => [GRID_CHARS[k], h])) };
+}
+
+const OTHER_VIEWS: OtherView[] = ['fside', 'side', 'bside', 'back'];
+
+/** a part layer about to be drawn on: keep what it looks like in every view (it no longer refits) */
+function materialize(doc: SpriteDoc, layer: SpriteLayer): SpriteLayer {
+  if (layer.edited || !layer.partId || doc.kind === 'object') return { ...layer, edited: true };
+  const views: SpriteLayer['views'] = { ...layer.views };
+  for (const v of OTHER_VIEWS) views[v] ??= new Uint8ClampedArray(layerPixels(doc, layer, v));
+  return { ...layer, edited: true, views };
+}
+
+/** where the body sits in the picture (pixel coordinates of this figure), so drawings line up with parts and animations */
+function anatomy(doc: SpriteDoc, view: View = 'front') {
+  const o = Math.floor((doc.size - DESIGN) / 2);
+  const ctx = fitContext(doc, view);
+  const r = (n: number) => Math.round(n + o);
+  if (doc.kind === 'character') {
+    const b = ctx.body;
+    return {
+      head: { cx: r(b.hx), cy: r(b.hy), rx: Math.round(b.hrx), ry: Math.round(b.hry) },
+      torso: { x0: r(b.t[0]), y0: r(b.t[1]), x1: r(b.t[2]), y1: r(b.t[3]) },
+      arm_left_cols: [r(b.aL[0]), r(b.aL[1])],
+      arm_right_cols: [r(b.aR[0]), r(b.aR[1])],
+      arm_rows: [r(b.ay[0]), r(b.ay[1])],
+      leg_left_cols: [r(b.lL[0]), r(b.lL[1])],
+      leg_right_cols: [r(b.lR[0]), r(b.lR[1])],
+      leg_rows: [r(b.ly[0]), r(b.ly[1])],
+      feet_row: r(b.ly[1]),
+      note: 'Pixel über torso.y0 = Kopf, ab leg_rows = Beine (links/rechts von head.cx), Arme in den arm-Spalten – so bewegen die Animationen sie.',
+    };
+  }
+  if (doc.kind === 'creature') {
+    const c = ctx.creature;
+    return { body: { cx: r(c.cx), cy: r(c.cy), rx: Math.round(c.rx), ry: Math.round(c.ry) }, top: r(c.top), ground_row: r(c.ground), eye_row: r(c.eyeY), eye_dx: Math.round(c.eyeDX), mouth_row: r(c.mouthY), flies: !!c.fly };
+  }
+  const b = ctx.bounds;
+  return { bounds: { x0: r(b.x0), y0: r(b.y0), x1: r(b.x1), y1: r(b.y1) }, note: 'oberes Drittel = Deckel/Kopf (bewegt sich beim Öffnen)' };
 }
 
 type Handler = (a: Args) => Promise<Omit<Extract<Result, { ok: true }>, 'ok'>> | Omit<Extract<Result, { ok: true }>, 'ok'>;
@@ -641,7 +747,93 @@ const H: Record<string, Handler> = {
   figure_status: async (a) => {
     const kind = kindOf(a.kind);
     const doc = await figureReady(kind);
-    return { data: { name: doc.name, size: doc.size, layers: doc.layers.map((l) => ({ id: l.id, slot: l.slot, part: l.partId, name: l.name, drawn: l.edited, visible: l.visible })), colors: doc.ramps } };
+    return {
+      data: {
+        name: doc.name,
+        size: doc.size,
+        layers: doc.layers.map((l) => ({ id: l.id, slot: l.slot, part: l.partId, name: l.name, drawn: l.edited, own_views: Object.keys(l.views ?? {}), visible: l.visible })),
+        colors: doc.ramps,
+        anatomy: anatomy(doc, (a.view as View) ?? 'front'),
+      },
+    };
+  },
+
+  figure_draw: async (a) => {
+    const kind = kindOf(a.kind);
+    const doc = await figureReady(kind);
+    const n = doc.size;
+    const view = (a.view ?? 'front') as View;
+    if (!VIEWS.some((v) => v.id === view)) fail(`view: ${VIEWS.map((v) => v.id).join(', ')}`);
+    if (kind === 'object' && view !== 'front') fail('Objekte haben nur die Vorderansicht');
+    const rows = Array.isArray(a.rows) ? a.rows.map(String) : fail('rows: Liste von Zeilen, ein Zeichen pro Pixel');
+    if (rows.length > n) fail(`Höchstens ${n} Zeilen (Figur ist ${n}×${n})`);
+    const pal = new Map<string, [number, number, number, number] | null>();
+    for (const [k, v] of Object.entries((a.palette ?? {}) as Record<string, unknown>)) {
+      if (k.length !== 1 || k === '.' || k === ' ') fail('palette: ein Zeichen pro Farbe, "." und Leerzeichen bedeuten „unverändert“');
+      pal.set(k, parseColor(v, k));
+    }
+    const x0 = int(a.x, 'x', 0);
+    const y0 = int(a.y, 'y', 0);
+
+    const layers = doc.layers.slice();
+    let at = a.layer ? layers.findIndex((l) => l.id === a.layer || l.name === a.layer) : -1;
+    if (a.layer && at < 0) fail(`Layer "${a.layer}" gibt es nicht – figure_status zeigt alle`);
+    if (at < 0) {
+      const slot = a.slot ? String(a.slot) : 'extra';
+      const slots = SLOTS[kind].map((x) => x.id);
+      if (!slots.includes(slot)) fail(`slot: ${slots.join(', ')}`);
+      const layer: SpriteLayer = { id: uid(), name: String(a.name ?? 'KI-Zeichnung').slice(0, 40), slot, partId: null, edited: true, visible: true, data: blank(n) };
+      // like the builder: below every layer of a later slot
+      const rank = (s: string | null) => (s && slots.includes(s) ? slots.indexOf(s) : slots.length);
+      let pos = 0;
+      layers.forEach((l, i) => rank(l.slot) <= rank(slot) && (pos = i + 1));
+      layers.splice(pos, 0, layer);
+      at = pos;
+    } else layers[at] = materialize(doc, layers[at]);
+    let layer = layers[at];
+    if (a.hide_in_other_views && kind !== 'object') {
+      const views = { ...layer.views };
+      for (const v of OTHER_VIEWS) if (v !== view && !views[v]) views[v] = blank(n);
+      layer = { ...layer, views };
+    }
+    const target = new Uint8ClampedArray(a.clear ? blank(n) : view === 'front' ? layer.data : layerPixels(doc, layer, view));
+    let painted = 0;
+    let outside = 0;
+    const put = (x: number, y: number, c: [number, number, number, number] | null) => {
+      if (x < 0 || y < 0 || x >= n || y >= n) return void outside++;
+      const i = (y * n + x) * 4;
+      if (c) target.set(c, i);
+      else target.fill(0, i, i + 4);
+      painted++;
+    };
+    const unknown = new Set<string>();
+    rows.forEach((row, ry) => {
+      [...row].forEach((ch, rx) => {
+        if (ch === '.' || ch === ' ') return;
+        if (!pal.has(ch)) return void unknown.add(ch);
+        const c = pal.get(ch)!;
+        put(x0 + rx, y0 + ry, c);
+        // mirror: the same pixel on the other side of the figure's middle
+        if (a.mirror) put(n - 1 - (x0 + rx), y0 + ry, c);
+      });
+    });
+    if (unknown.size) fail(`Zeichen ohne Farbe in palette: ${[...unknown].join(' ')}`);
+    layers[at] = view === 'front' ? { ...layer, data: target } : { ...layer, views: { ...layer.views, [view]: target } };
+    useSprites.getState().setDocument(kind, { ...doc, layers, updatedAt: Date.now() });
+    return { data: { layer: layers[at].id, name: layers[at].name, slot: layers[at].slot, view, painted, ...(outside ? { outside } : {}) } };
+  },
+
+  figure_grid: async (a) => {
+    const kind = kindOf(a.kind);
+    const doc = await figureReady(kind);
+    const view = (a.view ?? 'front') as View;
+    if (!VIEWS.some((v) => v.id === view)) fail(`view: ${VIEWS.map((v) => v.id).join(', ')}`);
+    let data: Uint8ClampedArray;
+    if (a.layer) {
+      const layer = doc.layers.find((l) => l.id === a.layer || l.name === a.layer) ?? fail(`Layer "${a.layer}" gibt es nicht`);
+      data = layerPixels(doc, layer!, view);
+    } else data = composeView(doc, view);
+    return { data: { size: doc.size, view, ...toGrid(data, doc.size), hint: '"." = leer; x/y = linke obere Ecke der Zeilen – passt direkt zu figure_draw' } };
   },
 
   figure_parts: (a) => {

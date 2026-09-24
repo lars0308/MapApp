@@ -336,6 +336,15 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.33 – Figuren mit KI: Charakter, Kreatur oder Objekt aus der Beschreibung**
+
+- **„Beschreibe dein Spiel“ auf der Startseite baut jetzt auch Figuren.** Schreib zum Beispiel „Ritter in silberner Rüstung mit rotem Umhang“, „Grüner Schleim-Boss mit Krone“ oder „Alte Schatztruhe mit Goldbeschlägen“, gern mit Referenzbild. Die KI erkennt, dass du eine Figur willst, öffnet den Figuren-Baukasten und zeichnet sie dort live: Bauteile als Basis, eigene Farben, eigene Pixel für jedes Detail. Sie schaut sich das Ergebnis mehrmals an und bessert nach. Danach liegt die Figur in der Galerie.
+- **Karte mit eigenen Figuren:** Beschreibst du eine Karte mit Held oder Gegnern („… mit einem Zwerg als Spielfigur“), baut die KI erst die Karte, dann die Figuren. Die Spielfigur wird zur Figur im Testspiel, Gegner und Händler stellt sie auf die Karte.
+- **Neuer KI-Befehl `figure_draw`:** Die KI zeichnet Pixel als Textzeilen mit Farbtabelle, pro Ansicht (vorne, schräg, Seite, hinten) und Layer. Spiegeln für symmetrische Figuren ist möglich, ebenso Details, die nur vorne zu sehen sind. Zeichnet sie auf einem Bauteil, behalten dessen andere Ansichten ihr Aussehen.
+- **Neuer KI-Befehl `figure_grid`:** liefert die Pixel einer Ansicht oder eines Layers im selben Format, damit die KI gezielt nachbessern kann. `figure_status` zeigt jetzt auch die Anatomie (Kopf, Rumpf, Arme, Beine bzw. Körper, Augen, Boden). So passen eigene Zeichnungen zu den Animationen.
+- **Pixel-Art-Regeln für die KI:** Umriss in dunklem Farbton, Licht von oben links, 3–4 Stufen pro Material, kühle Schatten und warme Lichter, kleine Palette, saubere Linien. Für Figuren bekommt die KI mehr Schritte (bis 32) und mehr Platz pro Antwort.
+- Deine offene Figur im Baukasten wird vorher in der Galerie gesichert, falls du sie schon verändert hattest. Mit „Stopp“ im Banner brichst du jederzeit ab.
+
 **Version 3.32 – Gelände nur, wenn du es willst**
 
 - **Wasser, Lava, Abgründe (mit Brücken) und Plateaus sind bei neuen Karten standardmäßig aus.** Flüsse, Häuser und Winter/Wüste waren schon aus beziehungsweise auf Sommer. Eine neue Karte ist also schlicht, bis du Gelände unter Aufbau → Gelände einschaltest. „Groß & detailliert“ schaltet Plateaus nicht mehr von selbst ein.

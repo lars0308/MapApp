@@ -1,7 +1,7 @@
 {
   "name": "mapforge",
   "version": "1.0",
-  "about": "MapForge: pixel-art map generator, tile editor and figure builder with Godot 4 export. Coordinates are tile cells (x to the right, y down, 0-based). A cell value is a tile gid (0 = empty); gids come from list_tiles. Typical flow: status → new_map (or generate) → render to look at it → paint / place_object / copy_paste to edit → render again → export_godot. Own tilesets: tileset_add → tileset_render → tileset_assign → generate. Figures: figure_parts → figure_set_part → figure_render → figure_export_godot.",
+  "about": "MapForge: pixel-art map generator, tile editor and figure builder with Godot 4 export. Coordinates are tile cells (x to the right, y down, 0-based). A cell value is a tile gid (0 = empty); gids come from list_tiles. Typical flow: status → new_map (or generate) → render to look at it → paint / place_object / copy_paste to edit → render again → export_godot. Own tilesets: tileset_add → tileset_render → tileset_assign → generate. Figures: figure_parts → figure_set_part / figure_color → figure_draw for own pixels → figure_render → figure_export_godot.",
   "commands": [
     {
       "name": "status",
@@ -858,7 +858,7 @@
     },
     {
       "name": "figure_status",
-      "description": "The figure in the builder (character, creature or object): name, size, layers with slot and part, colours.",
+      "description": "The figure in the builder (character, creature or object): name, size (pixels, square), layers (id, slot, part, drawn, own_views), colours and the anatomy – where head, torso, arms, legs (character), body, eyes, ground (creature) or the bounds (object) sit in pixel coordinates of this view, so own drawings line up with the parts and animate correctly.",
       "input": {
         "type": "object",
         "properties": {
@@ -869,6 +869,125 @@
               "creature",
               "object"
             ]
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "front",
+              "fside",
+              "side",
+              "bside",
+              "back"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      }
+    },
+    {
+      "name": "figure_draw",
+      "description": "Draw own pixels onto a figure layer – for details and shapes no part has (emblems, belts, masks, special armour, horns, a whole creature or object). rows = picture lines, one character per pixel, starting at x/y; palette maps each character to a colour ('#rrggbb', '#rrggbbaa' or 'none' = erase). '.' and space leave a pixel unchanged. Without layer a new layer is made in slot (default 'extra'); the slot decides how animations move it and the drawing order. Each view (front, fside, side, bside, back) has its own pixels: draw the views that differ; views never drawn show the front pixels unless hide_in_other_views is true (then they stay empty there – good for front-only details like a chest emblem). Drawing on a part layer keeps its other views. mirror: also paints the mirrored pixel (symmetric front views: draw the left half). clear: empty this view of the layer first.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "lines of the picture, e.g. [\"..kk..\", \".kddk.\"]"
+          },
+          "palette": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "character → colour, e.g. {\"k\":\"#1f1a2e\",\"d\":\"#c0392b\"}"
+          },
+          "x": {
+            "type": "integer",
+            "description": "column of the first character (default 0)"
+          },
+          "y": {
+            "type": "integer",
+            "description": "row of the first line (default 0)"
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "front",
+              "fside",
+              "side",
+              "bside",
+              "back"
+            ]
+          },
+          "layer": {
+            "type": "string",
+            "description": "id or name of an existing layer (figure_status); omit for a new layer"
+          },
+          "slot": {
+            "type": "string",
+            "description": "slot of a new layer (see figure_parts), default extra"
+          },
+          "name": {
+            "type": "string",
+            "description": "name of a new layer"
+          },
+          "mirror": {
+            "type": "boolean"
+          },
+          "clear": {
+            "type": "boolean"
+          },
+          "hide_in_other_views": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "rows",
+          "palette"
+        ]
+      }
+    },
+    {
+      "name": "figure_grid",
+      "description": "The figure (or one layer) of a view as text pixels: rows + palette + x/y of the top left corner, cropped to what is drawn – the same format figure_draw takes. Use it to edit exact pixels.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "front",
+              "fside",
+              "side",
+              "bside",
+              "back"
+            ]
+          },
+          "layer": {
+            "type": "string",
+            "description": "only this layer (id or name)"
           }
         },
         "required": [
@@ -985,7 +1104,7 @@
     },
     {
       "name": "figure_new",
-      "description": "Start a new figure (random parts or empty).",
+      "description": "Start a new figure: random parts, or empty (a blank canvas for drawing it yourself with figure_draw). size in pixels (default 32; parts are made for 32, larger sizes centre them).",
       "input": {
         "type": "object",
         "properties": {

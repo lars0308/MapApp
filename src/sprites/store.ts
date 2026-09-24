@@ -238,6 +238,11 @@ export function newDoc(kind: SpriteKind, size = 32, empty = false): SpriteDoc {
   return doc;
 }
 
+/** still the figure a new builder starts with (nothing chosen, drawn or renamed) */
+export function isUntouched(doc: SpriteDoc): boolean {
+  return doc.name === KIND_NAME[doc.kind] && !doc.layers.some((l) => l.edited) && doc.layers.map((l) => l.partId).join() === DEFAULT_SET[doc.kind].join();
+}
+
 // ---------------------------------------------------------------- persistence (browser storage)
 
 interface StoredDoc extends Omit<SpriteDoc, 'layers' | 'frames' | 'customAnims'> {

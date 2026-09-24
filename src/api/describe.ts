@@ -1,14 +1,30 @@
 import { runCommand } from './commands';
-import { aiMode } from './agent';
+import { aiMode, runAgent } from './agent';
 import { defaultGenerator, defaultHex, defaultSide } from '../generator/presets';
 import { GENRES, VIEWS, deriveConfig, type ViewKind } from '../profiles';
 import { useProject } from '../store/projectStore';
 import { saveNow } from '../persistence/autosave';
+import { useApp } from '../store/appStore';
+import { isUntouched, useSprites } from '../sprites/store';
+import type { SpriteKind } from '../sprites/types';
 
 // "Beschreibe dein Spiel": description (+ reference picture, + own tileset) → build plan from Claude
 // (server: api/describe.js via the Vercel AI Gateway) → project + map built by the app's generator.
 
+export interface FigurePlan {
+  kind?: string;
+  name?: string;
+  /** detailed description for the drawing AI */
+  brief?: string;
+  size?: number;
+  /** in a map plan: "player" = the playable figure, "map" = placed on the map */
+  use?: string;
+}
+
 export interface BuildPlan {
+  /** what the user wants: a map (project) or only figures */
+  create?: 'map' | 'figure';
+  figures?: FigurePlan[];
   name?: string;
   summary?: string;
   view?: string;
@@ -118,4 +134,34 @@ export async function setReference(ref: { text?: string; image?: string | null }
   const text = ref.text ?? useProject.getState().project.reference?.text;
   useProject.setState((st) => ({ project: { ...st.project, reference: image || text ? { text, image } : undefined } }));
   await saveNow();
+}
+
+const KIND_LABEL: Record<SpriteKind, string> = { character: 'Charakter', creature: 'Kreatur', object: 'Objekt' };
+const figureKind = (k: unknown): SpriteKind => (k === 'creature' || k === 'object' ? k : 'character');
+
+/** the figures of a plan the app can build (kind checked, at most 3) */
+export function planFigures(plan: BuildPlan): (FigurePlan & { kind: SpriteKind })[] {
+  return (Array.isArray(plan.figures) ? plan.figures : []).slice(0, 3).map((f) => ({ ...f, kind: figureKind(f.kind) }));
+}
+
+/**
+ * The AI draws one figure in the builder (character / creature / object page, live).
+ * The figure open there before goes to the gallery first, so nothing is lost.
+ */
+export async function buildFigure(fig: FigurePlan & { kind: SpriteKind }, wish: string, image: string | null, onMap: boolean): Promise<{ text: string; cost: number; stopped: boolean }> {
+  const kind = fig.kind;
+  await useSprites.getState().load(kind);
+  if (!isUntouched(useSprites.getState()[kind].doc)) useSprites.getState().saveToGallery(kind);
+  useApp.getState().goTo(kind);
+  const size = [16, 32, 48, 64].includes(Number(fig.size)) ? Number(fig.size) : 32;
+  const task = [
+    `Baue diese Figur (${KIND_LABEL[kind]}, kind "${kind}") in bestmöglicher Pixel-Art-Qualität: „${fig.name ?? KIND_LABEL[kind]}“.`,
+    fig.brief ? `Beschreibung: ${fig.brief}` : '',
+    wish.trim() ? `Wunsch des Nutzers im Original: ${wish.trim()}` : '',
+    image ? 'Das Referenzbild oben zeigt, wie sie aussehen soll.' : '',
+    `Beginne mit figure_new (kind "${kind}", name, size ${size}). Nutze Teile, eigene Farben und figure_draw für alle Details; prüfe mit figure_render und verbessere, bis sie wirklich gut aussieht. Zum Schluss figure_save.`,
+    onMap && fig.use === 'player' && kind !== 'object' ? 'Mach sie danach mit figure_use_as_player zur Spielfigur.' : '',
+    onMap && fig.use !== 'player' ? 'Stelle sie danach mit figure_to_map und place_object passend auf die Karte (1–3 Mal, an sinnvolle Stellen).' : '',
+  ].filter(Boolean).join('\n');
+  return runAgent(task, image ? [{ label: 'Referenzbild des Nutzers', dataUrl: image }] : [], { focus: 'figures' });
 }

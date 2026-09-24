@@ -44,6 +44,31 @@ So arbeitest du:
 - Arbeite zügig: meist 5–20 Werkzeugaufrufe. Stelle keine Rückfragen – triff sinnvolle Entscheidungen.
 - Zum Schluss: 2–3 kurze deutsche Sätze (du-Form), was du gebaut hast. Kein Markdown.`;
 
+// extra know-how when the AI builds figures (start page "Ritter mit rotem Umhang", a creature, a chest …)
+const FIGURES = `
+
+FIGUREN (Charakter, Kreatur, Objekt) – Ziel ist Pixel-Art in sehr hoher Qualität, wie von einem guten Pixel-Artist:
+Ablauf:
+1. figure_new (kind, name, meist size 32) → figure_parts und figure_status lesen (anatomy zeigt, wo Kopf, Rumpf, Arme, Beine bzw. Körper, Augen, Boden liegen).
+2. Basis wählen. Charaktere: fast immer Teile (Körper, Beine, Füße, Oberteil, Gesicht, Haare, Kopfbedeckung, Waffe, Schild, Rücken) – sie passen in allen Ansichten und animieren sauber. Kreaturen/Objekte: passende Teile, sonst figure_new mit empty und alles selbst zeichnen (Körper in slot body bzw. base, Augen/Mund in eigenen Slots).
+3. Farben mit figure_color: für jeden Kanal eigene 3 Töne [hell, mittel, dunkel] passend zur Beschreibung oder zum Referenzbild.
+4. Mit figure_draw alles ergänzen, was die Teile nicht haben: Wappen, Gürtel, Umhang, Maske, Hörner, Rüstungsplatten, Muster, Glanzlichter, eigene Waffen, ganze Körper. Die richtige slot-Wahl (hat, headx, face, top, back, weapon, offhand, eyes, mouth, horns, body, base, detail …) sorgt dafür, dass Animationen es richtig bewegen.
+5. Prüfen: figure_render (view all, scale 8) ansehen, Fehler gezielt verbessern (figure_grid liefert die exakten Pixel einer Ansicht oder eines Layers zum Ändern). Mindestens zwei Prüfrunden. Charakter und Kreatur: zum Schluss auch eine Animation rendern (Charakter walk, Kreatur k_hop, k_crawl oder k_fly – siehe figure_parts).
+6. figure_save. Wenn der Nutzer es möchte: figure_use_as_player bzw. figure_to_map + place_object.
+
+Pixel-Art-Regeln:
+- Klare, sofort lesbare Silhouette; Merkmale eher übertreiben (großer Hut, breites Schwert, leuchtende Augen).
+- 1 px Umriss außen in einem sehr dunklen, farbigen Ton (z. B. #1b1427 oder die dunkelste Stufe der Fläche), nicht reines Schwarz. Innen keine Linien, sondern Schattierung.
+- Licht von oben links: pro Material 3–4 Stufen (Glanz, hell, mittel, Schatten); Schatten unten rechts. Kein „Pillow Shading“ (nicht von allen Rändern zur Mitte heller).
+- Farbton verschieben: Schatten kühler und satter (Richtung Blau/Violett), Lichter wärmer (Richtung Gelb). Insgesamt eine kleine, stimmige Palette (etwa 12–20 Farben).
+- Saubere Linien (gleichmäßige Stufen 1-1, 2-2, 1-2-1 …), keine Einzelpixel-Krümel, Anti-Aliasing nur sparsam an Rundungen. Metall mit hartem Glanzpixel, Stoff weicher.
+- Gesicht und Augen mit wenigen, klaren Pixeln; ein heller Glanzpunkt macht Augen lebendig.
+- Ansichten: front (zum Betrachter), side (Blick nach rechts), back; fside/bside schräg; links wird gespiegelt. Details, die nur vorne zu sehen sind, mit hide_in_other_views zeichnen und für side/back eigene Versionen zeichnen. Objekte haben nur front.
+- Objekte in 3/4-Draufsicht wie die Karte: Oberseite sichtbar und heller, Vorderseite darunter dunkler, unten eine Standfläche mit weichem Schatten (#00000055).
+- figure_draw: rows alle gleich lang, ein Zeichen pro Pixel, "." = unverändert. Zeichne pro Aufruf eine Ansicht eines Layers; symmetrische Vorderansichten mit mirror (nur die linke Hälfte zeichnen).
+- Referenzbild: Form, Farben und Merkmale übernehmen und in sauberes Pixel-Art im Stil der Figur übersetzen.
+- Für Figuren sind 10–30 Werkzeugaufrufe normal. Qualität geht vor Tempo.`;
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST' });
   const host = req.headers['x-forwarded-host'] ?? req.headers.host;
@@ -61,6 +86,7 @@ export default async function handler(req, res) {
   if (!token) return res.status(500).json({ ok: false, error: 'KI ist auf dem Server nicht eingerichtet (AI Gateway)' });
 
   const model = MODELS[body.mode === 'sparsam' ? 'sparsam' : 'standard'];
+  const figures = body.focus === 'figures';
   // cache everything up to the newest message: the next step only pays full price for what is new
   const messages = body.messages.map((m, k) => {
     if (k !== body.messages.length - 1 || !Array.isArray(m.content) || !m.content.length) return m;
@@ -74,8 +100,9 @@ export default async function handler(req, res) {
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model: model.id,
-        max_tokens: 3000,
-        system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
+        // drawing a figure view as text pixels needs room
+        max_tokens: figures ? 8000 : 3000,
+        system: [{ type: 'text', text: figures ? SYSTEM + FIGURES : SYSTEM, cache_control: { type: 'ephemeral' } }],
         tools: TOOLS,
         messages,
       }),

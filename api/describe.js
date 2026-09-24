@@ -9,9 +9,21 @@ const MAX_IMAGE = 2_500_000; // characters of the data URL
 
 function system(context) {
   return `Du planst Spielkarten für MapForge, einen Pixel-Art-Kartengenerator mit Godot-Export.
-Der Nutzer beschreibt sein Spiel oder seine Karte, manchmal mit Referenzbild und/oder eigenem Tileset.
-Du antwortest NUR mit einem JSON-Objekt (kein Text davor oder danach) in dieser Form:
+Der Nutzer beschreibt sein Spiel oder seine Karte – oder eine Figur (Charakter, Kreatur/Monster, Objekt) –, manchmal mit Referenzbild und/oder eigenem Tileset.
+
+Entscheide zuerst, was er erstellen will:
+- Nur eine Figur (z. B. „Ritter mit rotem Umhang“, „Schleim-Monster mit Krone“, „goldene Schatztruhe“, ein Referenzbild einer Figur): antworte NUR mit
 {
+  "create": "figure",
+  "summary": "1 deutscher Satz (du-Form), was du baust",
+  "figures": [ { "kind": "character" | "creature" | "object", "name": "kurzer deutscher Name", "brief": "ausführliche Beschreibung für den Pixel-Artist: Form, Proportionen, Kleidung/Material, Farben (gern Hex), Besonderheiten, Stimmung, was vom Referenzbild übernommen wird", "size": 32 | 48 | 64 } ]
+}
+  character = Menschen und menschenähnliche Figuren (Held, Händler, Ork, Skelett-Krieger mit Waffe …), creature = Tiere und Monster (Schleim, Fledermaus, Spinne, Drache …), object = Dinge (Truhe, Fass, Laterne, Baum, Statue …). Größe meist 32, bei großen Bossen/Objekten 48 oder 64. Höchstens 3 Figuren.
+- Sonst eine Karte bzw. ein Spiel: antworte NUR mit dem Kartenplan unten. Beschreibt der Nutzer darin auch eigene Figuren (Spielfigur, Gegner, Händler), trage sie in "figures" ein (gleiche Form wie oben, dazu "use": "player" für die Spielfigur, sonst "map"), höchstens 2.
+
+Du antwortest NUR mit einem JSON-Objekt (kein Text davor oder danach). Kartenplan:
+{
+  "create": "map",
   "name": "kurzer deutscher Projektname",
   "summary": "1–2 deutsche Sätze: was du baust und warum (du-Form)",
   "view": ${context.views.map((v) => `"${v}"`).join(' | ')},
@@ -19,7 +31,8 @@ Du antwortest NUR mit einem JSON-Objekt (kein Text davor oder danach) in dieser 
   "perspective": eine Perspektive, die zur Ansicht passt,
   "width": Zahl 24–160, "height": Zahl 24–160,
   "generator": { nur die Einstellungen, die du ändern willst – gleiche Schlüssel und Form wie die Standardwerte unten },
-  "tips": ["höchstens 3 kurze deutsche Tipps für danach, optional"]
+  "tips": ["höchstens 3 kurze deutsche Tipps für danach, optional"],
+  "figures": [ optional, siehe oben ]
 }
 
 Ansichten, Perspektiven und Genres:

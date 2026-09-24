@@ -5,14 +5,19 @@ import { useEditor } from '../store/editorStore';
 import { useApp } from '../store/appStore';
 import { saveNow } from '../persistence/autosave';
 import { readFileAsDataUrl } from '../utils/download';
-import { askPlan, buildFromPlan, setReference } from '../api/describe';
+import { askPlan, buildFigure, buildFromPlan, planFigures, setReference } from '../api/describe';
 import { formatCost, runAgent } from '../api/agent';
 
 const EXAMPLES = [
   'Kleine Insel mit Dorf und Hafen, viel Wald im Süden, für ein gemütliches RPG',
   'Düsterer Dungeon mit Lava, Bossraum am Ende und vielen Schatztruhen – Roguelite',
   'Platformer-Level im Wald mit Leitern, Wasser und schwebenden Plattformen',
+  'Ritter in silberner Rüstung mit rotem Umhang, Schwert und Wappenschild',
+  'Grüner Schleim-Boss mit goldener Krone und bösen Augen',
+  'Alte Schatztruhe aus dunklem Holz mit Goldbeschlägen',
 ];
+/** chip text: the first part of an example */
+const chipLabel = (ex: string) => ex.split(/[,–]| mit /)[0];
 
 /**
  * Start page: describe the game / map in your own words (+ reference picture, + own tileset) –
@@ -40,10 +45,29 @@ export function DescribeCard() {
   const create = async () => {
     if (!text.trim() && !image) return toast('Beschreibe dein Spiel oder füge ein Referenzbild hinzu', 'error');
     try {
-      setBusy('Die KI plant deine Karte …');
+      setBusy('Die KI plant …');
       await saveNow();
-      // 1. quick plan: view, size, generator settings → project + first map
+      // 1. quick plan: a map (view, size, generator settings → project + first map) or only figures
       const plan = await askPlan({ text, image: image ?? undefined, tileset: tileset?.dataUrl });
+      const figures = planFigures(plan);
+      if (plan.create === 'figure' && figures.length) {
+        const wish = text;
+        const ref = image;
+        setText('');
+        setImage(null);
+        setBusy(null);
+        // the AI draws each figure live in the builder (banner shows the steps, stop anytime)
+        let cost = 0;
+        let words = '';
+        for (const f of figures) {
+          const r = await buildFigure(f, wish, ref, false);
+          cost += r.cost;
+          words = r.text || words;
+          if (r.stopped) break;
+        }
+        toast(`${words || plan.summary || 'Figur fertig'} (KI-Kosten ${formatCost(cost)})`, 'success');
+        return;
+      }
       const done = await buildFromPlan(plan, tileset ?? undefined, setBusy);
       // the project keeps description + picture: later AI requests see them again
       await setReference({ text, image });
@@ -60,10 +84,19 @@ export function DescribeCard() {
         ownTiles
           ? `Der Nutzer hat sein eigenes Tileset „${ownTiles.name}“ (id ${ownTiles.id}) hinzugefügt, die Demo-Tiles sind aus. Ordne es zuerst zu (tileset_render abschnittsweise, tileset_assign: Boden, Wände mit Rollen, Wasser, Wege, Türen, Deko) und generiere dann neu, damit die Karte aus seinen Tiles besteht.`
           : '',
+        figures.length ? `Diese eigenen Figuren werden danach separat gezeichnet – baue sie nicht selbst: ${figures.map((f) => f.name ?? f.kind).join(', ')}.` : '',
         'Setze danach alles um, was der Generator nicht von selbst macht: bestimmte Räume, Wege, Wasser, Objekte, Figuren, Hindernisse, Deko an den beschriebenen Stellen. Prüfe dein Ergebnis mit render.',
       ].filter(Boolean).join('\n');
       const words = await runAgent(task, image ? [{ label: 'Referenzbild des Nutzers (so soll es aussehen)', dataUrl: image }] : []);
-      toast(`${words.text || done.summary || 'Karte fertig'} (KI-Kosten ${formatCost(words.cost)})`, 'success');
+      let cost = words.cost;
+      // 3. own figures from the description (hero, enemies …): drawn in the builder, then onto the map
+      for (const f of words.stopped ? [] : figures.slice(0, 2)) {
+        const r = await buildFigure(f, text, image, true);
+        cost += r.cost;
+        if (r.stopped) break;
+      }
+      if (figures.length) goTo('map');
+      toast(`${words.text || done.summary || 'Karte fertig'} (KI-Kosten ${formatCost(cost)})`, 'success');
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Das hat nicht geklappt', 'error');
     } finally {
@@ -79,7 +112,7 @@ export function DescribeCard() {
         </span>
         <div>
           <h2 id="describe-title">Beschreibe dein Spiel</h2>
-          <p>Was für ein Spiel, welche Karte, welche Räume, Wege, Objekte und Figuren – die KI baut es für dich.</p>
+          <p>Eine Karte fürs Spiel oder eine einzelne Figur – Charakter, Kreatur oder Objekt. Die KI baut es für dich.</p>
         </div>
       </div>
       <textarea
@@ -96,7 +129,7 @@ export function DescribeCard() {
         <div className="describe-examples" aria-label="Beispiele">
           {EXAMPLES.map((ex) => (
             <button key={ex} type="button" className="chip" onClick={() => setText(ex)}>
-              {ex.split(/[,–]/)[0]}
+              {chipLabel(ex)}
             </button>
           ))}
         </div>
@@ -110,7 +143,7 @@ export function DescribeCard() {
       <Button variant="primary" block icon={<Icon.Spark size={16} />} disabled={!!busy} onClick={() => void create()}>
         {busy ?? 'Mit KI erstellen'}
       </Button>
-      <p className="hint">Die KI plant nur die Einstellungen – die Karte baut MapForge mit echten Tiles, Kollision und Godot-Export. Alles bleibt danach bearbeitbar.</p>
+      <p className="hint">Karten baut MapForge mit echten Tiles, Kollision und Godot-Export; Figuren zeichnet die KI Pixel für Pixel im Figuren-Baukasten, mit allen Ansichten und Animationen. Alles bleibt danach bearbeitbar.</p>
     </section>
   );
 }
