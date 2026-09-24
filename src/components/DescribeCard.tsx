@@ -6,7 +6,7 @@ import { useApp } from '../store/appStore';
 import { saveNow } from '../persistence/autosave';
 import { readFileAsDataUrl } from '../utils/download';
 import { askPlan, buildFromPlan, setReference } from '../api/describe';
-import { runAgent } from '../api/agent';
+import { formatCost, runAgent } from '../api/agent';
 
 const EXAMPLES = [
   'Kleine Insel mit Dorf und Hafen, viel Wald im Süden, für ein gemütliches RPG',
@@ -63,7 +63,7 @@ export function DescribeCard() {
         'Setze danach alles um, was der Generator nicht von selbst macht: bestimmte Räume, Wege, Wasser, Objekte, Figuren, Hindernisse, Deko an den beschriebenen Stellen. Prüfe dein Ergebnis mit render.',
       ].filter(Boolean).join('\n');
       const words = await runAgent(task, image ? [{ label: 'Referenzbild des Nutzers (so soll es aussehen)', dataUrl: image }] : []);
-      toast(words || done.summary || 'Karte fertig', 'success');
+      toast(`${words.text || done.summary || 'Karte fertig'} (KI-Kosten ${formatCost(words.cost)})`, 'success');
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Das hat nicht geklappt', 'error');
     } finally {

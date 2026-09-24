@@ -5,7 +5,7 @@ import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { readFileAsDataUrl } from '../utils/download';
 import { setReference } from '../api/describe';
-import { runAgent, useAgent } from '../api/agent';
+import { formatCost, runAgent, useAgent } from '../api/agent';
 
 /**
  * Aufbau → "Mit KI bauen": say what to build or change ("Truhe oben links, Fluss mit Brücke") – the
@@ -36,7 +36,7 @@ export function AiRefineCard() {
     setWish('');
     try {
       const done = await runAgent(task, reference?.image ? [{ label: 'Referenzbild des Nutzers (so soll es aussehen)', dataUrl: reference.image }] : []);
-      toast(done || 'Fertig', 'success');
+      toast(`${done.text || 'Fertig'} (KI-Kosten ${formatCost(done.cost)})`, 'success');
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Das hat nicht geklappt', 'error');
     }

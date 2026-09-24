@@ -3,7 +3,7 @@
 // map from it with its own generator; afterwards the building AI (api/agent.js) does the details.
 
 const GATEWAY = 'https://ai-gateway.vercel.sh/v1/messages';
-const MODEL = process.env.MAPFORGE_AI_MODEL || 'anthropic/claude-sonnet-5';
+const MODELS = { standard: process.env.MAPFORGE_AI_MODEL || 'anthropic/claude-sonnet-5', sparsam: 'anthropic/claude-haiku-4.5' };
 const MAX_TEXT = 3000;
 const MAX_IMAGE = 2_500_000; // characters of the data URL
 
@@ -92,7 +92,7 @@ export default async function handler(req, res) {
     const r = await fetch(GATEWAY, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 2500, system: system(body.context), messages: [{ role: 'user', content }] }),
+      body: JSON.stringify({ model: MODELS[body.mode === 'sparsam' ? 'sparsam' : 'standard'], max_tokens: 2500, system: system(body.context), messages: [{ role: 'user', content }] }),
     });
     const out = await r.json().catch(() => null);
     if (!r.ok) {

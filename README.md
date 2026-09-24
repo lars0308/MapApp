@@ -336,6 +336,19 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.26 – KI günstiger**
+
+- **Prompt-Caching** über das Vercel AI Gateway: Werkzeuge, Anweisungen und der bisherige Verlauf werden zwischengespeichert. Jeder weitere Schritt zahlt dafür nur ein Zehntel des Eingabepreises.
+- **Kleinere Anfragen:**
+  - Kartenbilder werden mit höchstens 768 px geschickt, Tileset-Ausschnitte mit 1100 px.
+  - Nur das neueste Bild bleibt im Verlauf.
+  - Die KI macht höchstens 20 Schritte und fasst gleichartige Arbeit zusammen.
+  - Im Test schrumpfte die Anfrage von 149 KB auf 34 KB.
+- **Einstellungen → KI-Assistent:**
+  - **Gründlich** (Claude Sonnet 5): 2 $ Eingabe, 10 $ Ausgabe, 0,20 $ aus dem Cache, je 1 Mio. Tokens.
+  - **Sparsam** (Claude Haiku 4.5): halb so teuer.
+- Nach jedem KI-Bauen steht in der Meldung, was es tatsächlich gekostet hat (zum Beispiel „KI-Kosten ≈ 6 ct“).
+
 **Version 3.25 – Die KI baut selbst, schnelle Tilesets, Raum füllen**
 
 - **Die KI baut die Karte selbst.** Neuer Server-Endpunkt `api/agent.js`:

@@ -1,4 +1,5 @@
 import { runCommand } from './commands';
+import { aiMode } from './agent';
 import { defaultGenerator, defaultHex, defaultSide } from '../generator/presets';
 import { GENRES, VIEWS, deriveConfig, type ViewKind } from '../profiles';
 import { useProject } from '../store/projectStore';
@@ -64,6 +65,7 @@ export async function askPlan(input: { text: string; image?: string; tileset?: s
         image: input.image ? await shrinkImage(input.image, 1024, 'image/jpeg') : undefined,
         tileset: input.tileset ? await shrinkImage(input.tileset, 1024, 'image/png') : undefined,
         context: context(),
+        mode: aiMode(),
       }),
     });
   } catch {

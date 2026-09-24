@@ -8,7 +8,7 @@ import { ObjectThumb } from '../objects/ObjectThumb';
 import { tileBlocks } from '../editor/collision';
 import { PERSPECTIVE_INFO } from '../generator/perspective';
 import { tilesetSupports } from './tilePools';
-import { runAgent, useAgent } from '../api/agent';
+import { formatCost, runAgent, useAgent } from '../api/agent';
 import { CATEGORIES, CATEGORY_LABEL, SUGGESTED_TAGS } from './categories';
 import { TileThumb } from './TileThumb';
 import { AssignSummary, TileLabel, confirmedMetas, suggestMetas } from './TileLabel';
@@ -59,7 +59,7 @@ function AiAssignButton({ ts }: { ts: Tileset }) {
     void runAgent(
       `Ordne das Tileset „${ts.name}“ (id ${ts.id}, ${ts.columns}×${ts.rows} Tiles à ${ts.tileSize} px) zu: schau es dir mit tileset_render abschnittsweise an und setze mit tileset_assign Kategorie, Rolle und Tags – Boden, Wände mit ihren Rollen (Kanten, Ecken, Innenecken, Fronten), Wasser, Wege, Türen, Deko, Hindernisse. Leere oder unklare Tiles auslassen. Danach generate, damit die Karte mit dem Tileset gebaut wird.`,
     )
-      .then((done) => toast(done || 'Tiles zugeordnet', 'success'))
+      .then((done) => toast(`${done.text || 'Tiles zugeordnet'} (KI-Kosten ${formatCost(done.cost)})`, 'success'))
       .catch((e: unknown) => toast(e instanceof Error ? e.message : 'KI-Zuordnung fehlgeschlagen', 'error'));
   return (
     <Button variant="secondary" block icon={<Icon.Spark size={16} />} disabled={running} onClick={run}>
