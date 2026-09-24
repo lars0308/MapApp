@@ -9,8 +9,10 @@ import { downloadBlob } from '../utils/download';
 // Works on the phone as well – nothing has to run on a computer.
 
 /** relay project (public URL + publishable anon key – safe to ship in the app) */
-const DEFAULT_URL = (import.meta.env.VITE_MAPFORGE_RELAY_URL as string | undefined) ?? '';
-const DEFAULT_KEY = (import.meta.env.VITE_MAPFORGE_RELAY_KEY as string | undefined) ?? '';
+const DEFAULT_URL = (import.meta.env.VITE_MAPFORGE_RELAY_URL as string | undefined) ?? 'https://uqimzsputtnajpsficao.supabase.co';
+const DEFAULT_KEY =
+  (import.meta.env.VITE_MAPFORGE_RELAY_KEY as string | undefined) ??
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxaW16c3B1dHRuYWpwc2ZpY2FvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyMzg0MjQsImV4cCI6MjEwNTgxNDQyNH0.IgQD8hUHjR4OeMF3w-4QrTEQfLNNNZnqN7zXBYV-TY0';
 const KEY = 'mapforge.relay';
 /** result pieces stay below the Realtime message limit (256 KB on free projects) */
 const CHUNK = 150_000;
@@ -120,7 +122,7 @@ async function connect() {
     if (status === 'SUBSCRIBED') {
       useRelay.setState({ status: 'connected', error: null });
       useEditor.getState().toast('KI von überall bereit – die KI kann jetzt in dieser App arbeiten', 'success');
-    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') useRelay.setState({ status: 'connecting', error: err?.message ?? 'Verbindung unterbrochen – versuche es weiter' });
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') useRelay.setState({ status: 'connecting', error: `Keine Verbindung zum Vermittler – Internet prüfen, es wird weiter versucht${err?.message ? ` (${err.message})` : ''}.` });
     else if (status === 'CLOSED' && useRelay.getState().enabled) useRelay.setState({ status: 'connecting' });
   });
 }

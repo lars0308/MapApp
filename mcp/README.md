@@ -25,6 +25,17 @@ KI  ⇄ MCP (stdio) ⇄ mcp/server.mjs ⇄ WebSocket ⇄ MapForge im Browser
 
 Ist kein Tab verbunden, startet der Server MapForge selbst in einem unsichtbaren Browser (installiertes Chrome/Edge oder `MAPFORGE_CHROME=/pfad/zu/chrome`). Die Projekte dieses Browsers liegen in `~/.mapforge-mcp/`.
 
+## KI von überall (Handy, claude.ai, ohne eigenen Server)
+
+Die App kann auch über das Internet gesteuert werden – auch am Handy, ohne PC:
+
+1. MapForge öffnen → **Einstellungen → KI von überall** einschalten.
+2. Die angezeigte **Adresse** kopieren (`https://…supabase.co/functions/v1/mapforge-mcp/<Kopplungscode>`).
+3. In Claude (App, claude.ai oder Desktop): **Einstellungen → Connectors → Eigenen Connector hinzufügen** → Adresse einfügen.
+4. Die App offen lassen, während die KI arbeitet. Exportierte ZIPs werden auf dem Gerät gespeichert, auf dem MapForge läuft.
+
+Technik: `supabase/functions/mapforge-mcp` (Supabase Edge Function, MCP über HTTP, ohne JWT – der Kopplungscode ist das Geheimnis) leitet jeden Tool-Aufruf über Supabase Realtime (Kanal `mapforge-<code>`) an den Tab weiter; die Antwort kommt in Stücken (≤ 150 KB) zurück. Eingerichtet im Supabase-Projekt „MapForge“ (`uqimzsputtnajpsficao`). Neu ausrollen nach Änderungen an `src/api/spec.json`: `npm run build` (kopiert die Befehlsliste) und `supabase functions deploy mapforge-mcp --no-verify-jwt`. Eigenes Projekt: in der App unter „Vermittler (Supabase)“ Adresse und öffentlichen Schlüssel eintragen oder `VITE_MAPFORGE_RELAY_URL` / `VITE_MAPFORGE_RELAY_KEY` setzen.
+
 ## Ohne MCP (jedes Programm)
 
 `node server.mjs --no-stdio` startet nur den HTTP-Teil:

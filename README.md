@@ -343,6 +343,11 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.4 – KI von überall (auch am Handy)**
+
+- **Einstellungen → KI von überall**: Schalter an, Adresse kopieren, in Claude als Connector eintragen – die KI arbeitet dann in dieser App, egal ob sie am Handy, Tablet oder PC offen ist und wo die KI läuft (z. B. Claude-App am Handy). Kein PC und kein eigener Server nötig. Jede Adresse enthält einen eigenen Kopplungscode („Neue Adresse erzeugen“ sperrt die alte). Exporte landen auf dem Gerät mit MapForge.
+- Die bisherige Verbindung über den MCP-Server auf dem Computer bleibt („KI auf diesem Computer“).
+
 **Version 3.3.1 – Tileset-Upload: Einzelteile statt Tausender Krümel**
 
 - Bilder, die kein sauberes Raster sind (KI-generierte Tile-Sheets, Teile mit Abständen, verschieden große Stücke, transparenter / einfarbiger / Verlaufs-Hintergrund), werden jetzt **in ihre Einzelteile zerlegt**: jedes Teil ausgeschnitten, in ganze Tiles gemessen (auch 2×1, 1×2 …), auf 16 / 32 / 48 / 64 px gebracht und in ein neues, sauberes Tileset gepackt. Kleine Splitter (Punkte, Steinchen neben Rissen) bleiben beim Teil daneben, weiche Schatten zählen als Hintergrund.

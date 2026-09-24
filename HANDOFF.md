@@ -1,6 +1,6 @@
 # Übergabe – MapForge (Stand 2026-09-24, Version 3.1)
 
-Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (Version 3.3 im README).
+Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (Version 3.4 im README).
 Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI auf Deutsch, UI selbsterklärend, mobil zuerst, keine Fake-Features.
 
 ## Stand (fertig, gepusht)
@@ -22,6 +22,11 @@ Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI 
 
 ## Eigene Objekte (Version 3.3)
 - `project.customObjects` (CustomObject: png w×h Tiles à 32 px), Registry + dynamischer Atlas in `src/objects/defs.ts` (`objectDef(type)` statt `OBJECT_DEFS[type]` benutzen!, `setCustomObjects` wird in main.tsx bei Projektänderung aufgerufen), Erzeugung `src/objects/fromFigure.ts`, UI: Figuren → Export, Tiles → Objekte.
+
+## KI von überall (Version 3.4)
+- Supabase-Projekt „MapForge“ (`uqimzsputtnajpsficao`, eu-central-1, Free) mit Edge Function `mapforge-mcp` (Code in `supabase/functions/mapforge-mcp`, verify_jwt aus, Kopplungscode im Pfad). App-Seite `src/api/relay.ts` (Realtime-Kanal `mapforge-<code>`, Ergebnisse in 150-KB-Stücken, ZIPs werden lokal heruntergeladen), UI `RelaySection` in `src/api/AiSection.tsx`.
+- Nach Änderungen an `src/api/spec.json` Edge Function neu deployen (spec.json liegt daneben, `npm run build` kopiert sie).
+- Noch nicht Ende-zu-Ende getestet (Sandbox blockt supabase.co) – erster echter Test durch den Nutzer.
 
 ## Danach offen
 5. Gegner/Beute automatisch nach Raumtyp/Distanz platzieren; Gegner auch im App-Testspiel.
