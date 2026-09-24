@@ -346,6 +346,14 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 2.9 – 8 Richtungen (Schrägansichten)**
+
+- Neue Ansichten **Schräg ↘** (schräg von vorne) und **Schräg ↗** (schräg von hinten) im Figuren-Baukasten und beim Animieren – links (↙ ↖) gespiegelt, zusammen 8 Richtungen. Alle Teile passen sich an: schmalerer Oberkörper, Arme dicht am Körper, Gesicht nach rechts gedreht, mehr Haar am Hinterkopf, schräg von hinten etwas Wange sichtbar. Kreaturen: Augen rücken zusammen und nach rechts.
+- Waffe bleibt in der rechten Hand und zeigt in Blickrichtung (schräg nach vorne-unten bzw. nach hinten-oben), Schild / zweite Hand liegt auf der abgewandten Seite hinter dem Körper.
+- Laufen und Rennen schräg: der Schritt der Seitenansicht, etwas kleiner; die übrigen Animationen wie vorne bzw. hinten.
+- „Auch andere Ansichten“: was vorne gemalt wird, landet auch in beiden Schrägansichten (schräg hinten gespiegelt).
+- Export: neue Wahl **8 Richtungen (+ schräg)** – Reihen `walk_down_side`, `walk_up_side` usw. Das Godot-Skript (Spieler und Gegner) wählt dann aus 8 Richtungen (in Godot 4.3 geprüft), sonst wie bisher 4. Die Figur im Karten-Export und beim Testspielen dreht sich schräg, wenn diagonal gelaufen wird.
+
 **Version 2.8.1 – Waffe immer in der rechten Hand, zeigt nach vorne**
 
 - Die Figur hält Schwert, Axt, Hammer & Co. immer in **ihrer rechten Hand**: von vorne sieht man die Waffe links im Bild, von der Seite in der vorderen Hand, von hinten rechts – nicht mehr gespiegelt.

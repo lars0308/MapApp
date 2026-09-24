@@ -238,9 +238,9 @@ function StudioBar({ kind, onSavePart }: { kind: SpriteKind; onSavePart: () => v
         options={VIEWS.map((v) => ({ value: v.id, label: v.label }))}
       />
       {view === 'front' && (
-        <label className="slot-lock studio-allviews" title="Was du vorne malst, erscheint auch in der Seiten- und Rückansicht (hinten gespiegelt, von der Seite schmaler). Gesichter bleiben vorne.">
+        <label className="slot-lock studio-allviews" title="Was du vorne malst, erscheint auch in den anderen Ansichten (hinten gespiegelt, von der Seite schmaler, schräg etwas schmaler). Gesichter bleiben vorne.">
           <input type="checkbox" checked={allViews} onChange={(e) => useSprites.getState().setAllViews(e.target.checked)} />
-          Auch Seite & Hinten
+          Auch andere Ansichten
         </label>
       )}
       <select className="input studio-size" value={doc.size} aria-label="Größe in Pixeln" onChange={(e) => setSize(kind, Number(e.target.value))} title="Größe in Pixeln (Baukasten-Teile sind für 32 px gezeichnet)">
@@ -447,7 +447,7 @@ function ViewHint({ kind }: { kind: SpriteKind }) {
   return (
     <div className="view-hint">
       <span>
-        {view === 'side' ? 'Seitenansicht' : 'Rückansicht'}: automatisch aus den Teilen. Was du hier malst, gilt nur für diese Ansicht.
+        {{ side: 'Seitenansicht', back: 'Rückansicht', fside: 'Schräg von vorne', bside: 'Schräg von hinten', front: '' }[view]}: automatisch aus den Teilen. Was du hier malst, gilt nur für diese Ansicht.
       </span>
       {own && (
         <button

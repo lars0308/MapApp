@@ -53,7 +53,8 @@ const BASE_NAME: Record<string, string> = { k_idle: 'idle', k_fly: 'walk', k_hop
 export function playerSheet(doc: SpriteDoc): Stored {
   const kind = doc.kind === 'creature' ? 'creature' : 'character';
   const anims = PLAYER_ANIMS[kind].map((ids) => ids.map((id) => ANIMATIONS.find((a) => a.id === id)).find(Boolean)).filter(Boolean) as AnimDef[];
-  const views: View[] = ['front', 'side', 'back'];
+  // all 8 directions (← ↙ ↖ are the mirrored → ↘ ↗)
+  const views: View[] = ['front', 'fside', 'side', 'bside', 'back'];
   const { canvas, rows } = buildSheet(doc, anims, views);
   const map: NonNullable<Stored['rows']> = {};
   for (const r of rows) {

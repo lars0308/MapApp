@@ -3,6 +3,8 @@ import { dataUrlToBytes, downloadBlob, downloadText, safeFileName } from '../uti
 import { playerSheet, playerSpriteData } from '../playtest/playerSprite';
 import { useSprites } from '../sprites/store';
 import { spriteGodotEntries } from '../sprites/exportSprite';
+import { DIR_NAME } from '../sprites/animation';
+import type { View } from '../sprites/types';
 import { serializeProject, PROJECT_EXTENSION } from '../persistence/projectFile';
 import { OBJECTS_IMAGE, buildGodotData, scaledObjectsPng, scaledTilesetPng, tilesetImageName } from './godotJson';
 import { renderMapPng, type PngOptions } from './pngExport';
@@ -51,7 +53,7 @@ export async function exportGodotPackage(p: Project, includeShadows = true) {
     }
   }
   if (player) {
-    const dir = (view: string) => (view === 'front' ? 'down' : view === 'back' ? 'up' : 'side');
+    const dir = (view: string) => DIR_NAME[view as View] ?? 'side';
     entries.push(
       ...spriteGodotEntries({
         folder: `${folder}/player`,

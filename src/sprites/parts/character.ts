@@ -1,5 +1,5 @@
 import { C, FIX, Painter } from '../painter';
-import type { Body, DemoPart, FitContext, SlotDef, View } from '../types';
+import { isBackView, type Body, type DemoPart, type FitContext, type SlotDef, type View } from '../types';
 
 // Chibi characters, front view, 32 × 32. Every part is painted from the body measurements,
 // so clothes, hair and weapons fit all body types (plug and play).
@@ -42,6 +42,24 @@ const head = (b: Body) => ({ xl: Math.floor(b.hx - b.hrx), xr: Math.ceil(b.hx + 
 type Paint = (b: Body, p: Painter) => void;
 /** Body for another view: side = narrow torso, one arm, legs side by side, facing right. */
 export function viewBody(b: Body, view: View): Body {
+  if (view === 'fside' || view === 'bside') {
+    // three-quarter view: narrower torso, arms right next to it, legs closer together
+    const tw = Math.max(5, Math.round((b.t[2] - b.t[0] + 1) * 0.8));
+    const t0 = Math.round(b.hx - tw / 2);
+    const t1 = t0 + tw - 1;
+    const aw = b.aR[1] - b.aR[0] + 1;
+    const lw = b.lR[1] - b.lR[0] + 1;
+    return {
+      ...b,
+      view,
+      hrx: b.hrx - 0.2,
+      t: [t0, b.t[1], t1, b.t[3]],
+      aL: [t0 - aw, t0 - 1],
+      aR: [t1 + 1, t1 + aw],
+      lL: [b.hx - 1 - lw, b.hx - 2],
+      lR: [b.hx, b.hx + lw - 1],
+    };
+  }
   if (view !== 'side') return { ...b, view };
   const hx = b.hx;
   const tw = Math.max(5, Math.round((b.t[2] - b.t[0] + 1) * 0.6));
@@ -54,7 +72,7 @@ export function viewBody(b: Body, view: View): Body {
 
 /** which parts exist in which view (face from behind, shield behind the body from the side …) */
 function visibleIn(slot: string, id: string, view: View | undefined): boolean {
-  if (view === 'back') return slot !== 'face' && (slot !== 'headx' || ['elf', 'horns', 'catears'].includes(id));
+  if (isBackView(view)) return slot !== 'face' && (slot !== 'headx' || ['elf', 'horns', 'catears'].includes(id));
   if (view === 'side') return slot !== 'offhand' && !(slot === 'headx' && id === 'patch');
   return true;
 }
@@ -72,6 +90,10 @@ const part = (slot: string, id: string, label: string, paint: Paint, opts: { out
     if (side && slot === 'face') sideFace(id, b, p);
     else if (side && slot === 'headx' && SIDE_HEADX[id]) SIDE_HEADX[id](b, p);
     else paint(b, p);
+    // turned a little to the right: eyes, mouth and what sits on the face move to the right
+    if (b.view === 'fside' && (slot === 'face' || (slot === 'headx' && FACE_HEADX.has(id)))) p.squeezeX(b.hx, 0.7, 2);
+    // things on the back peek out behind the body (on the far side)
+    if (slot === 'back' && (b.view === 'fside' || b.view === 'bside') && id !== 'tail') p.shiftX(-1);
     if (side) {
       // face side (right) stays free of hair below the hairline
       if (slot === 'hair') p.clearWhere((x, y) => x >= b.hx && y >= b.hy - 2 && y <= b.hy + 4 && x <= b.hx + b.hrx + 1);
@@ -94,6 +116,9 @@ const part = (slot: string, id: string, label: string, paint: Paint, opts: { out
     return p.finish(opts);
   },
 });
+
+/** head extras that sit on the face (turn with it) */
+const FACE_HEADX = new Set(['glasses', 'patch', 'beard', 'tusks', 'mustache', 'freckles', 'scar', 'paint', 'mask']);
 
 /** side view faces (looking right): one eye, mouth at the front */
 function sideFace(id: string, b: Body, p: Painter) {
@@ -240,8 +265,15 @@ const FACES: DemoPart[] = [
 
 const cap = (b: Body, p: Painter) => {
   // from behind the hair covers the whole head; from the side the back half
-  if (b.view === 'back') {
-    p.ell(b.hx, b.hy - 0.6, b.hrx + 0.7, b.hry + 0.4, HAIR, (_, y) => y <= b.hy + 2);
+  if (isBackView(b.view)) {
+    // three-quarter from behind: a bit of cheek and ear shows on the right
+    const cheek = b.view === 'bside' ? b.hx + b.hrx - 2 : Infinity;
+    p.ell(b.hx, b.hy - 0.6, b.hrx + 0.7, b.hry + 0.4, HAIR, (x, y) => y <= b.hy + 2 && !(x >= cheek && y >= b.hy - 2));
+    return;
+  }
+  if (b.view === 'fside') {
+    // three-quarter from the front: more hair at the back of the head (left)
+    p.ell(b.hx, b.hy - 0.6, b.hrx + 0.7, b.hry + 0.4, HAIR, (x, y) => y <= b.hy - 3 || (x <= b.hx - 4 && y <= b.hy + 1));
     return;
   }
   if (b.view === 'side') {
@@ -440,8 +472,9 @@ const HATS: DemoPart[] = [
     const rx = b.hrx - 1.4;
     const ry = b.hry - 1.3;
     // face opening: centre from the front, shifted forward from the side, none from behind
-    const fx = b.view === 'side' ? b.hx + 2.5 : b.hx;
-    p.ell(b.hx, b.hy, b.hrx + 1.6, b.hry + 1.5, P2, (x, y) => b.view === 'back' || ((x + 0.5 - fx) / (b.view === 'side' ? rx * 0.7 : rx)) ** 2 + ((y + 0.5 - (b.hy + 1)) / ry) ** 2 > 1);
+    const fx = b.view === 'side' ? b.hx + 2.5 : b.view === 'fside' ? b.hx + 1.5 : b.hx;
+    const k = b.view === 'side' ? 0.7 : b.view === 'fside' ? 0.85 : 1;
+    p.ell(b.hx, b.hy, b.hrx + 1.6, b.hry + 1.5, P2, (x, y) => isBackView(b.view) || ((x + 0.5 - fx) / (rx * k)) ** 2 + ((y + 0.5 - (b.hy + 1)) / ry) ** 2 > 1);
   }),
   part(
     'hat',
@@ -472,9 +505,12 @@ const HATS: DemoPart[] = [
 export function weaponHand(b: Body) {
   // the weapon is in the figure's right hand: seen from the front that is the left of the
   // picture, seen from behind the right, from the side the near hand
-  const a = b.view === 'front' || !b.view ? b.aL : b.aR;
+  const a = frontish(b.view) ? b.aL : b.aR;
   return { cx: a[0] + 1, hy: b.ay[1], x0: a[0], x1: a[1] };
 }
+
+/** seen from the front or three-quarter front: the figure's right hand is left in the picture */
+export const frontish = (v: View | undefined) => !v || v === 'front' || v === 'fside';
 
 /** weapons that point where the figure looks (blades); the others are held upright */
 const FORWARD = new Set(['sword', 'axe', 'hammer', 'spear']);
@@ -499,11 +535,14 @@ export function weaponPose(partId: string | null | undefined, view: View = 'fron
   if (FORWARD.has(id)) {
     if (view === 'side') return { rest: 75, sx: 1, sy: 1 };
     if (view === 'back') return { rest: 0, sx: 0.5, sy: 0.55 };
+    // diagonals: down-right towards the viewer / up-right away from him
+    if (view === 'fside') return { rest: 140, sx: 1, sy: 0.8 };
+    if (view === 'bside') return { rest: 40, sx: 0.8, sy: 0.75 };
     return { rest: 195, sx: 1, sy: 0.6 };
   }
   // upright weapons lean outwards: to the left in the front picture, to the right from behind
   const lean = UPRIGHT_LEAN[id] ?? 0;
-  return { rest: view === 'back' ? lean : view === 'side' ? (lean ? lean + 10 : 0) : -lean, sx: 1, sy: 1 };
+  return { rest: isBackView(view) ? lean : view === 'side' ? (lean ? lean + 10 : 0) : -lean, sx: 1, sy: 1 };
 }
 
 /** blade direction of a weapon part at rest (animation poses count from upright) */
@@ -514,7 +553,7 @@ export function weaponRest(partId: string | null | undefined, view: View = 'fron
 /** weapon hand / other hand (shield) */
 const hand = (b: Body) => {
   const gx = weaponHand(b).cx - 1;
-  return b.view === 'front' || !b.view ? { gx, hy: b.ay[1], ox: b.aR[1] + 2 } : { gx, hy: b.ay[1], ox: b.aL[0] - 1 };
+  return frontish(b.view) ? { gx, hy: b.ay[1], ox: b.aR[1] + 2 } : { gx, hy: b.ay[1], ox: b.aL[0] - 1 };
 };
 
 const WEAPONS: DemoPart[] = [

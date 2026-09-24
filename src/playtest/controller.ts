@@ -176,6 +176,10 @@ function tick(now: number) {
     const ny = char.y + vy * SPEED * dt;
     if (boxFree(char.x, ny)) char.y = ny;
     char.dir = Math.abs(vx) > Math.abs(vy) ? (vx < 0 ? 'left' : 'right') : vy < 0 ? 'up' : 'down';
+    // diagonal when both axes count (22.5° – 67.5°): the own figure turns three-quarter
+    const t = Math.min(Math.abs(vx), Math.abs(vy)) / Math.max(Math.abs(vx), Math.abs(vy));
+    char.diag = t > 0.414 ? (vy > 0 ? 'down' : 'up') : undefined;
+    if (char.diag) char.dir = vx < 0 ? 'left' : 'right';
     char.step += dt * 4;
   }
   char.moving = moving;

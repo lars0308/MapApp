@@ -3,13 +3,25 @@ import type { Ramps } from './palette';
 
 export type SpriteKind = 'character' | 'object' | 'creature';
 
-/** direction a figure is seen from: front (down), side (facing right), back (up) */
-export type View = 'front' | 'side' | 'back';
+/**
+ * direction a figure is seen from: front (down), side (facing right), back (up) – and the
+ * diagonals fside (down-right) / bside (up-right) for 8 directions (left = mirrored)
+ */
+export type View = 'front' | 'fside' | 'side' | 'bside' | 'back';
 export const VIEWS: { id: View; label: string }[] = [
   { id: 'front', label: 'Vorne' },
+  { id: 'fside', label: 'Schräg ↘' },
   { id: 'side', label: 'Seite' },
+  { id: 'bside', label: 'Schräg ↗' },
   { id: 'back', label: 'Hinten' },
 ];
+/** the classic 4 directions (↓ ↑ →, ← mirrored) */
+export const VIEWS4: View[] = ['front', 'side', 'back'];
+/** seen more from behind than from the front (no face, weapon hand on the right) */
+export const isBackView = (v: View | undefined) => v === 'back' || v === 'bside';
+export const isDiagView = (v: View | undefined) => v === 'fside' || v === 'bside';
+/** own pixels a layer can have besides the front */
+export type OtherView = Exclude<View, 'front'>;
 
 export interface SlotDef {
   id: string;
@@ -102,8 +114,8 @@ export interface SpriteLayer {
   visible: boolean;
   /** size × size RGBA (front view) */
   data: Uint8ClampedArray;
-  /** own pixels for the side / back view (else painted from the part or taken from the front) */
-  views?: Partial<Record<'side' | 'back', Uint8ClampedArray>>;
+  /** own pixels for the other views (else painted from the part or taken from the front) */
+  views?: Partial<Record<OtherView, Uint8ClampedArray>>;
 }
 
 /** An animation made of drawn / edited frames (own animation or imported spritesheet). */

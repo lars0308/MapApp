@@ -4969,7 +4969,12 @@ body.is-resizing-y * {
   justify-content: center;
 }
 .anim-view-row .segmented {
-  width: 280px;
+  width: 100%;
+  max-width: 440px;
+}
+.anim-view-row .segmented button {
+  padding: 0 4px;
+  white-space: nowrap;
 }
 .anim-custom-tools {
   display: flex;

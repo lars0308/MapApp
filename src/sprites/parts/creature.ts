@@ -1,5 +1,5 @@
 import { C, FIX, Painter } from '../painter';
-import type { Creature, DemoPart, FitContext, SlotDef, View } from '../types';
+import { isBackView, type Creature, type DemoPart, type FitContext, type SlotDef, type View } from '../types';
 
 // Creatures / monsters / enemies, 32 × 32. A body type (slime, bat, spider, ghost …) defines
 // where eyes, mouth, horns, wings and limbs go, so every part fits every body.
@@ -41,13 +41,17 @@ const part = (slot: string, id: string, label: string, paint: Paint, opts: { out
   paint: (ctx: FitContext) => {
     const p = new Painter();
     const c = ctx.creature;
-    if (c.view === 'back' && (slot === 'eyes' || slot === 'mouth')) return p;
+    if (isBackView(c.view) && (slot === 'eyes' || slot === 'mouth')) return p;
     if (c.view === 'side' && (slot === 'eyes' || slot === 'mouth')) {
       // one eye / mouth half at the front of the body
       paint({ ...c, eyeDX: 0, cx: c.cx + Math.max(2, c.rx * 0.45) }, p);
       if (slot === 'eyes') p.clearWhere((x) => x < c.cx);
+    } else if (c.view === 'fside' && (slot === 'eyes' || slot === 'mouth')) {
+      // three-quarter: eyes closer together, moved towards the right
+      paint({ ...c, eyeDX: Math.max(1, c.eyeDX * 0.7), cx: c.cx + Math.max(1, c.rx * 0.25) }, p);
     } else paint(c, p);
     if (c.view === 'side' && slot === 'back') p.shiftX(-3);
+    if ((c.view === 'fside' || c.view === 'bside') && slot === 'back') p.shiftX(-1);
     if (c.view === 'back' && slot === 'back') {
       // seen from behind the wings are in front – nothing to change, the layer order does it
     }

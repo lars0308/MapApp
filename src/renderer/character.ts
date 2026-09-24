@@ -8,6 +8,8 @@ export interface CharacterState {
   /** feet y in tiles (y-sort origin) */
   y: number;
   dir: 'down' | 'up' | 'left' | 'right';
+  /** walking diagonally (dir is then left / right): down-left/right or up-left/right */
+  diag?: 'down' | 'up';
   /** walk animation phase */
   step: number;
   moving: boolean;
@@ -27,8 +29,9 @@ export function drawCharacter(
     const spx = zoom / 20; // 32 px figure ≈ 1.6 tiles
     const walking = c.moving;
     // direction rows (front / side / back), older player figures only have the front rows
-    const view = c.dir === 'up' ? 'back' : c.dir === 'down' ? 'front' : 'side';
-    const r = own.rows?.[`${walking ? 'walk' : 'idle'}_${view}`] ?? own.rows?.[`${walking ? 'walk' : 'idle'}_front`];
+    const view = c.diag ? (c.diag === 'down' ? 'fside' : 'bside') : c.dir === 'up' ? 'back' : c.dir === 'down' ? 'front' : 'side';
+    const anim = walking ? 'walk' : 'idle';
+    const r = own.rows?.[`${anim}_${view}`] ?? own.rows?.[`${anim}_side`] ?? own.rows?.[`${anim}_front`];
     const row = r ? r.row : walking ? 1 : 0;
     const count = r ? r.frames : walking ? own.walk : own.idle;
     const frame = walking ? Math.floor(c.step * 4) % count : Math.floor(performance.now() / 250) % count;

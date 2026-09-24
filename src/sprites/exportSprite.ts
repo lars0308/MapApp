@@ -89,7 +89,8 @@ const PLAYER_SCRIPT = `extends CharacterBody2D
 ##   Arrow keys (ui_left/right/up/down) walk, Shift runs, Space/Enter (ui_accept) or J attacks.
 ##   Enemies (group "enemy") in front of the figure are hit with hurt(damage).
 ##   Call hurt(damage) on the player from your own code – at 0 hp it plays "death".
-## Uses walk_down / walk_side / walk_up … when directions were exported, else walk, idle …
+## Uses walk_down / walk_side / walk_up (+ walk_down_side / walk_up_side for 8 directions)
+## when directions were exported, else walk, idle …
 ## One-shot animations (attack, hurt, death, jump …) play once, then control returns.
 
 signal hp_changed(hp: int)
@@ -102,6 +103,7 @@ signal died
 @export var attack_reach := 22.0
 @onready var sprite: AnimatedSprite2D = $AnimatedSprite2D
 var facing := "down"
+var ahead := Vector2.DOWN
 var hp := 5
 var busy := ""  # one-shot animation that is playing ("" = free to move)
 
@@ -133,13 +135,13 @@ func _physics_process(_delta: float) -> void:
 func attack() -> void:
 \tbusy = "attack"
 \tplay_anim("attack")
-\tvar ahead := _facing_vector()
+\tvar fwd := _facing_vector()
 \tfor e in get_tree().get_nodes_in_group("enemy"):
 \t\tvar n := e as Node2D
 \t\tif n == null or not n.has_method("hurt"):
 \t\t\tcontinue
 \t\tvar to := n.global_position - global_position
-\t\tif to.length() < attack_reach and to.normalized().dot(ahead) > 0.3:
+\t\tif to.length() < attack_reach and to.normalized().dot(fwd) > 0.3:
 \t\t\tn.call("hurt", attack_damage, global_position)
 
 func hurt(damage := 1, from := Vector2.ZERO) -> void:
@@ -167,20 +169,32 @@ func _on_finished() -> void:
 \t\tbusy = ""
 
 func _face(dir: Vector2) -> void:
-\tif absf(dir.x) > absf(dir.y):
+\t# 8 directions when the diagonals (…_down_side / …_up_side) were exported, else 4
+\tif _diagonal():
+\t\tvar o := posmod(roundi(dir.angle() / (PI / 4.0)), 8)  # 0 → 1 ↘ 2 ↓ … 6 ↑ 7 ↗
+\t\tfacing = ["side", "down_side", "down", "down_side", "side", "up_side", "up", "up_side"][o]
+\t\tsprite.flip_h = o >= 3 and o <= 5
+\t\tahead = Vector2.RIGHT.rotated(o * PI / 4.0)
+\telif absf(dir.x) > absf(dir.y):
 \t\tfacing = "side"
 \t\tsprite.flip_h = dir.x < 0.0
+\t\tahead = Vector2.LEFT if sprite.flip_h else Vector2.RIGHT
 \telse:
 \t\tfacing = "down" if dir.y > 0.0 else "up"
 \t\tsprite.flip_h = false
+\t\tahead = Vector2.DOWN if facing == "down" else Vector2.UP
+
+func _diagonal() -> bool:
+\tfor n in sprite.sprite_frames.get_animation_names():
+\t\tif n.ends_with("_down_side"):
+\t\t\treturn true
+\treturn false
 
 func _facing_vector() -> Vector2:
-\tif facing == "side":
-\t\treturn Vector2.LEFT if sprite.flip_h else Vector2.RIGHT
-\treturn Vector2.DOWN if facing == "down" else Vector2.UP
+\treturn ahead
 
 func _name(base: String) -> String:
-\tfor n in [base + "_" + facing, base + "_down", base]:
+\tfor n in [base + "_" + facing, base + "_" + facing.get_slice("_", 0), base + "_down", base]:
 \t\tif sprite.sprite_frames.has_animation(n):
 \t\t\treturn n
 \treturn ""
@@ -397,6 +411,7 @@ signal died
 @export var attack_pause := 1.0
 @onready var sprite: AnimatedSprite2D = $AnimatedSprite2D
 var facing := "down"
+var ahead := Vector2.DOWN
 var hp := 3
 var busy := ""
 var cooldown := 0.0
@@ -466,15 +481,29 @@ func _play(base: String) -> void:
 \t\tbusy = ""
 
 func _face(dir: Vector2) -> void:
-\tif absf(dir.x) > absf(dir.y):
+\t# 8 directions when the diagonals (…_down_side / …_up_side) were exported, else 4
+\tif _diagonal():
+\t\tvar o := posmod(roundi(dir.angle() / (PI / 4.0)), 8)  # 0 → 1 ↘ 2 ↓ … 6 ↑ 7 ↗
+\t\tfacing = ["side", "down_side", "down", "down_side", "side", "up_side", "up", "up_side"][o]
+\t\tsprite.flip_h = o >= 3 and o <= 5
+\t\tahead = Vector2.RIGHT.rotated(o * PI / 4.0)
+\telif absf(dir.x) > absf(dir.y):
 \t\tfacing = "side"
 \t\tsprite.flip_h = dir.x < 0.0
+\t\tahead = Vector2.LEFT if sprite.flip_h else Vector2.RIGHT
 \telse:
 \t\tfacing = "down" if dir.y > 0.0 else "up"
 \t\tsprite.flip_h = false
+\t\tahead = Vector2.DOWN if facing == "down" else Vector2.UP
+
+func _diagonal() -> bool:
+\tfor n in sprite.sprite_frames.get_animation_names():
+\t\tif n.ends_with("_down_side"):
+\t\t\treturn true
+\treturn false
 
 func _name(base: String) -> String:
-\tfor n in [base + "_" + facing, base + "_down", base]:
+\tfor n in [base + "_" + facing, base + "_" + facing.get_slice("_", 0), base + "_down", base]:
 \t\tif sprite.sprite_frames.has_animation(n):
 \t\t\treturn n
 \treturn ""

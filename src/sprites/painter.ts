@@ -137,6 +137,26 @@ export class Painter {
     this.fixed = fx;
     return this;
   }
+  /**
+   * squeeze horizontally towards cx and move by dx, pixel by pixel (no pixel gets lost –
+   * a 1 px eye stays) – a face turned a little to the side
+   */
+  squeezeX(cx: number, s: number, dx: number) {
+    const g = new Uint8Array(S * S);
+    const fx = new Uint8Array(S * S);
+    for (let y = 0; y < S; y++)
+      for (let x = 0; x < S; x++) {
+        const i = y * S + x;
+        if (!this.g[i]) continue;
+        const tx = Math.floor(cx + (x + 0.5 - cx) * s + dx);
+        if (!this.in(tx, y)) continue;
+        g[y * S + tx] = this.g[i];
+        fx[y * S + tx] = this.fixed[i];
+      }
+    this.g = g;
+    this.fixed = fx;
+    return this;
+  }
   /** remove pixels where the test is true */
   clearWhere(test: (x: number, y: number) => boolean) {
     for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (test(x, y)) this.g[y * S + x] = 0;

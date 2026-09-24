@@ -1,8 +1,8 @@
-import type { Body, Bounds, Creature, CustomAnim, SpriteDoc, SpriteKind, SpriteLayer, View } from './types';
+import { isBackView, type Body, type Bounds, type Creature, type CustomAnim, type SpriteDoc, type SpriteKind, type SpriteLayer, type View } from './types';
 import { compose, fitContext, viewLayers } from './store';
 import { shiftColor } from './palette';
 import { S } from './painter';
-import { weaponHand, weaponRest } from './parts/character';
+import { frontish, weaponHand, weaponRest } from './parts/character';
 
 // Animations are built from the layers of a character / object: every pixel belongs to a
 // body region (head, torso, left/right arm incl. held items, left/right leg) and each frame
@@ -458,7 +458,7 @@ export const animsFor = (kind: SpriteKind) => ANIMATIONS.filter((a) => a.kind ==
 import { framePad, frameSize } from './frame';
 export { framePad, frameSize };
 
-export const DIR_NAME: Record<View, string> = { front: 'down', side: 'side', back: 'up' };
+export const DIR_NAME: Record<View, string> = { front: 'down', fside: 'down_side', side: 'side', bside: 'up_side', back: 'up' };
 export const frameKey = (view: View, animId: string, i: number) => `${view}:${animId}:${i}`;
 
 /** a front pose seen from behind: everything mirrored (the weapon hand is on the left there) */
@@ -468,16 +468,28 @@ function mirrorPose(p: Pose): Pose {
   return { ...p, off, rot: neg(p.rot), spin: p.spin && -p.spin, all: p.all && { x: -p.all.x, y: p.all.y }, lean: p.lean && -p.lean, trail: p.trail && -p.trail };
 }
 
+/**
+ * a side walk / run pose seen three-quarter: legs and arms swing less (part of the step goes
+ * towards or away from the viewer), the other arm swings against the weapon arm
+ */
+function diagStep(p: Pose): Pose {
+  const r = p.rot ?? {};
+  const k = (v: number | undefined, f: number) => (v ? Math.round(v * f) : 0);
+  return { ...p, lean: p.lean && p.lean * 0.5, hold: 0.85, rot: { ...r, legL: k(r.legL, 0.45), legR: k(r.legR, 0.45), armR: k(r.armR, 0.5), armL: -k(r.armR, 0.35) } };
+}
+
 /** poses of an animation for a view (side walk swings the legs, the back view mirrors the front) */
 export function posesFor(anim: AnimDef, view: View): Pose[] {
   if (view === 'side') return anim.side ?? anim.poses;
   if (anim.kind === 'character') {
+    // walking diagonally: the step of the side view, a little smaller
+    if ((view === 'fside' || view === 'bside') && anim.side && (anim.id === 'walk' || anim.id === 'run')) return anim.side.map(diagStep);
     // characters hold the weapon in their right hand: left in the front picture, right from
     // behind. Poses are written with the weapon arm on the right → the front view is mirrored.
-    if (view === 'front') return anim.poses.map(mirrorPose);
+    if (frontish(view)) return anim.poses.map(mirrorPose);
     return anim.back ? anim.back.map(mirrorPose) : anim.poses;
   }
-  if (view === 'back') return anim.back ?? anim.poses.map(mirrorPose);
+  if (isBackView(view)) return anim.back ?? anim.poses.map(mirrorPose);
   return anim.poses;
 }
 
@@ -487,7 +499,7 @@ function regionOf(layer: SpriteLayer, x: number, y: number, kind: SpriteKind, b:
   const r = regionRaw(layer, x, y, kind, b, bounds, c);
   // characters: seen from the front the left of the picture is the figure's right side
   // (weapon hand); creatures: mirrored from behind
-  const flip = kind === 'character' ? b.view === 'front' : c.view === 'back';
+  const flip = kind === 'character' ? frontish(b.view) : isBackView(c.view);
   return flip ? (SWAP[r] ?? r) : r;
 }
 
@@ -508,7 +520,7 @@ function regionRaw(layer: SpriteLayer, x: number, y: number, kind: SpriteKind, b
   // weapon: its own region (turns around the grip), always in the figure's right hand
   if (slot === 'weapon') return 'weapon';
   // the other hand (shield …): right in the front picture, left from behind
-  if (slot === 'offhand') return b.view === 'front' ? 'armR' : 'armL';
+  if (slot === 'offhand') return frontish(b.view) ? 'armR' : 'armL';
   if (slot === 'hair' || slot === 'hat' || slot === 'face' || slot === 'headx') return 'head';
   if (slot === 'back') return 'torso';
   if (y < b.t[1]) return 'head';
@@ -529,12 +541,12 @@ function pivots(kind: SpriteKind, b: Body, bounds: Bounds, c: Creature): Partial
     return { head: [bounds.x0, hy], torso: [(bounds.x0 + bounds.x1 + 1) / 2, bounds.y1 + 1] };
   }
   if (kind === 'creature') {
-    const back = c.view === 'back';
+    const back = isBackView(c.view);
     const l: Pt = [c.cx - c.rx * 0.6, c.cy];
     const r: Pt = [c.cx + c.rx * 0.6, c.cy];
     return { armL: back ? r : l, armR: back ? l : r, head: [c.cx, c.cy], torso: [c.cx, c.ground + 1] };
   }
-  const flip = b.view === 'front'; // weapon arm on the left of the picture
+  const flip = frontish(b.view); // weapon arm on the left of the picture
   const arm = (a: [number, number]): Pt => [(a[0] + a[1] + 1) / 2, b.ay[0] + 1];
   const leg = (l: [number, number]): Pt => [(l[0] + l[1] + 1) / 2, b.ly[0]];
   // the fist that holds the weapon (see weaponHand() in parts/character.ts)

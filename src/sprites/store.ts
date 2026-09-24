@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Body, Bounds, Creature, CustomAnim, DemoPart, FitContext, SlotDef, SpriteDoc, SpriteKind, SpriteLayer, UserPart, View } from './types';
+import type { Body, Bounds, Creature, CustomAnim, DemoPart, FitContext, SlotDef, SpriteDoc, SpriteKind, SpriteLayer, UserPart, View, OtherView } from './types';
 import { BODIES, CHARACTER_PARTS, CHARACTER_SLOTS, viewBody } from './parts/character';
 import { CREATURE_PARTS, CREATURE_SLOTS, DEFAULT_CREATURE, viewCreature } from './parts/creature';
 import { frameSize } from './frame';
@@ -147,9 +147,14 @@ export function layerPixels(doc: SpriteDoc, layer: SpriteLayer, view: View): Uin
 /** layers as seen from a view (from behind, wings / capes are drawn over the body) */
 export function viewLayers(doc: SpriteDoc, view: View): SpriteLayer[] {
   const layers = doc.layers.map((l) => ({ ...l, data: layerPixels(doc, l, view) }));
-  if (view !== 'back') return layers;
+  const is = (...slots: string[]) => (l: SpriteLayer) => slots.includes(l.slot ?? '');
+  const not = (...slots: string[]) => (l: SpriteLayer) => !slots.includes(l.slot ?? '');
   // from behind: the weapon (held forward) is hidden by the body, wings / capes lie on top
-  return [...layers.filter((l) => l.slot === 'weapon'), ...layers.filter((l) => l.slot !== 'back' && l.slot !== 'weapon'), ...layers.filter((l) => l.slot === 'back')];
+  if (view === 'back') return [...layers.filter(is('weapon')), ...layers.filter(not('back', 'weapon')), ...layers.filter(is('back'))];
+  // three-quarter: the other hand (shield) is on the far side, behind the body
+  if (view === 'bside') return [...layers.filter(is('shadow', 'offhand')), ...layers.filter(not('shadow', 'offhand', 'back')), ...layers.filter(is('back'))];
+  if (view === 'fside') return [...layers.filter(is('shadow', 'back', 'offhand')), ...layers.filter(not('shadow', 'back', 'offhand'))];
+  return layers;
 }
 
 export function composeView(doc: SpriteDoc, view: View): Uint8ClampedArray {
@@ -161,6 +166,8 @@ export interface ViewBase {
   front: Uint8ClampedArray;
   side: Uint8ClampedArray;
   back: Uint8ClampedArray;
+  fside: Uint8ClampedArray;
+  bside: Uint8ClampedArray;
 }
 
 function readAllViews(): boolean {
@@ -263,7 +270,7 @@ export async function deserialize(s: StoredDoc): Promise<SpriteDoc> {
       const out: SpriteLayer = { ...l, data: await fromPng(png, s.size) };
       if (views) {
         out.views = {};
-        for (const [k, v] of Object.entries(views)) out.views[k as 'side' | 'back'] = await fromPng(v, s.size);
+        for (const [k, v] of Object.entries(views)) out.views[k as OtherView] = await fromPng(v, s.size);
       }
       return out;
     }),
@@ -431,7 +438,7 @@ export const useSprites = create<SpriteState>((set, get) => {
       const doc = get()[kind].doc;
       const layer = doc.layers.find((l) => l.id === layerId);
       if (!layer) return null;
-      const base = (v: 'side' | 'back') => {
+      const base = (v: OtherView) => {
         const own = layer.views?.[v];
         if (own) return new Uint8ClampedArray(own);
         // a part is re-painted for the view (even when its front was drawn on)
@@ -439,7 +446,7 @@ export const useSprites = create<SpriteState>((set, get) => {
         if (part) return paintPart(part, fitContext(doc, v), doc.ramps, doc.size);
         return new Uint8ClampedArray(layer.data);
       };
-      return { layerId, front: new Uint8ClampedArray(layer.data), side: base('side'), back: base('back') };
+      return { layerId, front: new Uint8ClampedArray(layer.data), side: base('side'), back: base('back'), fside: base('fside'), bside: base('bside') };
     },
     propagateFront: (kind, base) => {
       const k = get()[kind];
@@ -452,16 +459,17 @@ export const useSprites = create<SpriteState>((set, get) => {
       if (!changed.length) return;
       // faces stay in front (no eyes on the back of the head)
       const face = layer.slot === 'face';
-      const squeeze = kind === 'object' ? 1 : 0.55;
       const cx = n / 2;
-      const views: Partial<Record<'side' | 'back', Uint8ClampedArray>> = { ...layer.views };
-      for (const v of ['side', 'back'] as const) {
+      const views: Partial<Record<OtherView, Uint8ClampedArray>> = { ...layer.views };
+      // side: squeezed to the middle, back: mirrored, diagonals: a little of both
+      const squeeze: Record<OtherView, number> = { side: kind === 'object' ? 1 : 0.55, back: -1, fside: 0.8, bside: -0.8 };
+      for (const v of ['side', 'back', 'fside', 'bside'] as const) {
         if (face) continue;
         const out = new Uint8ClampedArray(base[v]);
         for (const p of changed) {
           const x = p % n;
           const y = (p / n) | 0;
-          const tx = v === 'back' ? n - 1 - x : Math.floor(cx + (x + 0.5 - cx) * squeeze);
+          const tx = v === 'back' ? n - 1 - x : Math.floor(cx + (x + 0.5 - cx) * squeeze[v]);
           if (tx < 0 || tx >= n) continue;
           out.set(now.subarray(p * 4, p * 4 + 4), (y * n + tx) * 4);
         }

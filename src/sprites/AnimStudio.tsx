@@ -4,7 +4,7 @@ import { animsFor, frameKey, frameSize, framesOf, type AnimDef } from './animati
 import { ANIM_PRESETS } from './animPresets';
 import { exportFramesZip, exportSheetPng, exportSpriteGodot, type ExportChoice, isPlatformer } from './exportSprite';
 import { FrameEditor } from './FrameEditor';
-import { VIEWS, type CustomAnim, type SpriteKind, type View } from './types';
+import { VIEWS, VIEWS4, type CustomAnim, type SpriteKind, type View } from './types';
 import { HelpTip } from '../components/HelpTip';
 import { FigureChooser } from './FigureChooser';
 import { Icon } from '../components/icons';
@@ -153,7 +153,10 @@ function AnimWorkspace({ desktop, kind, onBack }: { desktop: boolean; kind: Spri
   const chosen = list.filter(isOn);
   // figures always get all directions (↓ ↑ → and ← mirrored); only a side-scroller needs just the side
   const sideOnly = settings.views[kind]?.length === 1 && settings.views[kind]![0] === 'side';
-  const exportViews: View[] = hasViews ? (sideOnly ? ['side'] : VIEWS.map((v) => v.id)) : ['front'];
+  // 8 directions: also the diagonals (↘ ↗, ↙ ↖ mirrored)
+  const eight = !sideOnly && !!settings.views[kind]?.includes('fside');
+  const dirMode = sideOnly ? 'side' : eight ? 'eight' : 'all';
+  const exportViews: View[] = hasViews ? (sideOnly ? ['side'] : eight ? VIEWS.map((v) => v.id) : VIEWS4) : ['front'];
   const fpsMap = Object.fromEntries(list.map((a) => [a.id, fpsOf(a)]));
   const choice: ExportChoice = { anims: chosen, fps: fpsMap, views: exportViews, custom };
 
@@ -520,16 +523,17 @@ function AnimWorkspace({ desktop, kind, onBack }: { desktop: boolean; kind: Spri
           </div>
 
           <h4 className="subhead">
-            Export ({chosen.length + custom.length} Animationen{hasViews ? (sideOnly ? ' · Seite, links gespiegelt' : ' · vorne, hinten, Seite – links gespiegelt') : ''})
+            Export ({chosen.length + custom.length} Animationen{hasViews ? (sideOnly ? ' · Seite, links gespiegelt' : eight ? ' · vorne, hinten, Seite, schräg – links gespiegelt' : ' · vorne, hinten, Seite – links gespiegelt') : ''})
           </h4>
           {hasViews && (
             <div className="anim-dirs">
               <Segmented
                 label="Richtungen im Export"
-                value={sideOnly ? 'side' : 'all'}
-                onChange={(v) => save({ ...settings, views: { ...settings.views, [kind]: v === 'side' ? ['side'] : VIEWS.map((x) => x.id) } })}
+                value={dirMode}
+                onChange={(v) => save({ ...settings, views: { ...settings.views, [kind]: v === 'side' ? ['side'] : v === 'eight' ? VIEWS.map((x) => x.id) : VIEWS4 } })}
                 options={[
                   { value: 'all', label: '4 Richtungen ↓ ↑ ← →' },
+                  { value: 'eight', label: '8 Richtungen (+ schräg)' },
                   { value: 'side', label: '2 Richtungen ← → (Platformer)' },
                 ]}
               />
