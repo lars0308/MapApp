@@ -11,6 +11,8 @@ const T = 16;
 const GRASS = { base: '#5fae45', light: '#72c052', dark: '#4e9a3a', blade: '#86d162', deep: '#43873a' };
 const DIRT = { base: '#d8b27a', light: '#e5c592', dark: '#bf955e', rim: '#a87d4c', pebble: '#c9a26d' };
 const WATER = { deep: '#3f95cf', base: '#4aa6db', light: '#6cc0ea', foam: '#e6f7ff', sand: '#e4d29a', sandDark: '#cdb877' };
+// dungeon / cave pools: darker water with a wet stone rim instead of a beach
+const POOL = { deep: '#1f4f78', base: '#28618f', light: '#3a7cab', foam: '#9fd0ea', sand: '#524b5a', sandDark: '#2d2932' };
 const ROCK = { top: '#8e9aa6', face: '#6f7b88', dark: '#566270', light: '#a9b4bf', line: '#4a5461' };
 
 /** 0..1 field of a corner mask at a pixel; > 0.5 = inside. Wobble is 0 on tile borders (seamless). */
@@ -71,25 +73,26 @@ function dirt(d: D, mask: number) {
 }
 
 /** shore / water overlay: sand rim on the land side, a foam line, light shallows, deep water */
-function water(d: D, mask: number, sparkle: number) {
+function water(d: D, mask: number, sparkle: number, w = WATER) {
   for (let y = 0; y < T; y++)
     for (let x = 0; x < T; x++) {
-      const v = mask === 15 ? 1 : field(mask, x, y, 0.08);
+      // c0: a single water cell – a round puddle in the middle of the tile
+      const v = mask === 15 ? 1 : mask === 0 ? 1.05 - Math.hypot((x + 0.5) / T - 0.5, (y + 0.5) / T - 0.5) * 1.5 : field(mask, x, y, 0.08);
       if (v < 0.5 - 2 / T) continue;
       let c: string;
-      if (v < 0.5 - 1 / T) c = WATER.sandDark;
-      else if (v < 0.5) c = WATER.sand;
-      else if (v < 0.5 + 1 / T) c = WATER.foam;
-      else if (v < 0.5 + 3 / T) c = WATER.light;
-      else if (v < 0.5 + 6 / T) c = WATER.base;
-      else c = WATER.deep;
+      if (v < 0.5 - 1 / T) c = w.sandDark;
+      else if (v < 0.5) c = w.sand;
+      else if (v < 0.5 + 1 / T) c = w.foam;
+      else if (v < 0.5 + 3 / T) c = w.light;
+      else if (v < 0.5 + 6 / T) c = w.base;
+      else c = w.deep;
       d.px(x, y, c);
     }
   // little wave glints
   for (let k = 0; k < sparkle; k++) {
     const x = d.rng.int(1, 12);
     const y = d.rng.int(1, 14);
-    if ((mask === 15 ? 1 : field(mask, x, y, 0.08)) > 0.5 + 4 / T) d.rect(x, y, 3, 1, WATER.light).px(x + 1, y, WATER.foam);
+    if ((mask === 15 ? 1 : field(mask, x, y, 0.08)) > 0.5 + 4 / T) d.rect(x, y, 3, 1, w.light).px(x + 1, y, w.foam);
   }
 }
 
@@ -173,8 +176,8 @@ function defs(): Def[] {
   for (let m = 1; m <= 15; m++) out.push({ category: m === 15 ? 'path' : undefined, role: 'path_edge', tags: ['dirt', `c${m}`], collision: false, draw: (d) => dirt(d, m) });
   out.push({ category: 'path', role: 'path_edge', tags: ['dirt', 'c15'], weight: 40, collision: false, draw: (d) => dirt(d, 15) });
   // shores: 15 corner shapes + calm / rippled open water
-  for (let m = 1; m <= 15; m++) out.push({ category: m === 15 ? 'water' : undefined, role: 'shore', tags: ['water', `c${m}`], collision: true, draw: (d) => water(d, m, m === 15 ? 2 : 1) });
-  out.push({ category: 'water', role: 'shore', tags: ['water', 'c15'], weight: 60, collision: true, draw: (d) => water(d, 15, 0) });
+  for (let m = 1; m <= 15; m++) out.push({ category: m === 15 ? 'water' : undefined, role: 'shore', tags: ['water', 'sand', `c${m}`], collision: true, draw: (d) => water(d, m, m === 15 ? 2 : 1) });
+  out.push({ category: 'water', role: 'shore', tags: ['water', 'sand', 'c15'], weight: 60, collision: true, draw: (d) => water(d, 15, 0) });
   // grassy plateaus: rims on top, rock faces below
   out.push(
     { category: 'wallTop', role: 'cliff_top', tags: ['grass'], collision: false, draw: (d) => cliffRim(d, { n: true }) },
@@ -198,6 +201,13 @@ function defs(): Def[] {
     { category: 'deco', tags: ['grass', 'moss'], weight: 12, collision: false, draw: (d) => mushrooms(d) },
     { category: 'deco', tags: ['grass', 'reeds'], weight: 8, collision: false, draw: (d) => reeds(d) },
   );
+  // pools in dungeons and caves (stone rim); appended so older tiles keep their ids
+  for (let m = 1; m <= 15; m++) out.push({ role: 'shore', tags: ['water', 'stone', `c${m}`], collision: true, draw: (d) => water(d, m, 1, POOL) });
+  // single-cell puddles (c0), beach and stone rim
+  out.push({ role: 'shore', tags: ['water', 'sand', 'c0'], collision: true, draw: (d) => water(d, 0, 0) });
+  out.push({ role: 'shore', tags: ['water', 'stone', 'c0'], collision: true, draw: (d) => water(d, 0, 0, POOL) });
+  // full stone-rimmed pool (c15) with glints
+  out.push({ role: 'shore', tags: ['water', 'stone', 'c15'], weight: 60, collision: true, draw: (d) => water(d, 15, 2, POOL) });
   return out;
 }
 

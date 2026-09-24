@@ -1,4 +1,4 @@
-import { CELL_CORRIDOR, CELL_HAZARD, CELL_ROOM, CELL_VOID, CELL_WALL, type TileRole } from '../types';
+import { CELL_CORRIDOR, CELL_HAZARD, CELL_ROOM, CELL_VOID, CELL_WALL, lookOf, type TileRole } from '../types';
 import { tileOf } from '../tilesets/gid';
 import { useProject } from '../store/projectStore';
 import { TilePools } from '../tilesets/tilePools';
@@ -287,7 +287,7 @@ export function applyAutoEdges(changed: number[], paintedLayerId: string) {
   const store = useProject.getState();
   const p = store.project;
   const layer = p.layers.find((l) => l.id === paintedLayerId);
-  if (!layer || !changed.length || p.map.perspective === 'hex' || p.map.perspective === 'side_view') return;
+  if (!layer || !changed.length || p.map.perspective === 'hex' || p.map.perspective === 'side_view' || !lookOf(p.generator).softEdges) return;
   const W = p.map.width;
   const H = p.map.height;
   const metas = metaTable(p);
@@ -338,8 +338,19 @@ export function applyAutoEdges(changed: number[], paintedLayerId: string) {
     const m = water || path;
     let gid = 0;
     if (want) {
-      if (role === want && meta(i)?.tags.includes(`c${m}`)) continue;
-      gid = pools.pickRole(new Rng(hashSeed(`${want}${i}`)), want, [`c${m}`]);
+      // same look as the painted water next to it (beach or stone rim)
+      let kind: string | undefined;
+      if (want === 'shore')
+        for (let oy = -1; oy <= 1 && !kind; oy++)
+          for (let ox = -1; ox <= 1 && !kind; ox++) {
+            const xx = x + ox;
+            const yy = y + oy;
+            if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+            const j = yy * W + xx;
+            if (source('shore')(j)) kind = meta(j)?.tags.includes('stone') ? 'stone' : 'sand';
+          }
+      if (role === want && meta(i)?.tags.includes(`c${m}`) && (!kind || meta(i)?.tags.includes(kind))) continue;
+      gid = pools.pickRole(new Rng(hashSeed(`${want}${i}`)), want, kind ? [`c${m}`, kind] : [`c${m}`]);
     } else if (!role) continue;
     if (gid !== data[i]) (cells.push(i), gids.push(gid));
   }

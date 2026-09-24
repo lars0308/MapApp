@@ -1,4 +1,4 @@
-import type { GeneratorSettings, RoomShape } from '../types';
+import { lookOf, type GeneratorSettings, type RoomShape } from '../types';
 import type { Rng } from './rng';
 import { createMask, maskArea, type Mask } from './shapes';
 
@@ -143,7 +143,7 @@ export function placeRooms(s: GeneratorSettings, W: number, H: number, rng: Rng,
     }
     if (!placed) continue;
     rects.push(placed);
-    const mask = createMask(shape, placed.w, placed.h, rng, s.irregularity / 100);
+    const mask = createMask(shape, placed.w, placed.h, rng, s.irregularity / 100, lookOf(s).smoothRooms);
     // anchor = floor cell closest to centroid
     let sx = 0;
     let sy = 0;

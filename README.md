@@ -336,6 +336,17 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.22 – Aussehen ein- und ausschaltbar, für alle Kartenarten**
+
+- Neuer Bereich **Aufbau → Aussehen** mit vier Schaltern (alle standardmäßig an, wirken beim nächsten Generieren):
+  - **Runde Wege und Ufer:** weiche Ränder für Erdwege und Wasser. Draußen gibt es Strand und Schaum, in Dungeons und Höhlen einen nassen Steinrand. Gilt auch beim Selbstmalen, im Baukasten ist das der einzige Schalter.
+  - **Boden in Flecken:** Abnutzung und Moos zusammenhängend. Aus bedeutet das alte Verhalten: jede Kachel würfelt einzeln.
+  - **Deko an Rändern:** an Wänden, in Ecken, am Waldrand und am Wasser. Aus bedeutet gleichmäßig verteilt.
+  - **Glatte Raumränder:** unregelmäßige Räume ohne einzelne Kerben.
+- Die Schalter wirken für Räume, Höhle, Außen, Dorf und Insel, in jeder Ansicht (Top-Down, 3/4, Schräg, Isometrisch). Seitenansicht und Hex haben eigene Generatoren und sind davon nicht betroffen.
+- **Wasserbecken in Dungeons und Höhlen** haben jetzt runde Ränder mit Steinkante. Einzelne Wasserfelder werden zu runden Pfützen statt eckigen Quadraten.
+- Die KI-Schnittstelle kennt die Schalter: `set_generator` mit `look: { softEdges, floorPatches, smartDeco, smoothRooms }`.
+
 **Version 3.21 – Natur mit weichen Übergängen und neue Kartenart „Insel“**
 
 - **Neues Demo-Tileset „Demo Natur“** in hellen Sommerfarben: Wiese mit Blumen und Klee, Erdwege, Wasser mit Strand und Schaumkante, Gras-Klippen mit Felswand, Büsche, Steine, Baumstümpfe, Pilze und Schilf. Es wird automatisch zu neuen und bestehenden Projekten hinzugefügt.

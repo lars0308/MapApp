@@ -124,6 +124,20 @@ export const TILE_ROLES = [
 ] as const;
 export type TileRole = (typeof TILE_ROLES)[number];
 
+/** switchable finishing touches of the generator (Aufbau → Aussehen) */
+export interface MapLook {
+  /** paths and shores with round, corner-matched edges (also when painting) */
+  softEdges: boolean;
+  /** floor wear and moss in natural patches instead of single random tiles */
+  floorPatches: boolean;
+  /** deco along walls, corners, forest edges and water instead of spread evenly */
+  smartDeco: boolean;
+  /** irregular rooms without single-tile notches */
+  smoothRooms: boolean;
+}
+export const DEFAULT_LOOK: MapLook = { softEdges: true, floorPatches: true, smartDeco: true, smoothRooms: true };
+export const lookOf = (g: { look?: Partial<MapLook> }): MapLook => ({ ...DEFAULT_LOOK, ...g.look });
+
 export interface TileMeta {
   category?: TileCategory;
   /** auto-tile role (optional, more specific than the category) */
@@ -273,6 +287,8 @@ export interface GeneratorSettings {
   layout?: 'rooms' | 'cave' | 'outdoor' | 'village' | 'island';
   /** caves: 0 = smooth, 100 = very ragged with niches and pillars */
   caveRoughness?: number;
+  /** look of the generated map (all on when missing) */
+  look?: MapLook;
   /** enemies and loot placed by room type and distance from the start (0–100, missing = none) */
   population?: { enemies: number; loot: number };
   /** side-scroller levels (perspective side_view) */

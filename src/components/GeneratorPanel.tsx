@@ -2,7 +2,7 @@ import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { PRESETS } from '../generator/presets';
 import { deriveConfig } from '../profiles';
-import type { Perspective, RoomShape, SideSettings } from '../types';
+import { lookOf, type MapLook, type Perspective, type RoomShape, type SideSettings } from '../types';
 import { CORRIDOR_OPTS, DISTRIBUTIONS, SHAPES, SPECIALS } from './generatorOptions';
 import { PERSPECTIVE_INFO } from '../generator/perspective';
 import { RoomCountGuard } from './RoomCountGuard';
@@ -160,6 +160,7 @@ export function GeneratorPanel() {
       <div className="panel-scroll">
         <BuildModeCard />
         <MapSection manual />
+        <LookSection manual />
       </div>
     );
   if (side) return <SidePanel />;
@@ -295,6 +296,8 @@ export function GeneratorPanel() {
         <p className="hint">Gegner werden weiter vom Start mehr und stärker, der Startraum bleibt frei.</p>
       </Section>
 
+      <LookSection />
+
       <Section title="Werte der Karte" defaultOpen={false}>
         <Stats />
       </Section>
@@ -318,6 +321,32 @@ const SIDE_PRESETS: { id: string; label: string; text: string; side: Partial<Sid
 ];
 
 /** Settings of the side-scroller generator (perspective side_view). */
+/** switchable finishing touches – for every top-down map kind (rooms, cave, outdoor, village, island) */
+function LookSection({ manual = false }: { manual?: boolean }) {
+  const g = useProject((s) => s.project.generator);
+  const update = useProject((s) => s.updateGenerator);
+  const look = lookOf(g);
+  const set = (patch: Partial<MapLook>) => update({ look: { ...look, ...patch } });
+  return (
+    <Section title="Aussehen" defaultOpen={false}>
+      <Toggle
+        label="Runde Wege und Ufer"
+        description={manual ? 'Gemalte Erdwege und Wasser bekommen weiche Ränder' : 'Erdwege und Wasser mit weichen Rändern, Strand oder Steinrand'}
+        checked={look.softEdges}
+        onChange={(softEdges) => set({ softEdges })}
+      />
+      {!manual && (
+        <>
+          <Toggle label="Boden in Flecken" description="Abnutzung und Moos zusammenhängend statt einzeln verstreut" checked={look.floorPatches} onChange={(floorPatches) => set({ floorPatches })} />
+          <Toggle label="Deko an Rändern" description="An Wänden, in Ecken, am Waldrand und am Wasser statt gleichmäßig verteilt" checked={look.smartDeco} onChange={(smartDeco) => set({ smartDeco })} />
+          <Toggle label="Glatte Raumränder" description="Unregelmäßige Räume ohne einzelne Kerben" checked={look.smoothRooms} onChange={(smoothRooms) => set({ smoothRooms })} />
+          <p className="hint">Wirkt beim nächsten Generieren.</p>
+        </>
+      )}
+    </Section>
+  );
+}
+
 function SidePanel() {
   const g = useProject((s) => s.project.generator);
   const update = useProject((s) => s.updateGenerator);

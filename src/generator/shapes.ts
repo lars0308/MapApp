@@ -170,7 +170,7 @@ function cleanup(m: Mask): void {
   for (let i = 0; i < w * h; i++) if (data[i] && label[i] !== best) data[i] = 0;
 }
 
-export function createMask(shape: RoomShape, w: number, h: number, rng: Rng, irregularity: number): Mask {
+export function createMask(shape: RoomShape, w: number, h: number, rng: Rng, irregularity: number, smooth = true): Mask {
   let m: Mask;
   const small = w < 5 || h < 5;
   switch (small ? 'rect' : shape) {
@@ -186,7 +186,7 @@ export function createMask(shape: RoomShape, w: number, h: number, rng: Rng, irr
     case 'irregular':
       m = irregularMask(w, h, rng, irregularity);
       erodeEdges(m, rng, Math.max(0.35, irregularity));
-      fillNotches(m);
+      if (smooth) fillNotches(m);
       break;
     default:
       m = rectMask(w, h);

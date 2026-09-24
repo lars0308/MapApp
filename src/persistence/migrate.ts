@@ -59,7 +59,19 @@ export function migrateProject(p: Project): Project {
     tilesets = [...tilesets, hex];
     nextGid = hex.firstGid + hex.columns * hex.rows;
   }
-  // summer nature tiles with soft path / shore edges (v3.21)
+  // summer nature tiles with soft path / shore edges (v3.21); v3.22 appended stone pool shores –
+  // the set grows in place when nothing comes after it (same gids for the old tiles)
+  const oldNature = tilesets.find((t) => t.id === DEMO_NATURE_ID);
+  if (oldNature && !Object.values(oldNature.tiles).some((m) => m.role === 'shore' && m.tags.includes('stone'))) {
+    const fresh = createDemoNatureTileset(oldNature.firstGid);
+    const oldEnd = oldNature.firstGid + oldNature.columns * oldNature.rows;
+    const freshEnd = fresh.firstGid + fresh.columns * fresh.rows;
+    const later = tilesets.some((t) => t.firstGid >= oldEnd);
+    if (fresh.columns === oldNature.columns && (freshEnd <= oldEnd || !later)) {
+      tilesets = tilesets.map((t) => (t.id === DEMO_NATURE_ID ? { ...fresh, active: t.active } : t));
+      nextGid = Math.max(nextGid, freshEnd);
+    }
+  }
   if (!tilesets.some((t) => t.id === DEMO_NATURE_ID)) {
     const nature = createDemoNatureTileset(nextGid);
     tilesets = [...tilesets, nature];
