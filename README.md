@@ -97,13 +97,14 @@ Vorbereitung für eine Bauteil-Bibliothek (Räume, Wege, Abgründe, Klippen, Br�
 
 ## Perspektiven
 
-Die Map bleibt ein orthogonales 2D-Raster. Die Perspektive bestimmt, **welche Tile-Rollen** der Generator einsetzt – sie ist keine Verzerrung derselben Map:
+Die Map bleibt intern ein orthogonales 2D-Raster. Die Perspektive bestimmt, **welche Tile-Rollen** der Generator einsetzt – sie ist keine Verzerrung derselben Map:
 
 | Perspektive | Wandlogik |
 | --- | --- |
 | `top_down` | Wände als flache Kanten mit Rollen aus der Nachbarschaft (`wall_top`, `corner_*`, `inner_corner_*` …) |
 | `low_top_down` | Wand über einem Raum = Oberkante (`wall_top`) + **Wandfront** (`wall_front`, 1 Reihe); Seitenwände sind erhöht (Oberkante + sichtbare Innenseite), Ecken gehen in die Fronten über; Schatten unter Fronten |
-| `isometric_45` | Wandfront 2 Reihen hoch (`wall_front` + `wall_front_upper`), Seitenwände mit sichtbarer Fläche, Schatten auch seitlich |
+| `isometric_45` (Schräg 45°, Quadrate) | Wandfront 2 Reihen hoch (`wall_front` + `wall_front_upper`), Seitenwände mit sichtbarer Fläche, Schatten auch seitlich |
+| `isometric` (Isometrisch, Raute) | Echtes Rautenraster: Die Karte wird wie Top-Down erzeugt, die Ansicht zeichnet Böden als Rauten und Wände als Blöcke mit hellen/dunklen Seiten; Plateaus stehen erhöht. Normale Top-Down-Tiles reichen. |
 
 Die Perspektive steht im Projekt, in der Projektdatei und im Export (`map.perspective`). Tilesets lassen sich Perspektiven zuordnen (Tiles → Tilesets); der Generator nutzt nur passende, aktive Tilesets. Mitgeliefert: „Demo Wände Top-Down“, „Demo Wände 3/4“ (Low Top-Down + 45°) und „Demo Gelände“.
 
@@ -317,30 +318,29 @@ Wichtige Entscheidungen:
 
 ## Bekannte Einschränkungen
 
-- 45° / Isometric-like ist kein echtes isometrisches Rautenraster, sondern ein orthogonales Raster mit doppelt hohen Wandfronten und sichtbaren Seitenwänden. Ein Rautenraster (Godot `TILE_SHAPE_ISOMETRIC`) wäre eine spätere Erweiterung.
+- „Schräg 45°“ ist ein Quadratraster mit doppelt hohen Wandfronten. Die echte Rautenansicht heißt „Isometrisch (Raute)“; sie wird in der App gezeichnet, der Godot-Export liefert dafür aber noch eine quadratische TileMap (kein `TILE_SHAPE_ISOMETRIC`).
 - Klippen und Plateaus sind Bildschirm-Höhe (eine Stufe), keine echten Höhenebenen; die Höhe steht in `navigation.heights`.
-- Die Wandrollen sind regelbasiert; eigene Tilesets brauchen Tiles mit passender Rolle (fehlende Rollen fallen auf verwandte Rollen bzw. Kategorien zurück). Kein Export als Godot-Terrain-Set.
+- Die Wandrollen sind regelbasiert; eigene Tilesets brauchen Tiles mit passender Rolle (fehlende Rollen fallen auf verwandte Rollen bzw. Kategorien zurück).
 - Das Godot-Script ist gegen die Godot-4.3-API geschrieben und wird bei Änderungen in einem echten Godot 4.3 (headless) geprüft, aber nicht per CI.
 - Eigene Objekte sind unbewegte Sprites (Vorderansicht); Gegner-Verhalten gibt es nur im Figuren-Export, nicht für Objekte auf der Karte.
 - Der Playtest ist bewusst einfach (keine Physik-Engine, keine Gegner, keine Höhenwechsel-Animation).
 - Spezialräume sind im Datensatz und im Room Graph markiert, haben aber noch keine Spielmechanik.
-- Tilesets müssen quadratische Tiles ohne Abstand/Rand haben.
 - Große PNG-Exporte sind durch Canvas-Limits des Browsers begrenzt (die App warnt und bietet kleinere Maßstäbe an).
-- Generierung läuft im Haupt-Thread (80×80 ca. 40 ms, 256×256 mit 60 Räumen ca. 0,5–1 s).
-- Kein direkter `.tscn`-Export – der Loader baut die Szene zur Laufzeit (oder per `build_now()` aus einem `@tool`-Script).
 
 ## Sinnvolle nächste Erweiterungen
 
-- Export der Wandrollen als Godot-Terrain-Set (Peering Bits)
-- Echtes isometrisches Raster für 45°, mehrere Höhenebenen
-- Direkter `.tscn`/`.tres`-Export (TileSet-Ressource + Szene)
-- Generator im Web Worker, Fortschrittsanzeige für sehr große Maps
-- Außenbereiche und Dörfer (brauchen Gras-/Haus-Tiles im Demo-Set)
+- Godot-Export der Rautenansicht (isometrisches TileSet), mehrere Höhenebenen
 - Tileset-Optionen für Rand/Abstand und nicht-quadratische Tiles
 
 ---
 
 ## Änderungen
+
+**Version 3.19 – Isometrisch als echtes Rautenraster**
+
+- Neue Ansicht **„Isometrisch (Raute)“**: Böden liegen als Rauten, Wände stehen als Blöcke mit heller und dunkler Seite, Plateaus sind erhöht. Sie ist jetzt die Standard-Ansicht für die Spielart „Isometrisch“ und funktioniert mit normalen Top-Down-Tiles.
+- Malen, Auswählen, Minimap, Testspielen (Pfeiltasten bewegen die Figur so, wie es auf dem Bildschirm aussieht) und der Bild-Export arbeiten in der Rautenansicht.
+- Die alte 45°-Ansicht heißt jetzt „Schräg 45° (Quadrate)“ und zeigt im Assistenten eine passende Vorschau – vorher sah die Vorschau nach Raute aus, die Karte war aber quadratisch.
 
 **Version 3.18 – Figuren-Abgleich mit der Cloud ohne Verluste**
 

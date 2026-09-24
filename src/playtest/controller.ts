@@ -178,9 +178,16 @@ function tick(now: number) {
   }
   const moving = len > 0.08;
   if (moving) {
-    const nx = char.x + vx * SPEED * dt;
+    // iso diamond: keys / stick point on screen – turn them into grid steps (screen right = +u −v)
+    let [mx, my] = [vx, vy];
+    if (getRenderer()?.iso) {
+      const [du, dv] = [vy + vx / 2, vy - vx / 2];
+      const k = Math.hypot(vx, vy) / (Math.hypot(du, dv) || 1);
+      [mx, my] = [du * k, dv * k];
+    }
+    const nx = char.x + mx * SPEED * dt;
     if (boxFree(nx, char.y)) char.x = nx;
-    const ny = char.y + vy * SPEED * dt;
+    const ny = char.y + my * SPEED * dt;
     if (boxFree(char.x, ny)) char.y = ny;
     char.dir = Math.abs(vx) > Math.abs(vy) ? (vx < 0 ? 'left' : 'right') : vy < 0 ? 'up' : 'down';
     // diagonal when both axes count (22.5° – 67.5°): the own figure turns three-quarter
@@ -232,11 +239,15 @@ export function startPlaytest(): boolean {
     // spawn markers are editor hints – in the game the enemies / chests themselves stand there
     const p = useProject.getState().project;
     r.setDocument(p.map.width, p.map.height, p.layers.filter((l) => l.role !== 'spawn'), null);
-    r.playItems = (ctx, sx, sy, z) => [
-      ...combat.enemies.filter((e) => e.alive).map((e) => ({ key: e.y, draw: () => drawEnemy(ctx, e, sx, sy, z) })),
-      ...combat.chests.filter((c) => c.open).map((c) => ({ key: c.y + 0.01, draw: () => drawChest(ctx, c, sx, sy, z) })),
-      ...(char ? [{ key: char.y + 0.02, draw: () => char && drawSwing(ctx, char, sx, sy, z) }] : []),
-    ];
+    // iso: `at` gives screen mappers local to the figure's standing point; x/y sort by depth
+    r.playItems = (ctx, sx, sy, z, at) => {
+      const loc = (x: number, y: number) => (at ? at(x, y) : ([sx, sy] as const));
+      return [
+        ...combat.enemies.filter((e) => e.alive).map((e) => ({ key: e.y, x: e.x, y: e.y, draw: () => drawEnemy(ctx, e, ...loc(e.x, e.y), z) })),
+        ...combat.chests.filter((c) => c.open).map((c) => ({ key: c.y + 0.01, x: c.x, y: c.y + 0.01, draw: () => drawChest(ctx, c, ...loc(c.x, c.y), z) })),
+        ...(char ? [{ key: char.y + 0.02, x: char.x, y: char.y + 0.02, draw: () => char && drawSwing(ctx, char, ...loc(char.x, char.y), z) }] : []),
+      ];
+    };
   }
   window.addEventListener('keydown', onKey);
   window.addEventListener('keyup', onKey);

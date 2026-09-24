@@ -30,11 +30,20 @@ export const PERSPECTIVE_INFO: Record<Perspective, PerspectiveInfo> = {
   },
   isometric_45: {
     id: 'isometric_45',
-    label: '45° / Isometric-like',
-    short: 'Stärkere Schräge',
+    label: 'Schräg 45° (Quadrate)',
+    short: 'Quadratraster, stärkere Schräge',
     points: ['Doppelt hohe Wandfronten', 'Sichtbare Wandseiten', 'Braucht passende Tilesets'],
     faceRows: 2,
     sideFaces: true,
+  },
+  isometric: {
+    id: 'isometric',
+    label: 'Isometrisch (Raute)',
+    short: 'Echtes Rautenraster',
+    points: ['Felder als Rauten, Wände als Blöcke', 'Erhöhte Bereiche mit Höhe', 'Nutzt normale Top-Down-Tiles'],
+    // generated like top-down; the renderer turns floors into diamonds and walls into blocks
+    faceRows: 0,
+    sideFaces: false,
   },
   hex: {
     id: 'hex',

@@ -124,7 +124,7 @@ export function MapSection({ manual = false }: { manual?: boolean }) {
           />
         </div>
       )}
-      {!side && map.perspective !== 'hex' && <Toggle label="Schatten" description="Wände werfen Schatten" checked={map.shadows} onChange={(shadows) => setMapOptions({ shadows })} />}
+      {!side && map.perspective !== 'hex' && map.perspective !== 'isometric' && <Toggle label="Schatten" description="Wände werfen Schatten" checked={map.shadows} onChange={(shadows) => setMapOptions({ shadows })} />}
       <details className="more" open={side}>
         <summary>{manual ? 'Genaue Größe und Tilegröße' : 'Genaue Größe, Tilegröße, Seed'}</summary>
         <MapSettingsFields seed={!manual} />

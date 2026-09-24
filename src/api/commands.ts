@@ -17,6 +17,7 @@ import { OBJECT_DEFS, OBJECT_TYPES, customObjectDefs, objectDef } from '../objec
 import { buildGodotData } from '../export/godotJson';
 import { buildGodotPackage } from '../export/actions';
 import { MapRenderer } from '../renderer/MapRenderer';
+import { applyIso } from '../renderer/isoSetup';
 import { loadImage } from '../utils/image';
 import { useSprites, DEMO_PARTS, SLOTS, composeView, partById, toPng } from '../sprites/store';
 import { RAMP_PRESETS, CHANNELS, type Channel, type Ramp } from '../sprites/palette';
@@ -139,12 +140,21 @@ async function renderArea(p: Project, x: number, y: number, w: number, h: number
   const canvas = document.createElement('canvas');
   const r = new MapRenderer(canvas);
   r.hex = p.map.perspective === 'hex';
+  applyIso(r, p);
   r.backdrop = p.map.perspective === 'side_view' ? (p.generator.side?.style === 'cave' ? 'cave' : 'sky') : 'plain';
   r.setDocument(p.map.width, p.map.height, p.layers, p.tilesets);
   r.objects = p.objects;
   r.overlay.showGrid = grid;
   r.overlay.activeTool = 'hand';
   if (collision) r.overlay.collision = computeBlocked(p);
+  if (r.iso) {
+    // diamond view: always the whole map (the area is given in cells, the picture is turned)
+    px = Math.max(2, Math.min(px, Math.floor(4000 / r.worldW)));
+    x = 0;
+    y = 0;
+    w = r.worldW;
+    h = r.worldH;
+  }
   r.resize(w * px, h * px);
   // tileset images decode asynchronously – draw once they are there
   for (let i = 0; i < 40; i++) {

@@ -9,7 +9,9 @@ export interface PoolTile {
 }
 
 export function tilesetSupports(ts: Tileset, perspective: Perspective): boolean {
-  return !ts.perspectives?.length || ts.perspectives.includes(perspective);
+  // the diamond view draws ordinary top-down tiles as diamonds / blocks
+  const p = perspective === 'isometric' ? 'top_down' : perspective;
+  return !ts.perspectives?.length || ts.perspectives.includes(p) || ts.perspectives.includes(perspective);
 }
 
 export interface RoleFallback {

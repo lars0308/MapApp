@@ -35,7 +35,7 @@ export interface ViewInfo {
 
 export const VIEWS: ViewInfo[] = [
   { id: 'top_down', label: 'Top-Down', text: 'Von oben oder schräg von oben (3/4) – Zelda, Enter the Gungeon, Stardew Valley.', available: true, perspectives: ['top_down', 'low_top_down'] },
-  { id: 'isometric', label: 'Isometrisch', text: 'Diagonale 45°-Ansicht mit hohen Wänden – Diablo, Hades.', available: true, perspectives: ['isometric_45'] },
+  { id: 'isometric', label: 'Isometrisch', text: 'Rautenraster mit Blockwänden und Höhen – Diablo, Hades, Final Fantasy Tactics.', available: true, perspectives: ['isometric', 'isometric_45'] },
   { id: 'side_scroller', label: '2D Side-Scroller', text: 'Seitenansicht mit Schwerkraft, Plattformen, Leitern – Mario, Celeste, Hollow Knight.', available: true, perspectives: ['side_view'] },
   { id: 'hexagonal', label: 'Hexagonal', text: 'Sechseck-Raster für Strategie und Taktik – Civilization, Battle for Wesnoth.', available: true, perspectives: ['hex'] },
 ];
@@ -186,7 +186,7 @@ export function profileLabel(p: GameProfile | undefined): string {
 
 /** Profile of a project saved before profiles existed. */
 export function profileFromPerspective(perspective: Perspective): GameProfile {
-  return { view: perspective === 'isometric_45' ? 'isometric' : perspective === 'side_view' ? 'side_scroller' : perspective === 'hex' ? 'hexagonal' : 'top_down', genre: 'other', effort: 'medium' };
+  return { view: perspective === 'isometric_45' || perspective === 'isometric' ? 'isometric' : perspective === 'side_view' ? 'side_scroller' : perspective === 'hex' ? 'hexagonal' : 'top_down', genre: 'other', effort: 'medium' };
 }
 
 /** Everything the app derives from a profile. */

@@ -55,7 +55,7 @@ export function PerspectivePreview({ perspective }: { perspective: Perspective }
       </svg>
     );
   }
-  if (perspective === 'low_top_down') {
+  if (perspective === 'low_top_down' || perspective === 'isometric_45') {
     // Classic 2D 3/4 view: the back (top) wall shows its full height, the side walls are raised
     // (cap + visible inner face), the front (bottom) wall is only a narrow top edge – the room is
     // open towards the viewer.
@@ -105,7 +105,7 @@ export function PerspectivePreview({ perspective }: { perspective: Perspective }
       </svg>
     );
   }
-  // 45°: rotated room seen diagonally – both back walls show tall faces, front walls only their caps
+  // isometric: diamond grid, room seen diagonally – both back walls show tall faces, front walls only their caps
   const iso = (x: number, y: number) => `${x},${y}`;
   const floorLines = [];
   for (let k = 1; k < 6; k++) {

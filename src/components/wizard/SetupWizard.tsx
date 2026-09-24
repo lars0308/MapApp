@@ -92,7 +92,7 @@ function withProfile(d: Draft, patch: Partial<GameProfile>): Draft {
   if (!genreInfo(profile.genre).views.includes(profile.view)) profile.genre = profile.view === 'side_scroller' ? 'platformer' : profile.view === 'hexagonal' ? 'strategy' : 'other';
   const { gen, map } = applyProfile(profile, defaultGenerator(d.gen.seed), DEFAULT_MAP);
   const allowed = deriveConfig(profile).perspectives;
-  return { ...d, profile, gen, map: { ...d.map, ...map, perspective: allowed.includes(d.map.perspective) ? d.map.perspective : allowed[allowed.length - 1] } };
+  return { ...d, profile, gen, map: { ...d.map, ...map, perspective: allowed.includes(d.map.perspective) ? d.map.perspective : allowed.includes('isometric') ? 'isometric' : allowed[allowed.length - 1] } };
 }
 
 function freshDraft(): Draft {
@@ -267,12 +267,12 @@ function WizardDialog() {
                   <PerspectiveCard key={p} id={p} selected={map.perspective === p} onSelect={() => setMap({ perspective: p })} />
                 ))}
               </div>
-              <Toggle
+              {map.perspective !== 'isometric' && <Toggle
                 label="Schatten anzeigen"
                 description="Subtile Schatten unter Wänden, eigener Layer „Schatten“"
                 checked={map.shadows}
                 onChange={(v) => setMap({ shadows: v })}
-              />
+              />}
               {map.perspective === 'isometric_45' && (
                 <p className="note">
                   Die 45°-Ansicht bleibt ein 2D-Raster: Wandfronten werden doppelt hoch und Seitenwände sichtbar. Für echte Wirkung brauchst du Tiles mit

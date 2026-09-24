@@ -12,6 +12,12 @@ import { HEX_CORNERS, ROW_STEP, hexAt, hexOrigin, hexWorldSize } from '../genera
 // Rendering happens on demand (dirty flag + requestAnimationFrame).
 
 const CHUNK = 16;
+/** iso: free world rows above the map for tall walls and objects */
+const ISO_TOP = 2;
+/** iso: wall block height in world units (a diamond is 2 × 1) */
+const ISO_WALL = 1.1;
+/** iso: height of one step of raised floor */
+const ISO_STEP = 0.5;
 
 export interface Camera {
   /** world tile coordinate at the left/top screen edge */
@@ -88,7 +94,16 @@ export class MapRenderer {
   objects: MapObject[] = [];
   character: CharacterState | null = null;
   /** playtest extras (enemies, chests, attack arc): y-sorted items to draw */
-  playItems: ((ctx: CanvasRenderingContext2D, sx: (x: number) => number, sy: (y: number) => number, zoom: number) => { key: number; draw: () => void }[]) | null = null;
+  playItems:
+    | ((
+        ctx: CanvasRenderingContext2D,
+        sx: (x: number) => number,
+        sy: (y: number) => number,
+        zoom: number,
+        /** iso: screen mappers for a figure standing at (x, y) */
+        at?: (x: number, y: number) => [(x: number) => number, (y: number) => number],
+      ) => { key: number; draw: () => void; x?: number; y?: number }[])
+    | null = null;
   /** tiles not drawn in place (lifts during the playtest – drawn as movers instead) */
   hiddenGids = new Set<number>();
   movers: { gid: number; x: number; y: number }[] = [];
@@ -125,6 +140,7 @@ export class MapRenderer {
 
   invalidateAll() {
     for (const c of this.chunks) c.dirty = true;
+    if (this.isoCache) this.isoCache.dirty = true;
     this.requestRender();
   }
 
@@ -135,6 +151,7 @@ export class MapRenderer {
       const c = this.chunks[((y / CHUNK) | 0) * this.chunkCols + ((x / CHUNK) | 0)];
       if (c) c.dirty = true;
     }
+    if (this.isoCache) this.isoCache.dirty = true;
     this.requestRender();
   }
 
@@ -157,12 +174,29 @@ export class MapRenderer {
 
   /** hex map (odd rows shifted, rows 3/4 apart) – see generator/hex.ts */
   hex = false;
+  /**
+   * isometric diamond map: cell (x, y) is a diamond 2 world units wide and 1 high, its top corner at
+   * world (x − y + H, (x + y) / 2 + ISO_TOP); walls stand as blocks, raised floor (heights) as
+   * lower blocks, objects and figures upright. Tiles are ordinary square tiles drawn transformed.
+   */
+  iso = false;
+  /** raised floor per cell (plateaus, see generator terrain) – iso only */
+  heights: Uint8Array | null = null;
+  /** tile for the side faces of wall blocks / raised floor (role wall_front / cliff_front) – iso only */
+  isoWallSide = 0;
+  isoCliffSide = 0;
   /** map size in world units (a hex map is half a cell wider and ¾ as high) */
   get worldW() {
+    if (this.iso) return this.W + this.H;
     return this.hex ? hexWorldSize(this.W, this.H)[0] : this.W;
   }
   get worldH() {
+    if (this.iso) return (this.W + this.H) / 2 + ISO_TOP;
     return this.hex ? hexWorldSize(this.W, this.H)[1] : this.H;
+  }
+  /** world point of a map point (cell coordinates, fractional) */
+  toWorld(u: number, v: number): [number, number] {
+    return this.iso ? [u - v + this.H, (u + v) / 2 + ISO_TOP] : [u, v];
   }
 
   /* ---------- camera ---------- */
@@ -181,15 +215,18 @@ export class MapRenderer {
   }
 
   focus(x: number, y: number, w = 1, h = 1) {
-    const zoom = clamp(Math.min(this.viewW / (w + 8), this.viewH / (h + 8)), this.minZoom, 48);
+    const span = this.iso ? (w + h) * 1.2 : 0;
+    const zoom = clamp(Math.min(this.viewW / (Math.max(w, span) + 8), this.viewH / (Math.max(h, span / 2) + 8)), this.minZoom, 48);
+    const [cx, cy] = this.toWorld(x + w / 2, y + h / 2);
     this.cam.zoom = zoom;
-    this.cam.x = x + w / 2 - this.viewW / zoom / 2;
-    this.cam.y = y + h / 2 - this.viewH / zoom / 2;
+    this.cam.x = cx - this.viewW / zoom / 2;
+    this.cam.y = cy - this.viewH / zoom / 2;
     this.cameraChanged();
   }
 
   /** keep a world point in the view centre (playtest camera) */
   follow(x: number, y: number, snap = false) {
+    [x, y] = this.toWorld(x, y);
     const tx = x - this.viewW / this.cam.zoom / 2;
     const ty = y - this.viewH / this.cam.zoom / 2;
     const k = snap ? 1 : 0.18;
@@ -235,6 +272,11 @@ export class MapRenderer {
   }
 
   screenToCell(sx: number, sy: number): { x: number; y: number } {
+    if (this.iso) {
+      const wx = this.cam.x + sx / this.cam.zoom - this.H;
+      const wy = (this.cam.y + sy / this.cam.zoom - ISO_TOP) * 2;
+      return { x: Math.floor((wx + wy) / 2), y: Math.floor((wy - wx) / 2) };
+    }
     if (this.hex) return hexAt(this.cam.x + sx / this.cam.zoom, this.cam.y + sy / this.cam.zoom);
     return {
       x: Math.floor(this.cam.x + sx / this.cam.zoom),
@@ -331,9 +373,16 @@ export class MapRenderer {
   }
 
   render() {
-    if (this.table.refresh()) for (const c of this.chunks) c.dirty = true;
+    if (this.table.refresh()) {
+      for (const c of this.chunks) c.dirty = true;
+      if (this.isoCache) this.isoCache.dirty = true;
+    }
     if (this.hex) {
       this.renderHex();
+      return;
+    }
+    if (this.iso) {
+      this.renderIso();
       return;
     }
     const { ctx, cam } = this;
@@ -638,6 +687,279 @@ export class MapRenderer {
       const off = Math.floor((n - 1) / 2);
       cells({ x: o.hover.x - off, y: o.hover.y - off, w: n, h: n }, 'rgba(255,255,255,0.08)', COLORS.accent);
     }
+  }
+
+
+  /* ---------- isometric diamond map ---------- */
+
+  private isoCache: { canvas: HTMLCanvasElement; ppt: number; dirty: boolean } | null = null;
+
+  /** draw the flat layers of one cell as a diamond (world top corner wx, wy; lift in world units) */
+  private isoFlat(ctx: CanvasRenderingContext2D, layers: Layer[], i: number, px: number, py: number, u: number) {
+    // unit square → diamond: +x = (u, u/2), +y = (−u, u/2); a hair bigger so no seams show
+    const k = 1 + 1.2 / Math.max(4, u);
+    for (const layer of layers) {
+      const g = layer.data[i];
+      if (!g) continue;
+      ctx.save();
+      ctx.globalAlpha = layer.opacity ?? 1;
+      ctx.transform(u * k, (u / 2) * k, -u * k, (u / 2) * k, px, py - (u * (k - 1)) / 2);
+      drawGid(ctx, this.table, g, 0, 0, 1, 1);
+      ctx.restore();
+    }
+  }
+
+  /** a block: side faces (texture side, else top) + top face at `lift` world units */
+  private isoBlock(ctx: CanvasRenderingContext2D, top: (() => void) | null, side: number, px: number, py: number, u: number, lift: number) {
+    const h = lift * u;
+    const faces: [number, number, number, number, string][] = [
+      // left face: from the left corner to the bottom corner, lit
+      [u, u / 2, px - u, py + u / 2 - h, 'rgba(0,0,0,0.18)'],
+      // right face: from the bottom corner to the right corner, shaded
+      [u, -u / 2, px, py + u - h, 'rgba(0,0,0,0.42)'],
+    ];
+    for (const [a, b, e, f, shade] of faces) {
+      ctx.save();
+      ctx.transform(a, b, 0, h, e, f);
+      if (side) drawGid(ctx, this.table, side, 0, 0, 1, 1);
+      ctx.fillStyle = side ? shade : 'rgba(40,36,50,0.95)';
+      ctx.fillRect(0, 0, 1, 1);
+      ctx.restore();
+    }
+    if (top) {
+      ctx.save();
+      ctx.translate(0, -h);
+      top();
+      ctx.restore();
+    }
+  }
+
+  private renderIso() {
+    const { ctx, cam } = this;
+    const z = cam.zoom;
+    const W = this.W;
+    const H = this.H;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = COLORS.outside;
+    ctx.fillRect(0, 0, this.viewW, this.viewH);
+    const sx = (wx: number) => (wx - cam.x) * z;
+    const sy = (wy: number) => (wy - cam.y) * z;
+    // screen position of the top corner of cell (x, y) / of a map point
+    const P = (u: number, v: number): [number, number] => {
+      const [wx, wy] = this.toWorld(u, v);
+      return [sx(wx), sy(wy)];
+    };
+
+    // map floor outline
+    ctx.fillStyle = COLORS.mapBg;
+    ctx.beginPath();
+    ctx.moveTo(...P(0, 0));
+    ctx.lineTo(...P(W, 0));
+    ctx.lineTo(...P(W, H));
+    ctx.lineTo(...P(0, H));
+    ctx.closePath();
+    ctx.fill();
+
+    const visible = this.layers.filter((l) => l.visible);
+    // flat: everything painted on the ground; walls become blocks, standing things stand up;
+    // 3/4 wall fronts and top-down shadows make no sense in the diamond view
+    const flat = visible.filter((l) => ['floor', 'groundDetails', 'paths', 'deco', 'gameplay', 'spawn', 'custom'].includes(l.role));
+    const walls = visible.filter((l) => l.role === 'walls');
+    const standing = visible.filter((l) => l.role === 'objects' || l.role === 'objectsFront' || l.role === 'overhead');
+    const heights = this.heights && this.heights.length === W * H ? this.heights : null;
+
+    // visible cells: the view rectangle in cell space (a rotated square) plus a margin for tall things
+    const wx0 = cam.x - 2;
+    const wx1 = cam.x + this.viewW / z + 2;
+    const wy0 = cam.y - 1;
+    const wy1 = cam.y + this.viewH / z + ISO_TOP + 2;
+    const inView = (x: number, y: number) => {
+      const wx = x - y + H;
+      const wy = (x + y) / 2 + ISO_TOP;
+      return wx + 1 >= wx0 && wx - 1 <= wx1 && wy + 1 >= wy0 && wy - 2.5 <= wy1;
+    };
+    const dMin = Math.max(0, Math.floor((wy0 - ISO_TOP) * 2) - 2);
+    const dMax = Math.min(W + H - 2, Math.ceil((wy1 - ISO_TOP) * 2) + 2);
+    const cells: number[] = [];
+    for (let d = dMin; d <= dMax; d++) {
+      const xa = Math.max(0, d - (H - 1));
+      const xb = Math.min(W - 1, d);
+      for (let x = xa; x <= xb; x++) {
+        const y = d - x;
+        if (inView(x, y)) cells.push(y * W + x);
+      }
+    }
+
+    // flat pass (cached as one picture when zoomed out)
+    const lifted = (i: number) => !!heights && heights[i] > 0;
+    if (z < 10) {
+      const cache = this.isoFlatCache(flat, heights);
+      const [ox, oy] = [sx(0), sy(0)];
+      ctx.imageSmoothingEnabled = z < cache.ppt * 0.6;
+      ctx.drawImage(cache.canvas, ox, oy, this.worldW * z, this.worldH * z);
+      ctx.imageSmoothingEnabled = false;
+    } else {
+      for (const i of cells) {
+        if (lifted(i)) continue;
+        const [px, py] = P(i % W, (i / W) | 0);
+        this.isoFlat(ctx, flat, i, px, py, z);
+      }
+    }
+
+    // depth pass: blocks, raised floor, standing tiles, objects, figures – sorted by x + y
+    type Item = { key: number; draw: () => void };
+    const items: Item[] = [];
+    for (const i of cells) {
+      const x = i % W;
+      const y = (i / W) | 0;
+      const [px, py] = P(x, y);
+      const wallG = walls.map((l) => l.data[i]).find(Boolean);
+      const lift = heights ? heights[i] * ISO_STEP : 0;
+      if (wallG) {
+        items.push({ key: x + y + 1, draw: () => this.isoBlock(ctx, () => this.isoFlat(ctx, walls, i, px, py, z), this.isoWallSide || wallG, px, py, z, ISO_WALL + lift) });
+      } else if (lift) {
+        const floorG = flat[0]?.data[i] ?? 0;
+        items.push({ key: x + y + 1 - 0.01, draw: () => this.isoBlock(ctx, () => this.isoFlat(ctx, flat, i, px, py, z), this.isoCliffSide || floorG, px, py, z, lift) });
+      }
+      for (const l of standing) {
+        const g = l.data[i];
+        if (!g) continue;
+        // a tile standing upright on the middle of its diamond
+        items.push({
+          key: x + y + 1.02,
+          draw: () => {
+            const [cx, cy] = P(x + 0.5, y + 0.5);
+            const w = z * 1.1;
+            ctx.globalAlpha = l.opacity ?? 1;
+            drawGid(ctx, this.table, g, cx - w / 2, cy - w + z * 0.2 - lift * z, w, w);
+            ctx.globalAlpha = 1;
+          },
+        });
+      }
+    }
+    // objects (trees, houses …): the sprite stands on the middle of its base row
+    const atlas = this.objects.length ? objectAtlas().canvas : null;
+    const A = OBJECT_ATLAS_TILE;
+    for (const o of this.objects) {
+      const def = objectDef(o.type);
+      if (!def || !atlas || !inView(o.x, o.y)) continue;
+      const u = o.x + def.w / 2;
+      const v = o.y + 0.5;
+      items.push({
+        key: u + v + 0.03,
+        draw: () => {
+          const [cx, cy] = P(u, v);
+          const s = z * 1.25;
+          const w = def.w * s;
+          const h = def.h * s;
+          const bottom = cy + z * 0.25;
+          ctx.drawImage(atlas, def.sx * A, def.sy * A, def.w * A, def.h * A, cx - w / 2, bottom - h, w, h);
+          if (this.overlay.objectHighlight === o.id) {
+            ctx.strokeStyle = COLORS.accent;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(cx - w / 2, bottom - h, w, h);
+          }
+        },
+      });
+    }
+    // figures: drawn with screen mappers local to their standing point
+    const at = (fx: number, fy: number): [(x: number) => number, (y: number) => number] => {
+      const [cx, cy] = P(fx, fy);
+      return [(x: number) => cx + (x - fx) * z, (y: number) => cy + (y - fy) * z];
+    };
+    const ch = this.character;
+    if (ch) {
+      const [lx, ly] = at(ch.x, ch.y);
+      items.push({ key: ch.x + ch.y, draw: () => drawCharacter(ctx, ch, lx, ly, z) });
+    }
+    if (this.playItems) for (const it of this.playItems(ctx, sx, sy, z, at)) items.push({ key: it.x !== undefined && it.y !== undefined ? it.x + it.y : it.key, draw: it.draw });
+    items.sort((a, b) => a.key - b.key);
+    for (const it of items) it.draw();
+
+    // overlays: collision, grid, highlights – as diamonds on the ground
+    const diamond = (x: number, y: number, w = 1, h = 1) => {
+      ctx.moveTo(...P(x, y));
+      ctx.lineTo(...P(x + w, y));
+      ctx.lineTo(...P(x + w, y + h));
+      ctx.lineTo(...P(x, y + h));
+      ctx.closePath();
+    };
+    if (this.overlay.collision) {
+      const c = this.overlay.collision;
+      ctx.fillStyle = 'rgba(230, 80, 100, 0.32)';
+      ctx.beginPath();
+      for (const i of cells) if (c[i]) diamond(i % W, (i / W) | 0);
+      ctx.fill();
+    }
+    if (this.overlay.showGrid && z >= 6) {
+      ctx.beginPath();
+      for (let x = 0; x <= W; x++) {
+        ctx.moveTo(...P(x, 0));
+        ctx.lineTo(...P(x, H));
+      }
+      for (let y = 0; y <= H; y++) {
+        ctx.moveTo(...P(0, y));
+        ctx.lineTo(...P(W, y));
+      }
+      ctx.strokeStyle = COLORS.grid;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    diamond(0, 0, W, H);
+    ctx.strokeStyle = COLORS.border;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const o = this.overlay;
+    const area = (r: Selection, fill: string | null, stroke: string, dash: number[] = []) => {
+      ctx.beginPath();
+      diamond(r.x, r.y, r.w, r.h);
+      if (fill) {
+        ctx.fillStyle = fill;
+        ctx.fill();
+      }
+      ctx.setLineDash(dash);
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    };
+    if (o.highlight) area(o.highlight, 'rgba(232,137,176,0.10)', COLORS.accent, [6, 4]);
+    if (o.selection) area(o.selection, 'rgba(232,137,176,0.08)', COLORS.accent, [5, 4]);
+    if (o.preview) area(o.preview, COLORS.accentFill, COLORS.accent);
+    if (o.stamp) area({ x: o.stamp.x, y: o.stamp.y, w: o.stamp.clip.w, h: o.stamp.clip.h }, COLORS.accentFill, COLORS.accent, [5, 4]);
+    else if (o.hover && this.inBounds(o.hover.x, o.hover.y) && o.activeTool !== 'hand') {
+      const n = o.activeTool === 'brush' || o.activeTool === 'eraser' ? o.brushSize : 1;
+      const off = Math.floor((n - 1) / 2);
+      area({ x: o.hover.x - off, y: o.hover.y - off, w: n, h: n }, 'rgba(255,255,255,0.08)', COLORS.accent);
+    }
+  }
+
+  /** zoomed out: all flat cells as one picture (rebuilt when the map changes) */
+  private isoFlatCache(flat: Layer[], heights: Uint8Array | null) {
+    const ppt = clamp(Math.floor(4096 / this.worldW), 2, 10);
+    let c = this.isoCache;
+    if (!c || c.ppt !== ppt || c.canvas.width !== Math.ceil(this.worldW * ppt) || c.canvas.height !== Math.ceil(this.worldH * ppt)) {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(this.worldW * ppt);
+      canvas.height = Math.ceil(this.worldH * ppt);
+      c = this.isoCache = { canvas, ppt, dirty: true };
+    }
+    if (c.dirty) {
+      const g = c.canvas.getContext('2d')!;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, c.canvas.width, c.canvas.height);
+      g.imageSmoothingEnabled = false;
+      for (let i = 0; i < this.W * this.H; i++) {
+        if (heights && heights[i] > 0) continue;
+        const [wx, wy] = this.toWorld(i % this.W, (i / this.W) | 0);
+        this.isoFlat(g, flat, i, wx * ppt, wy * ppt, ppt);
+      }
+      c.dirty = false;
+    }
+    return c;
   }
 
   private drawOverlay(sx: (x: number) => number, sy: (y: number) => number) {

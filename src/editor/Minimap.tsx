@@ -70,6 +70,12 @@ function drawMap(canvas: HTMLCanvasElement, p: Project, redraw: () => void) {
       const [ox, oy] = hexOrigin(0, y);
       g.drawImage(src, 0, y, W, 1, ox * s, oy * s, W * s, Math.ceil(s));
     }
+  } else if (p.map.perspective === 'isometric') {
+    // diamond grid: cell (u, v) → world (u − v + H, (u + v) / 2 + 2), same as the map view
+    const s = canvas.width / (W + H);
+    g.setTransform(s, s / 2, -s, s / 2, H * s, 2 * s);
+    g.drawImage(src, 0, 0);
+    g.setTransform(1, 0, 0, 1, 0, 0);
   } else g.drawImage(src, 0, 0, canvas.width, canvas.height);
 }
 
@@ -78,11 +84,12 @@ export function Minimap({ compact = false }: { compact?: boolean }) {
   const playtest = useEditor((s) => s.playtest);
   const W = useProject((s) => s.project.map.width);
   const H = useProject((s) => s.project.map.height);
-  const hex = useProject((s) => s.project.map.perspective === 'hex');
+  const persp = useProject((s) => s.project.map.perspective);
+  const hex = persp === 'hex';
   const mapRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const max = compact ? 104 : MAX;
-  const [ww, wh] = hex ? hexWorldSize(W, H) : [W, H];
+  const [ww, wh] = hex ? hexWorldSize(W, H) : persp === 'isometric' ? [W + H, (W + H) / 2 + 2] : [W, H];
   const scale = Math.min(max / ww, max / wh);
   const cw = Math.max(1, Math.round(ww * scale));
   const ch = Math.max(1, Math.round(wh * scale));

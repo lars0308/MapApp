@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { MapRenderer } from '../renderer/MapRenderer';
+import { applyIso } from '../renderer/isoSetup';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { mapEvents, viewEvents } from '../store/events';
@@ -82,6 +83,7 @@ export function MapCanvas() {
     r.objects = p.objects;
     r.backdrop = backdropOf(p);
     r.hex = p.map.perspective === 'hex';
+    applyIso(r, p);
     fitTileToPerspective(p);
 
     let fitted = false;
@@ -113,6 +115,10 @@ export function MapCanvas() {
         r.hex = p.map.perspective === 'hex';
         r.fit();
       }
+      if ((p.map.perspective === 'isometric') !== r.iso) {
+        applyIso(r, p);
+        r.fit();
+      } else if (r.iso && (p.result !== prev.result || tilesetsChanged)) applyIso(r, p);
       if (p.map.perspective !== prev.map.perspective || projectSwitched) fitTileToPerspective(p);
       if (backdropOf(p) !== r.backdrop) {
         r.backdrop = backdropOf(p);

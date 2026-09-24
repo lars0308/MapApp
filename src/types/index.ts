@@ -33,8 +33,8 @@ export type TileCategory =
  * Camera perspective of the map. Controls which wall/tile roles the generator uses.
  * side_view = 2D side-scroller (gravity, ground, platforms) – its own generator.
  */
-export type Perspective = 'top_down' | 'low_top_down' | 'isometric_45' | 'side_view' | 'hex';
-export const PERSPECTIVES: Perspective[] = ['top_down', 'low_top_down', 'isometric_45', 'side_view', 'hex'];
+export type Perspective = 'top_down' | 'low_top_down' | 'isometric_45' | 'isometric' | 'side_view' | 'hex';
+export const PERSPECTIVES: Perspective[] = ['top_down', 'low_top_down', 'isometric_45', 'isometric', 'side_view', 'hex'];
 
 /**
  * Auto-tile roles. The generator asks for a role first and falls back to
