@@ -1,10 +1,8 @@
 ## MapForge → Godot 4 loader (Godot 4.3+, TileMapLayer)
 ##
-## Usage:
-##   1. Copy the exported folder to res://mapforge/
-##   2. Add a Node2D to your scene and attach this script
-##   3. Set "map_json_path" (default: res://mapforge/map.json) and run
-##      (or call build_now() from a @tool script / the editor to keep the nodes)
+## Usage (easiest): copy the exported folder anywhere into your project and run Map.tscn.
+## Manual: add a Node2D, attach this script – map.json next to this script is found automatically
+## (or set "map_json_path"). Call build_now() from a @tool script / the editor to keep the nodes.
 ##
 ## Scene that is created:
 ##   MapForgeLoader (this node)
@@ -14,15 +12,21 @@
 ##       Objects                             Node2D per object: Sprite2D + StaticBody2D (origin = base line)
 ##       Characters                          put your player / NPCs here → correct front/behind sorting
 ##     <layers after the y-sorted group>     TileMapLayer (ObjectsFront, Overhead, Collision, Gameplay, SpawnPoints)
-##     Overhead                              object parts that are always above characters (arch beams)
-##     SpawnPoints                           Marker2D
+##     OverheadObjects                       object parts that are always above characters (arch beams, roofs)
+##     SpawnMarkers                          Marker2D per spawn point (type, room_id, properties as meta)
 ##
 ## Everything stays editable: tiles are tiles, layers are separate nodes, objects are nodes.
 extends Node2D
 class_name MapForgeLoader
 
-@export_file("*.json") var map_json_path: String = "res://mapforge/map.json"
+## empty = map.json next to this script
+@export_file("*.json") var map_json_path: String = ""
+## optional: your player scene (e.g. player/player.tscn from the export) – placed on the player spawn
+@export var player_scene: PackedScene
+@export var player_camera_zoom: float = 2.0
 @export var build_on_ready: bool = true
+## the scene already contains tiles and objects (Map.tscn from MapForge): only runtime parts are added
+@export var baked: bool = false
 ## Collision layer keeps its physics but is not drawn
 @export var hide_collision_layer: bool = true
 ## Additionally create merged CollisionShape2D rectangles (instead of relying on tile physics)
@@ -37,8 +41,20 @@ var layer_nodes: Dictionary = {}
 var world: Node2D
 var characters: Node2D
 var astar: AStarGrid2D
+var player: Node2D
 var _sources: Dictionary = {}
 var _objects_texture: Texture2D
+
+## side-scroller: emitted when a body of group "player" reaches the goal
+signal goal_reached(body: Node)
+## hex maps: a hex was clicked (info: terrain, cost, river, road, settlement)
+signal hex_clicked(cell: Vector2i, info: Dictionary)
+
+var hex_camera: Camera2D
+var hex_astar: AStar2D
+var _hex_terrain := PackedByteArray()
+var _hex_rivers := PackedByteArray()
+var _hex_roads := PackedByteArray()
 
 
 func _ready() -> void:
@@ -48,7 +64,11 @@ func _ready() -> void:
 
 
 func build_now() -> void:
-	map_data = load_map_json(map_json_path)
+	var path := map_json_path
+	if path == "" or not FileAccess.file_exists(path):
+		path = (get_script() as Script).resource_path.get_base_dir().path_join("map.json")
+	map_json_path = path
+	map_data = load_map_json(path)
 	if map_data.is_empty():
 		return
 	var info: Dictionary = map_data.get("map", {})
@@ -58,14 +78,25 @@ func build_now() -> void:
 		info.get("name", ""), int(info.get("width", 0)), int(info.get("height", 0)), tile_size, perspective, str(info.get("seed", ""))
 	])
 	var base_dir := map_json_path.get_base_dir()
-	tile_set = build_tile_set(map_data, base_dir)
-	_objects_texture = _load_image_texture(base_dir, str(map_data.get("objectsImage", "")), map_data.get("objectsImageBase64", ""))
-	build_layers(map_data)
-	build_objects(map_data)
+	if baked and has_node("World"):
+		_adopt_baked(map_data)
+	else:
+		tile_set = build_tile_set(map_data, base_dir)
+		_objects_texture = _load_image_texture(base_dir, str(map_data.get("objectsImage", "")), map_data.get("objectsImageBase64", ""))
+		build_layers(map_data)
+		build_objects(map_data)
 	if use_collision_rects:
 		build_collision_rects(map_data)
 	build_spawn_markers(map_data)
 	astar = build_astar(map_data)
+	if perspective == "side_view":
+		build_side(map_data)
+	if perspective == "hex":
+		build_hex(map_data)
+	if player_scene:
+		_spawn_player()
+		if perspective == "side_view":
+			_setup_side_player()
 	print("MapForge: %d layers, %d objects, %d rooms" % [layer_nodes.size(), map_data.get("objects", []).size(), get_rooms().size()])
 
 
@@ -85,6 +116,11 @@ static func load_map_json(path: String) -> Dictionary:
 func build_tile_set(data: Dictionary, base_dir: String) -> TileSet:
 	var ts := TileSet.new()
 	ts.tile_size = Vector2i(tile_size, tile_size)
+	if perspective == "hex":
+		# odd rows shifted half a hex, rows 3/4 apart – same layout as in MapForge
+		ts.tile_shape = TileSet.TILE_SHAPE_HEXAGON
+		ts.tile_layout = TileSet.TILE_LAYOUT_STACKED
+		ts.tile_offset_axis = TileSet.TILE_OFFSET_AXIS_HORIZONTAL
 	ts.add_custom_data_layer()
 	ts.set_custom_data_layer_name(0, "category")
 	ts.set_custom_data_layer_type(0, TYPE_STRING)
@@ -116,6 +152,18 @@ func build_tile_set(data: Dictionary, base_dir: String) -> TileSet:
 			# tall tiles (e.g. upper wall fronts) sort by a point further down (ySortOrigin)
 			td.y_sort_origin = int(tile.get("ySortOrigin", 0)) + int(tile_size / 2.0)
 	return ts
+
+
+## Map.tscn from MapForge: layers, World, objects are already nodes of the scene
+func _adopt_baked(data: Dictionary) -> void:
+	world = get_node("World")
+	characters = world.get_node("Characters")
+	for node in find_children("*", "TileMapLayer", true, false):
+		layer_nodes[node.name] = node
+		if tile_set == null:
+			tile_set = (node as TileMapLayer).tile_set
+	for tileset in data.get("tilesets", []):
+		_sources[tileset["id"]] = int(tileset.get("sourceId", -1))
 
 
 func build_layers(data: Dictionary) -> void:
@@ -163,7 +211,8 @@ func build_layers(data: Dictionary) -> void:
 				source.create_tile(coords)
 			if role == "collision":
 				_ensure_collision(source, coords)
-			node.set_cell(Vector2i(int(t["x"]), int(t["y"])), source_id, coords)
+			# turned / mirrored tiles: alternative = TRANSFORM_FLIP_H | FLIP_V | TRANSPOSE
+			node.set_cell(Vector2i(int(t["x"]), int(t["y"])), source_id, coords, int(t.get("alternative", 0)))
 
 	if not world_added:
 		add_child(world)
@@ -176,7 +225,7 @@ func build_layers(data: Dictionary) -> void:
 func build_objects(data: Dictionary) -> void:
 	var objects_root := world.get_node("Objects")
 	var overhead := Node2D.new()
-	overhead.name = "Overhead"
+	overhead.name = "OverheadObjects"
 	overhead.z_index = 2
 	add_child(overhead)
 	for o in data.get("objects", []):
@@ -237,7 +286,7 @@ func build_collision_rects(data: Dictionary) -> void:
 
 func build_spawn_markers(data: Dictionary) -> void:
 	var root := Node2D.new()
-	root.name = "SpawnPoints"
+	root.name = "SpawnMarkers"
 	add_child(root)
 	for sp in data.get("spawnPoints", []):
 		var marker := Marker2D.new()
@@ -286,6 +335,276 @@ func room_center_position(room: Dictionary) -> Vector2:
 ## Add your player / NPC here so it sorts correctly against walls, cliffs and objects
 func add_character(node: Node2D) -> void:
 	characters.add_child(node)
+
+
+## Player on the "player" spawn point (else the first spawn / map centre), camera follows.
+func _spawn_player() -> void:
+	player = player_scene.instantiate() as Node2D
+	if player == null:
+		return
+	var spawns: Array = map_data.get("spawnPoints", [])
+	var pos := Vector2(float(map_data.get("map", {}).get("width", 0)) / 2.0, float(map_data.get("map", {}).get("height", 0)) / 2.0)
+	var found := false
+	for sp in spawns:
+		if str(sp.get("type", "")) == "player":
+			pos = Vector2(float(sp["x"]), float(sp["y"]))
+			found = true
+			break
+	if not found and spawns.size() > 0:
+		pos = Vector2(float(spawns[0]["x"]), float(spawns[0]["y"]))
+	# feet on the bottom middle of the spawn tile
+	player.position = Vector2((pos.x + 0.5) * tile_size, (pos.y + 0.9) * tile_size)
+	add_character(player)
+	var cam := Camera2D.new()
+	cam.zoom = Vector2(player_camera_zoom, player_camera_zoom)
+	cam.position_smoothing_enabled = true
+	player.add_child(cam)
+
+
+# ------------------------------------------------------------------ side-scroller
+
+## One-way platforms, ladders (group "ladder"), hazards (group "hazard") and the goal.
+func build_side(data: Dictionary) -> void:
+	var side: Dictionary = data.get("side", {})
+	var root := Node2D.new()
+	root.name = "SideScroller"
+	add_child(root)
+	for pl in side.get("platforms", []):
+		var body := StaticBody2D.new()
+		body.name = "Platform"
+		var shape := CollisionShape2D.new()
+		var rect := RectangleShape2D.new()
+		rect.size = Vector2(float(pl["w"]) * tile_size, 4.0)
+		shape.shape = rect
+		shape.one_way_collision = true
+		shape.position = Vector2((float(pl["x"]) + float(pl["w"]) / 2.0) * tile_size, float(pl["y"]) * tile_size + 2.0)
+		body.add_child(shape)
+		root.add_child(body)
+	for ld in side.get("ladders", []):
+		var area := _area(root, "Ladder", float(ld["x"]) + 0.2, float(ld["y"]), 0.6, float(ld["h"]))
+		area.add_to_group("ladder")
+	for hz in side.get("hazards", []):
+		var area := _area(root, "Hazard", float(hz["x"]) + 0.1, float(hz["y"]) + 0.3, float(hz["w"]) - 0.2, float(hz["h"]) - 0.3)
+		area.add_to_group("hazard")
+		area.body_entered.connect(_on_hazard)
+	for lf in side.get("lifts", []):
+		_build_lift(root, lf)
+	var goal = side.get("goal", null)
+	if goal != null:
+		var area := _area(root, "Goal", float(goal[0]) - 0.5, float(goal[1]) - 1.0, 2.0, 2.0)
+		area.add_to_group("goal")
+		area.body_entered.connect(_on_goal)
+
+
+## A lift: its tiles move from the map into an AnimatableBody2D that goes up and down (group "lift").
+func _build_lift(parent: Node, lf: Dictionary) -> void:
+	var x := int(lf["x"])
+	var w := int(lf["w"])
+	var top := int(lf["top"])
+	var bottom := int(lf["bottom"])
+	var body := AnimatableBody2D.new()
+	body.name = "Lift"
+	body.add_to_group("lift")
+	parent.add_child(body)
+	var tiles := TileMapLayer.new()
+	tiles.name = "Tiles"
+	tiles.tile_set = tile_set
+	var src_layer: TileMapLayer = layer_nodes.get("ObjectsBack", null)
+	if src_layer:
+		for c in range(x, x + w):
+			var cell := Vector2i(c, bottom)
+			var sid := src_layer.get_cell_source_id(cell)
+			if sid >= 0:
+				tiles.set_cell(cell, sid, src_layer.get_cell_atlas_coords(cell), src_layer.get_cell_alternative_tile(cell))
+				src_layer.erase_cell(cell)
+	body.add_child(tiles)
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(w * tile_size, 6.0)
+	shape.shape = rect
+	shape.one_way_collision = true
+	shape.position = Vector2((x + w / 2.0) * tile_size, bottom * tile_size + 3.0)
+	body.add_child(shape)
+	var dist := float(bottom - top) * tile_size
+	var travel := float(bottom - top) / float(lf.get("speed", 3.0))
+	var pause := float(lf.get("pause", 1.0))
+	var tw := create_tween().set_loops()
+	tw.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
+	tw.tween_interval(pause)
+	tw.tween_property(body, "position:y", -dist, travel)
+	tw.tween_interval(pause)
+	tw.tween_property(body, "position:y", 0.0, travel)
+
+
+func _area(parent: Node, area_name: String, x: float, y: float, w: float, h: float) -> Area2D:
+	var area := Area2D.new()
+	area.name = area_name
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(w * tile_size, h * tile_size)
+	shape.shape = rect
+	shape.position = Vector2((x + w / 2.0) * tile_size, (y + h / 2.0) * tile_size)
+	area.add_child(shape)
+	parent.add_child(area)
+	return area
+
+
+func _on_hazard(body: Node) -> void:
+	if body.has_method("hazard_hit"):
+		body.call("hazard_hit")
+	elif body.has_method("hurt"):
+		body.call("hurt", 1)
+
+
+func _on_goal(body: Node) -> void:
+	if body.is_in_group("player"):
+		print("MapForge: goal reached")
+		goal_reached.emit(body)
+
+
+## same jump / speed as the MapForge playtest, camera kept inside the level
+func _setup_side_player() -> void:
+	var side: Dictionary = map_data.get("side", {})
+	var phys: Dictionary = side.get("physics", {})
+	for key in ["gravity", "jump_velocity", "run_speed", "speed", "fall_limit"]:
+		var value = null
+		match key:
+			"gravity": value = phys.get("gravity", null)
+			"jump_velocity": value = phys.get("jumpVelocity", null)
+			"run_speed": value = phys.get("runSpeed", null)
+			"speed": value = phys.get("walkSpeed", null)
+			"fall_limit": value = side.get("fallLimit", null)
+		if value != null and key in player:
+			player.set(key, float(value))
+	var info: Dictionary = map_data.get("map", {})
+	for c in player.get_children():
+		if c is Camera2D:
+			c.limit_left = 0
+			c.limit_top = 0
+			c.limit_right = int(info.get("width", 0)) * tile_size
+			c.limit_bottom = int(info.get("height", 0)) * tile_size
+
+
+# ------------------------------------------------------------------ hex maps
+
+## Camera (arrows / WASD, wheel = zoom, right or middle mouse = drag), click = hex_clicked, pathfinding.
+func build_hex(data: Dictionary) -> void:
+	var info: Dictionary = data.get("map", {})
+	var w := int(info.get("width", 0))
+	var h := int(info.get("height", 0))
+	var hex: Dictionary = data.get("hex", {})
+	_hex_terrain = rle_decode(hex.get("terrain", []), w * h)
+	_hex_rivers = rle_decode(hex.get("rivers", []), w * h)
+	_hex_roads = rle_decode(hex.get("roads", []), w * h)
+	hex_astar = build_hex_astar()
+	if player_scene == null:
+		hex_camera = Camera2D.new()
+		hex_camera.name = "HexCamera"
+		hex_camera.position = Vector2((w + 0.5) * tile_size / 2.0, (h * 0.75 + 0.25) * tile_size / 2.0)
+		hex_camera.zoom = Vector2(player_camera_zoom, player_camera_zoom) * 0.5
+		add_child(hex_camera)
+		hex_camera.make_current()
+
+
+func _ground() -> TileMapLayer:
+	return layer_nodes.get("Ground", null)
+
+
+## terrain name of a hex ("grass", "forest", "mountain", "water" …)
+func terrain_at(cell: Vector2i) -> String:
+	var w := int(map_data.get("map", {}).get("width", 0))
+	var i := cell.y * w + cell.x
+	if cell.x < 0 or cell.y < 0 or i >= _hex_terrain.size():
+		return ""
+	return str(map_data.get("hex", {}).get("terrainLegend", {}).get(str(_hex_terrain[i]), ""))
+
+
+## movement cost of a hex (-1 = not walkable); roads make it cheaper
+func move_cost(cell: Vector2i) -> float:
+	var c := float(map_data.get("hex", {}).get("costs", {}).get(terrain_at(cell), -1))
+	var w := int(map_data.get("map", {}).get("width", 0))
+	if c > 0 and _hex_roads.size() > cell.y * w + cell.x and _hex_roads[cell.y * w + cell.x] != 0:
+		c = 0.5
+	return c
+
+
+func hex_info(cell: Vector2i) -> Dictionary:
+	var w := int(map_data.get("map", {}).get("width", 0))
+	var i := cell.y * w + cell.x
+	var town := ""
+	for s in map_data.get("hex", {}).get("settlements", []):
+		if int(s["x"]) == cell.x and int(s["y"]) == cell.y:
+			town = str(s.get("kind", ""))
+	return {
+		"cell": cell,
+		"terrain": terrain_at(cell),
+		"cost": move_cost(cell),
+		"river": i >= 0 and i < _hex_rivers.size() and _hex_rivers[i] != 0,
+		"road": i >= 0 and i < _hex_roads.size() and _hex_roads[i] != 0,
+		"settlement": town,
+	}
+
+
+## AStar2D over all walkable hexes (weight = movement cost), neighbours from the hex TileMapLayer
+func build_hex_astar() -> AStar2D:
+	var astar := AStar2D.new()
+	var ground := _ground()
+	if ground == null:
+		return astar
+	var info: Dictionary = map_data.get("map", {})
+	var w := int(info.get("width", 0))
+	var h := int(info.get("height", 0))
+	for y in range(h):
+		for x in range(w):
+			var cell := Vector2i(x, y)
+			var cost := move_cost(cell)
+			if cost > 0:
+				astar.add_point(y * w + x, ground.map_to_local(cell), cost)
+	for id in astar.get_point_ids():
+		var cell := Vector2i(id % w, id / w)
+		for n in ground.get_surrounding_cells(cell):
+			var nid := n.y * w + n.x
+			if n.x >= 0 and n.y >= 0 and n.x < w and n.y < h and astar.has_point(nid) and not astar.are_points_connected(id, nid):
+				astar.connect_points(id, nid)
+	return astar
+
+
+## cheapest way from one hex to another (list of cells, empty = no way)
+func hex_path(from: Vector2i, to: Vector2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var w := int(map_data.get("map", {}).get("width", 0))
+	if hex_astar == null or not hex_astar.has_point(from.y * w + from.x) or not hex_astar.has_point(to.y * w + to.x):
+		return out
+	for id in hex_astar.get_id_path(from.y * w + from.x, to.y * w + to.x):
+		out.append(Vector2i(id % w, id / w))
+	return out
+
+
+func _process(delta: float) -> void:
+	if hex_camera == null:
+		return
+	var v := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	hex_camera.position += v * 600.0 * delta / hex_camera.zoom.x
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if hex_camera == null:
+		return
+	if event is InputEventMouseButton and event.pressed:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+			hex_camera.zoom = (hex_camera.zoom * 1.1).clamp(Vector2(0.2, 0.2), Vector2(8, 8))
+		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			hex_camera.zoom = (hex_camera.zoom / 1.1).clamp(Vector2(0.2, 0.2), Vector2(8, 8))
+		elif mb.button_index == MOUSE_BUTTON_LEFT and _ground():
+			var cell := _ground().local_to_map(_ground().get_local_mouse_position())
+			var info := hex_info(cell)
+			print("MapForge hex ", cell, ": ", info)
+			hex_clicked.emit(cell, info)
+	elif event is InputEventMouseMotion:
+		var mm := event as InputEventMouseMotion
+		if mm.button_mask & (MOUSE_BUTTON_MASK_RIGHT | MOUSE_BUTTON_MASK_MIDDLE):
+			hex_camera.position -= mm.relative / hex_camera.zoom.x
 
 
 static func rle_decode(rle: Array, size: int) -> PackedByteArray:

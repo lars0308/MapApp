@@ -342,6 +342,16 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.13 – Fertige Godot-Szene**
+
+- Das Godot-Paket enthält jetzt **`tileset.tres`**, einen fertigen TileSet. Er hat alle Kacheln, Y-Sort-Ursprünge, Custom Data „category“ und „role“, Kollisionspolygone und bei Hex-Karten die Hexagon-Form.
+- Dazu kommt **`Map.tscn`**: jede Ebene als TileMapLayer mit ihren Kacheln, dazu die Y-sortierte „World“. Objekte sind Sprite2D mit Kollision, Dächer liegen in „OverheadObjects“, die Spielfigur ist eingebunden. Alles lässt sich sofort im Godot-Editor ansehen und weiterbearbeiten.
+- Das angehängte Loader-Script (`baked = true`) ergänzt beim Start nur Spawn-Marker, AStar, Side-Scroller-Plattformen, Leitern und Aufzüge sowie die Hex-Helfer.
+- Mit Godot 4.3 geprüft für Top-Down/Dorf, Low Top-Down, 45°, Side-Scroller und Hex:
+  - Jede Kachel (Quelle, Atlas-Position, Drehung, Y-Sort, Kollision, Rolle) stimmt mit dem bisherigen Laufzeit-Aufbau überein.
+  - Die Spielfigur erscheint.
+- Die Spawn-Marker heißen jetzt `SpawnMarkers`, die Objekt-Dächer `OverheadObjects`. Vorher kollidierten diese Namen mit den gleichnamigen Kachel-Ebenen.
+
 **Version 3.12 – KI arbeitet auch, wenn MapForge zu ist**
 
 - „KI von überall“: Ist keine MapForge-App offen, führt der Vermittler den Befehl in **MapForge in der Cloud** aus. Das ist die eigene App in einem unsichtbaren Browser auf Vercel, `api/cloud.js`. Die KI arbeitet dort an denselben Karten. Jeder Befehl dauert in der Cloud ein paar Sekunden länger, weil der Browser erst starten muss.

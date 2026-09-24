@@ -10,6 +10,7 @@ import { OBJECTS_IMAGE, buildGodotData, scaledObjectsPng, scaledTilesetPng, tile
 import { renderMapPng, type PngOptions } from './pngExport';
 import { createZip, type ZipEntry } from './zip';
 import { GODOT_LOADER_FILENAME, GODOT_LOADER_SCRIPT, GODOT_README } from './godotScript';
+import { TILESET_RESOURCE, buildMapScene, buildTileSetResource } from './godotScene';
 
 export function exportProjectFile(p: Project) {
   downloadText(serializeProject(p), `${safeFileName(p.name)}${PROJECT_EXTENSION}`);
@@ -89,16 +90,9 @@ export async function buildGodotPackage(p: Project, includeShadows = true): Prom
       }),
     );
   }
-  entries.push({
-    path: `${folder}/Map.tscn`,
-    data: `[gd_scene load_steps=${player ? 3 : 2} format=3]
-
-[ext_resource type="Script" path="${GODOT_LOADER_FILENAME}" id="1_loader"]
-${player ? '[ext_resource type="PackedScene" path="player/player.tscn" id="2_player"]\n' : ''}
-[node name="Map" type="Node2D"]
-script = ExtResource("1_loader")
-${player ? 'player_scene = ExtResource("2_player")\n' : ''}`,
-  });
+  // ready resources: TileSet and the scene with all tiles and objects (visible in the Godot editor)
+  entries.push({ path: `${folder}/${TILESET_RESOURCE}`, data: buildTileSetResource(data) });
+  entries.push({ path: `${folder}/Map.tscn`, data: buildMapScene(data, { player: !!player }) });
   return { blob: createZip(entries), name: `${folder}-godot.zip` };
 }
 

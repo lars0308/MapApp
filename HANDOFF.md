@@ -40,7 +40,7 @@ Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI 
 ## Danach offen
 6. ~~Außenbereiche und Dörfer~~ erledigt: `generator.layout = 'outdoor' | 'village'`. Das nutzt `cavify` und eine Wald-Maske in `src/generator/index.ts`; Häuser setzt `placeHouses`. Höhlen: `src/generator/cave.ts`.
 7. Echtes isometrisches Rautenraster + Höhenebenen.
-8. Godot-Terrain-Set für Wände; direkter `.tscn`/`.tres`-Export.
+8. Godot-Terrain-Set für Wände (offen). ~~Direkter `.tscn`/`.tres`-Export~~ erledigt: `src/export/godotScene.ts` erzeugt `tile_map_data` als base64 im Format 0 (uint16 Version, dann 12 Bytes pro Zelle). Getestet mit Godot 4.3 aus dem Scratchpad.
 9. ~~Tilesets mit Rand/Abstand, nicht-quadratische Tiles~~ erledigt: `repackGrid` in `src/tilesets/slicing.ts` und `recutTileset` im Store; das Original liegt in `Tileset.sourceDataUrl` und `Tileset.cut`. ~~Generator im Web Worker~~ erledigt: `src/generator/worker.ts` und `runner.ts` (`generateAsync`, fällt ohne Worker auf den Hauptthread zurück).
 
 ## Tests

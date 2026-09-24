@@ -45,7 +45,7 @@ export function ExportPanel() {
         <div className="export-list">
           <ExportItem
             title="Godot-Paket"
-            meta={`Empfohlen · Ordner ins Godot-Projekt ziehen, Map.tscn starten${playerSpriteName() ? ` · mit Spielfigur „${playerSpriteName()}“` : ''}`}
+            meta={`Empfohlen · Ordner ins Godot-Projekt ziehen, Map.tscn öffnen – alle Kacheln und Objekte direkt im Editor bearbeitbar${playerSpriteName() ? ` · mit Spielfigur „${playerSpriteName()}“` : ''}`}
             busy={busy === 'godot'}
             onClick={() => run('godot', () => exportGodotPackage(project, withShadows), 'Godot-Paket exportiert')}
           />

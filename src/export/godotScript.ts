@@ -17,8 +17,8 @@ export const GODOT_LOADER_SCRIPT = `## MapForge → Godot 4 loader (Godot 4.3+, 
 ##       Objects                             Node2D per object: Sprite2D + StaticBody2D (origin = base line)
 ##       Characters                          put your player / NPCs here → correct front/behind sorting
 ##     <layers after the y-sorted group>     TileMapLayer (ObjectsFront, Overhead, Collision, Gameplay, SpawnPoints)
-##     Overhead                              object parts that are always above characters (arch beams)
-##     SpawnPoints                           Marker2D
+##     OverheadObjects                       object parts that are always above characters (arch beams, roofs)
+##     SpawnMarkers                          Marker2D per spawn point (type, room_id, properties as meta)
 ##
 ## Everything stays editable: tiles are tiles, layers are separate nodes, objects are nodes.
 extends Node2D
@@ -30,6 +30,8 @@ class_name MapForgeLoader
 @export var player_scene: PackedScene
 @export var player_camera_zoom: float = 2.0
 @export var build_on_ready: bool = true
+## the scene already contains tiles and objects (Map.tscn from MapForge): only runtime parts are added
+@export var baked: bool = false
 ## Collision layer keeps its physics but is not drawn
 @export var hide_collision_layer: bool = true
 ## Additionally create merged CollisionShape2D rectangles (instead of relying on tile physics)
@@ -81,10 +83,13 @@ func build_now() -> void:
 		info.get("name", ""), int(info.get("width", 0)), int(info.get("height", 0)), tile_size, perspective, str(info.get("seed", ""))
 	])
 	var base_dir := map_json_path.get_base_dir()
-	tile_set = build_tile_set(map_data, base_dir)
-	_objects_texture = _load_image_texture(base_dir, str(map_data.get("objectsImage", "")), map_data.get("objectsImageBase64", ""))
-	build_layers(map_data)
-	build_objects(map_data)
+	if baked and has_node("World"):
+		_adopt_baked(map_data)
+	else:
+		tile_set = build_tile_set(map_data, base_dir)
+		_objects_texture = _load_image_texture(base_dir, str(map_data.get("objectsImage", "")), map_data.get("objectsImageBase64", ""))
+		build_layers(map_data)
+		build_objects(map_data)
 	if use_collision_rects:
 		build_collision_rects(map_data)
 	build_spawn_markers(map_data)
@@ -154,6 +159,18 @@ func build_tile_set(data: Dictionary, base_dir: String) -> TileSet:
 	return ts
 
 
+## Map.tscn from MapForge: layers, World, objects are already nodes of the scene
+func _adopt_baked(data: Dictionary) -> void:
+	world = get_node("World")
+	characters = world.get_node("Characters")
+	for node in find_children("*", "TileMapLayer", true, false):
+		layer_nodes[node.name] = node
+		if tile_set == null:
+			tile_set = (node as TileMapLayer).tile_set
+	for tileset in data.get("tilesets", []):
+		_sources[tileset["id"]] = int(tileset.get("sourceId", -1))
+
+
 func build_layers(data: Dictionary) -> void:
 	world = Node2D.new()
 	world.name = "World"
@@ -213,7 +230,7 @@ func build_layers(data: Dictionary) -> void:
 func build_objects(data: Dictionary) -> void:
 	var objects_root := world.get_node("Objects")
 	var overhead := Node2D.new()
-	overhead.name = "Overhead"
+	overhead.name = "OverheadObjects"
 	overhead.z_index = 2
 	add_child(overhead)
 	for o in data.get("objects", []):
@@ -274,7 +291,7 @@ func build_collision_rects(data: Dictionary) -> void:
 
 func build_spawn_markers(data: Dictionary) -> void:
 	var root := Node2D.new()
-	root.name = "SpawnPoints"
+	root.name = "SpawnMarkers"
 	add_child(root)
 	for sp in data.get("spawnPoints", []):
 		var marker := Marker2D.new()
@@ -646,7 +663,9 @@ Contents
 - tilesets/*.png        tileset images, re-sampled to the map tile size
 - objects.png           object sprites (trees, pillars, rocks, arches …), same scale
 - mapforge_loader.gd    loader script (Godot 4.3+, TileMapLayer)
-- Map.tscn              ready scene (loader attached) – just run it
+- tileset.tres          ready TileSet: all tiles, y-sort origins, custom data "category" / "role", collision
+- Map.tscn              ready scene: every layer is a TileMapLayer with its tiles, objects are Sprite2D
+                        nodes with collision – visible and editable in the editor, just run it
 - player/               your own character from MapForge (only if set as player)
 
 Schritte / Steps
@@ -656,8 +675,14 @@ Schritte / Steps
 3. Fertig. Ist in MapForge eine eigene Spielfigur gesetzt, liegt sie in player/ und steht am
    Startpunkt, die Kamera folgt ihr (Pfeiltasten). Done – with your own player if one was set.
 
-Eigene Szene: Node2D + mapforge_loader.gd – map.json neben dem Script wird automatisch gefunden.
-Own scene: Node2D + mapforge_loader.gd – map.json next to the script is found automatically.
+Map.tscn ist fertig gebaut: Kacheln und Objekte kannst du direkt im Godot-Editor ansehen und ändern
+(TileMapLayer auswählen → unten „TileMap“ zum Malen). Das angehängte Script (baked = true) ergänzt beim
+Start nur Spielfigur, Spawn-Marker, AStar, Side-Scroller-Plattformen/Leitern/Aufzüge und Hex-Helfer aus map.json.
+Map.tscn is fully built: tiles and objects are editable in the editor; the loader (baked = true) only adds
+the runtime parts from map.json.
+
+Eigene Szene ohne fertige Kacheln: Node2D + mapforge_loader.gd – baut alles beim Start aus map.json.
+Own scene: Node2D + mapforge_loader.gd – builds everything from map.json at runtime.
 
 Y-sort
 - Layers with "ySort": true (ObjectsBack, WallsFront), all objects and the node
