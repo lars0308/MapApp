@@ -25,7 +25,14 @@ import { buildSpriteGodot } from '../sprites/exportSprite';
 import { setPlayerSprite } from '../playtest/playerSprite';
 import { figureToObject } from '../objects/fromFigure';
 import { VIEWS, VIEWS4, type SpriteKind, type View } from '../sprites/types';
-import type { GeneratorSettings, Layer, ObjectType, Perspective, Project } from '../types';
+import type { GeneratorSettings, Layer, ObjectType, Perspective, Project, TileCategory, TileMeta, TileRole, Tileset } from '../types';
+import { TILE_ROLES } from '../types';
+import { CATEGORIES } from '../tilesets/categories';
+import { autoAssign, tileLabel } from '../tilesets/autoAssign';
+import { createTilesetFromFile, findEmptyTiles } from '../tilesets/slicing';
+import { confirmedMetas, suggestMetas } from '../tilesets/TileLabel';
+import { learnFrom } from '../tilesets/learning';
+import { uid } from '../utils/id';
 
 // Commands an AI (or any program) can run against the app: the same actions as the
 // buttons, as JSON in / JSON out. Used by the MCP bridge (src/api/bridge.ts) and available
@@ -69,6 +76,11 @@ function findLayer(p: Project, ref: unknown): Layer {
   const r = String(ref).toLowerCase();
   const l = p.layers.find((x) => x.id === ref) ?? p.layers.find((x) => x.name.toLowerCase() === r) ?? p.layers.find((x) => x.role.toLowerCase() === r);
   return l ?? fail(`Layer "${ref}" gibt es nicht – list_layers zeigt alle`);
+}
+
+function findTileset(p: Project, ref: unknown): Tileset {
+  const r = String(ref ?? '').toLowerCase();
+  return p.tilesets.find((t) => t.id === ref) ?? p.tilesets.find((t) => t.name.toLowerCase() === r) ?? fail(`Tileset "${ref}" gibt es nicht – tileset_list zeigt alle`);
 }
 
 const turnOf = (rotate: unknown, mirror: unknown): number => {
@@ -242,6 +254,166 @@ const H: Record<string, Handler> = {
     }
     const limit = int(a.limit, 'limit', 300);
     return { data: { count: out.length, tiles: out.slice(0, limit) } };
+  },
+
+  // ------------------------------------------------------------------ own tilesets
+  tileset_list: () => {
+    const p = P();
+    return {
+      data: {
+        tilesets: p.tilesets.map((ts) => {
+          const metas = Object.values(ts.tiles);
+          return {
+            id: ts.id,
+            name: ts.name,
+            own: ts.source === 'upload',
+            tileSize: ts.tileSize,
+            gids: [ts.firstGid, ts.firstGid + ts.columns * ts.rows - 1],
+            tiles: ts.columns * ts.rows - ts.emptyTiles.length,
+            active: ts.active,
+            perspectives: ts.perspectives,
+            assigned: metas.filter((m) => (m.category || m.role) && !m.auto).length,
+            suggestions: metas.filter((m) => m.auto).length,
+          };
+        }),
+        categories: CATEGORIES.map((c) => c.id),
+        roles: TILE_ROLES,
+        forThisMap: p.map.perspective,
+      },
+    };
+  },
+
+  tileset_add: async (a) => {
+    let dataUrl: string;
+    if (a.image_base64) dataUrl = `data:image/png;base64,${String(a.image_base64).replace(/^data:[^,]*,/, '')}`;
+    else if (a.url) {
+      let r: Response;
+      try {
+        r = await fetch(String(a.url));
+      } catch {
+        return fail('Bild konnte nicht geladen werden – die Seite erlaubt den Abruf aus dem Browser nicht (CORS). Bild als image_base64 schicken oder woanders ablegen.');
+      }
+      if (!r.ok) fail(`Bild konnte nicht geladen werden (HTTP ${r.status})`);
+      const blob = await r.blob();
+      dataUrl = await new Promise<string>((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(String(fr.result));
+        fr.onerror = () => rej(new Error('Lesen fehlgeschlagen'));
+        fr.readAsDataURL(blob);
+      });
+    } else return fail('url oder image_base64 angeben');
+    const s = useProject.getState();
+    const name = str(a.name, 'name', String(a.url ?? 'KI-Tileset').split('/').pop()!.replace(/\.[^.]+$/, '') || 'KI-Tileset');
+    let ts: Tileset;
+    let note: string;
+    if (a.tile_size) {
+      const size = int(a.tile_size, 'tile_size');
+      const img = await loadImage(dataUrl);
+      const { columns, rows, empty } = await findEmptyTiles(dataUrl, size);
+      if (columns * rows > 1500) fail(`${columns * rows} Tiles bei ${size} px – zu viele; größere tile_size wählen oder ohne tile_size (Teile-Erkennung)`);
+      ts = { id: uid('ts'), name, source: 'upload', dataUrl, imageWidth: img.naturalWidth, imageHeight: img.naturalHeight, tileSize: size, columns, rows, firstGid: s.project.nextGid, active: true, tiles: {}, emptyTiles: empty, perspectives: [] };
+      note = `Raster ${size} px`;
+    } else ({ ts, note } = await createTilesetFromFile(name, dataUrl, s.project.map.tileSize, s.project.nextGid));
+    ts.perspectives = Array.isArray(a.perspectives) ? (a.perspectives as Perspective[]) : [];
+    ts.tiles = await autoAssign(ts);
+    s.addTileset(ts);
+    const added = P().tilesets[P().tilesets.length - 1];
+    return { text: `Tileset „${added.name}“: ${added.columns * added.rows - added.emptyTiles.length} Tiles (${note}), automatische Vorschläge gesetzt – mit tileset_render ansehen, mit tileset_assign korrigieren.`, data: { id: added.id, gids: [added.firstGid, added.firstGid + added.columns * added.rows - 1], tileSize: added.tileSize } };
+  },
+
+  tileset_render: async (a) => {
+    const ts = findTileset(P(), a.tileset);
+    const img = await loadImage(ts.dataUrl);
+    const t = ts.tileSize;
+    const scale = int(a.scale, 'scale', Math.max(1, Math.min(8, Math.round(48 / t))));
+    const cell = t * scale;
+    const c = document.createElement('canvas');
+    c.width = ts.columns * cell;
+    c.height = ts.rows * cell;
+    if (c.width * c.height > 16_000_000) fail('Bild wäre zu groß – kleineres scale');
+    const g = c.getContext('2d')!;
+    g.fillStyle = '#26232c';
+    g.fillRect(0, 0, c.width, c.height);
+    g.imageSmoothingEnabled = false;
+    g.drawImage(img, 0, 0, ts.columns * t, ts.rows * t, 0, 0, c.width, c.height);
+    const empty = new Set(ts.emptyTiles);
+    const fs = Math.max(9, Math.min(14, Math.round(cell / 4)));
+    g.font = `bold ${fs}px sans-serif`;
+    g.textBaseline = 'top';
+    for (let r = 0; r < ts.rows; r++)
+      for (let q = 0; q < ts.columns; q++) {
+        const i = r * ts.columns + q;
+        const x = q * cell;
+        const y = r * cell;
+        g.strokeStyle = 'rgba(255,255,255,0.35)';
+        g.strokeRect(x + 0.5, y + 0.5, cell - 1, cell - 1);
+        if (empty.has(i)) continue;
+        const lbl = tileLabel(ts.tiles[i]);
+        const lines = [String(ts.firstGid + i), lbl ? `${lbl.text}${lbl.auto ? '?' : ''}` : ''];
+        lines.forEach((line, k) => {
+          if (!line) return;
+          const w = g.measureText(line).width + 4;
+          g.fillStyle = k ? (lbl?.auto ? 'rgba(160,110,20,0.85)' : 'rgba(30,110,60,0.85)') : 'rgba(0,0,0,0.7)';
+          const ly = k ? y + cell - fs - 3 : y + 1;
+          g.fillRect(x + 1, ly, w, fs + 2);
+          g.fillStyle = '#fff';
+          g.fillText(line, x + 3, ly + 1);
+        });
+      }
+    return { text: `${ts.name}: gid oben links, Zuordnung unten (? = Vorschlag, noch nicht bestätigt)`, binary: { kind: 'image', mime: 'image/png', name: 'tileset.png', base64: dataUrlBase64(c.toDataURL('image/png')) } };
+  },
+
+  tileset_assign: (a) => {
+    const gids = Array.isArray(a.gids) ? (a.gids as unknown[]).map(Number).filter(Number.isFinite) : [];
+    if (!gids.length) fail('gids fehlen');
+    const patch: Partial<TileMeta> = {};
+    if (a.clear) Object.assign(patch, { category: undefined, role: undefined });
+    if (a.category !== undefined) {
+      if (!CATEGORIES.some((c) => c.id === a.category)) fail(`Kategorie „${a.category}“ gibt es nicht: ${CATEGORIES.map((c) => c.id).join(', ')}`);
+      patch.category = a.category as TileCategory;
+    }
+    if (a.role !== undefined) {
+      if (!(TILE_ROLES as readonly string[]).includes(String(a.role))) fail(`Rolle „${a.role}“ gibt es nicht – tileset_list zeigt alle`);
+      patch.role = a.role as TileRole;
+    }
+    if (Array.isArray(a.tags)) patch.tags = (a.tags as unknown[]).map(String);
+    if (a.collision !== undefined) patch.collision = !!a.collision;
+    const known = gids.filter((g) => P().tilesets.some((t) => g >= t.firstGid && g < t.firstGid + t.columns * t.rows));
+    if (!known.length) fail('Keine dieser gids gehört zu einem Tileset');
+    useProject.getState().setTileMeta(known, patch);
+    return { data: { assigned: known.length, patch } };
+  },
+
+  tileset_auto_assign: async (a) => {
+    const ts = findTileset(P(), a.tileset);
+    const tiles = await suggestMetas(ts);
+    useProject.getState().mergeTileMetas(ts.id, tiles);
+    let confirmed = 0;
+    if (a.confirm) {
+      const now = findTileset(P(), ts.id);
+      const c = confirmedMetas(now.tiles);
+      confirmed = Object.keys(c).length;
+      useProject.getState().mergeTileMetas(ts.id, c);
+      void learnFrom({ ...now, tiles: { ...now.tiles, ...c } });
+    }
+    return { data: { suggested: Object.keys(tiles).length, confirmed } };
+  },
+
+  tileset_update: (a) => {
+    const ts = findTileset(P(), a.tileset);
+    const patch: Partial<Pick<Tileset, 'name' | 'active' | 'perspectives'>> = {};
+    if (a.name) patch.name = String(a.name);
+    if (a.active !== undefined) patch.active = !!a.active;
+    if (Array.isArray(a.perspectives)) patch.perspectives = a.perspectives as Perspective[];
+    useProject.getState().updateTileset(ts.id, patch);
+    return { data: { id: ts.id, ...patch } };
+  },
+
+  tileset_remove: (a) => {
+    const ts = findTileset(P(), a.tileset);
+    if (ts.source !== 'upload') fail('Mitgelieferte Demo-Tilesets bleiben – mit tileset_update active=false ausschalten');
+    useProject.getState().removeTileset(ts.id);
+    return { data: { removed: ts.name } };
   },
 
   list_layers: () => ({

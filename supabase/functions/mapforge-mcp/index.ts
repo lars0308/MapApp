@@ -25,7 +25,7 @@ const json = (data: unknown, status = 200) => new Response(JSON.stringify(data),
 type AppResult = { ok: boolean; error?: string; text?: string; data?: unknown; binary?: { kind: string; mime: string; name: string; base64: string } };
 
 /** run one command in the MapForge tab that listens on the code's channel */
-async function relay(code: string, command: string, args: unknown): Promise<AppResult> {
+async function relay(code: string, command: string, args: unknown, timeout = TIMEOUT): Promise<AppResult> {
   const sb = createClient(SUPABASE_URL, KEY, { auth: { persistSession: false } });
   const ch = sb.channel(`mapforge-${code}`, { config: { broadcast: { self: false } } });
   const id = crypto.randomUUID();
@@ -35,7 +35,7 @@ async function relay(code: string, command: string, args: unknown): Promise<AppR
     return await new Promise<AppResult>((resolve) => {
       const timer = setTimeout(
         () => resolve({ ok: false, error: 'MapForge antwortet nicht. Ist die App offen (auch am Handy) und unter Einstellungen → KI-Verbindung „KI von überall“ eingeschaltet – mit diesem Kopplungscode?' }),
-        TIMEOUT,
+        timeout,
       );
       // results come in pieces (Realtime messages are limited in size)
       ch.on('broadcast', { event: 'result' }, ({ payload }) => {
@@ -84,13 +84,15 @@ async function handle(code: string, m: Rpc) {
       });
     case 'ping':
       return reply({});
-    case 'tools/list':
-      return reply({ tools: spec.commands.map((c) => ({ name: c.name, description: c.description, inputSchema: c.input })) });
-    case 'tools/call': {
-      const name = String(m.params?.name ?? '');
-      if (!spec.commands.some((c) => c.name === name)) return reply({ isError: true, content: [{ type: 'text', text: `Unbekanntes Tool ${name}` }] });
-      return reply(toMcp(await relay(code, name, m.params?.arguments ?? {})));
+    case 'tools/list': {
+      // the connected app knows its newest commands – the copy here is the fallback
+      const live = await relay(code, '__spec', {}, 4000);
+      const commands = live.ok && Array.isArray((live.data as typeof spec)?.commands) ? (live.data as typeof spec).commands : spec.commands;
+      return reply({ tools: commands.map((c) => ({ name: c.name, description: c.description, inputSchema: c.input })) });
     }
+    case 'tools/call':
+      // unknown commands are answered by the app itself
+      return reply(toMcp(await relay(code, String(m.params?.name ?? ''), m.params?.arguments ?? {})));
     default:
       // notifications (no id) need no answer
       if (m.id === undefined || m.id === null) return null;

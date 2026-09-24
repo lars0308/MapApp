@@ -342,6 +342,11 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.6 – KI verwaltet eigene Tilesets**
+
+- Neue KI-Befehle: `tileset_list`, `tileset_add` (PNG per Adresse oder base64, mit Teile-Erkennung und automatischen Vorschlägen), `tileset_render` (Bild mit gid und Zuordnung jedes Tiles), `tileset_assign` (Kategorie, Rolle, Tags, Kollision – die App lernt daraus), `tileset_auto_assign`, `tileset_update` (Name, an/aus, Kartenarten), `tileset_remove`.
+- Der Vermittler für „KI von überall“ holt die Befehlsliste jetzt live aus der verbundenen App – neue Befehle brauchen kein neues Hochladen mehr.
+
 **Version 3.5 – Gegner & Beute automatisch, Kampf im Testspiel**
 
 - Generator (Top-Down / Isometrisch): neue Regler **Gegner** und **Beute (Truhen)** unter *Ausstattung* (auch im Assistenten). Verteilung nach Entfernung zum Start: der Startraum bleibt frei, weiter hinten mehr und stärkere Gegner (Stufe 1–5, 25 % Fernkämpfer), der Boss bekommt Wachen; Truhen in Schatzräumen, Sackgassen und selten sonst (Stufe 1–3), jede Truhe als echtes Objekt. Genres setzen passende Werte (Puzzle: keine Gegner). Alles als Spawnpunkte mit Eigenschaften im Godot-Export.

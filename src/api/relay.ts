@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
-import { runCommand, type Result } from './commands';
+import { runCommand, spec, type Result } from './commands';
 import { useEditor } from '../store/editorStore';
 import { downloadBlob } from '../utils/download';
 
@@ -113,7 +113,8 @@ async function connect() {
   ch.on('broadcast', { event: 'call' }, async ({ payload }) => {
     const { id, command, args } = payload as { id: string; command: string; args: Record<string, unknown> };
     useRelay.setState({ last: command, count: useRelay.getState().count + 1 });
-    const text = JSON.stringify(localise(await runCommand(command, args ?? {})));
+    // __spec: the relay asks for the current command list
+    const text = JSON.stringify(command === '__spec' ? { ok: true, data: spec } : localise(await runCommand(command, args ?? {})));
     const n = Math.max(1, Math.ceil(text.length / CHUNK));
     for (let i = 0; i < n; i++) await ch.send({ type: 'broadcast', event: 'result', payload: { id, i, n, data: text.slice(i * CHUNK, (i + 1) * CHUNK) } });
   });

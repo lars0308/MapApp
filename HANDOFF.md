@@ -1,6 +1,6 @@
 # Übergabe – MapForge (Stand 2026-09-24, Version 3.1)
 
-Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (Version 3.5 im README).
+Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (Version 3.6 im README).
 Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI auf Deutsch, UI selbsterklärend, mobil zuerst, keine Fake-Features.
 
 ## Stand (fertig, gepusht)
@@ -25,7 +25,7 @@ Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI 
 
 ## KI von überall (Version 3.4)
 - Supabase-Projekt „MapForge“ (`uqimzsputtnajpsficao`, eu-central-1, Free) mit Edge Function `mapforge-mcp` (Code in `supabase/functions/mapforge-mcp`, verify_jwt aus, Kopplungscode im Pfad). App-Seite `src/api/relay.ts` (Realtime-Kanal `mapforge-<code>`, Ergebnisse in 150-KB-Stücken, ZIPs werden lokal heruntergeladen), UI `RelaySection` in `src/api/AiSection.tsx`.
-- Nach Änderungen an `src/api/spec.json` Edge Function neu deployen (spec.json liegt daneben, `npm run build` kopiert sie).
+- Die Edge Function (v2) fragt `tools/list` live bei der App ab (`__spec`), neue Befehle brauchen kein Redeploy; die mitgelieferte spec.json ist nur Rückfall (deployt ist eine gekürzte Fassung).
 - Noch nicht Ende-zu-Ende getestet (Sandbox blockt supabase.co) – erster echter Test durch den Nutzer.
 
 ## Gegner & Beute (Version 3.5)

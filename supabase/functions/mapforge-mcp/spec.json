@@ -1,7 +1,7 @@
 {
   "name": "mapforge",
   "version": "1.0",
-  "about": "MapForge: pixel-art map generator, tile editor and figure builder with Godot 4 export. Coordinates are tile cells (x to the right, y down, 0-based). A cell value is a tile gid (0 = empty); gids come from list_tiles. Typical flow: status → new_map (or generate) → render to look at it → paint / place_object / copy_paste to edit → render again → export_godot. Figures: figure_parts → figure_set_part → figure_render → figure_export_godot.",
+  "about": "MapForge: pixel-art map generator, tile editor and figure builder with Godot 4 export. Coordinates are tile cells (x to the right, y down, 0-based). A cell value is a tile gid (0 = empty); gids come from list_tiles. Typical flow: status → new_map (or generate) → render to look at it → paint / place_object / copy_paste to edit → render again → export_godot. Own tilesets: tileset_add → tileset_render → tileset_assign → generate. Figures: figure_parts → figure_set_part → figure_render → figure_export_godot.",
   "commands": [
     {
       "name": "status",
@@ -150,6 +150,182 @@
             "type": "integer"
           }
         }
+      }
+    },
+    {
+      "name": "tileset_list",
+      "description": "Tilesets of the project: id, name, tile size, gid range, number of tiles, active, perspectives, how many tiles are assigned / still unconfirmed suggestions. Also the allowed categories and roles for tileset_assign.",
+      "input": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "tileset_add",
+      "description": "Add an own tileset from a PNG (url or base64). Clean grids are cut as they are, sheets of separate pieces (gaps, different sizes, AI-generated sheets) are cut into their pieces automatically; then every tile gets an automatic suggestion (floor, wall, corner …). tile_size forces a plain grid of that size.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "https address of a PNG (the server must allow the download – CORS)"
+          },
+          "image_base64": {
+            "type": "string",
+            "description": "PNG as base64 (not via the phone relay for big images)"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tile_size": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 256
+          },
+          "perspectives": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "top_down",
+                "low_top_down",
+                "isometric_45",
+                "side_view",
+                "hex"
+              ]
+            },
+            "description": "map kinds the tileset is drawn for (empty = all)"
+          }
+        }
+      }
+    },
+    {
+      "name": "tileset_render",
+      "description": "Picture of a tileset with every tile's gid and its current assignment (short label; '?' = unconfirmed suggestion) – to see what the tiles are before assigning them.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "tileset": {
+            "type": "string",
+            "description": "Tileset id or name (see tileset_list)"
+          },
+          "scale": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          }
+        },
+        "required": [
+          "tileset"
+        ]
+      },
+      "returns": "image"
+    },
+    {
+      "name": "tileset_assign",
+      "description": "Assign tiles (like correcting them in the palette): category, role (auto-tiling), tags, collision. Several gids at once. Confirms suggestions; the app learns from it for future tilesets.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "gids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "category": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "collision": {
+            "type": "boolean"
+          },
+          "clear": {
+            "type": "boolean",
+            "description": "remove category and role"
+          }
+        },
+        "required": [
+          "gids"
+        ]
+      }
+    },
+    {
+      "name": "tileset_auto_assign",
+      "description": "Automatic assignment again for all tiles that are not confirmed yet (confirmed / edited tiles stay). confirm=true accepts all suggestions afterwards.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "tileset": {
+            "type": "string",
+            "description": "Tileset id or name (see tileset_list)"
+          },
+          "confirm": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tileset"
+        ]
+      }
+    },
+    {
+      "name": "tileset_update",
+      "description": "Rename a tileset, switch it on / off (active = used by the generator and the palette), or set the map kinds it is for.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "tileset": {
+            "type": "string",
+            "description": "Tileset id or name (see tileset_list)"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "perspectives": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "top_down",
+                "low_top_down",
+                "isometric_45",
+                "side_view",
+                "hex"
+              ]
+            }
+          }
+        },
+        "required": [
+          "tileset"
+        ]
+      }
+    },
+    {
+      "name": "tileset_remove",
+      "description": "Remove an own (uploaded) tileset; its tiles disappear from the map (undo possible).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "tileset": {
+            "type": "string",
+            "description": "Tileset id or name (see tileset_list)"
+          }
+        },
+        "required": [
+          "tileset"
+        ]
       }
     },
     {
