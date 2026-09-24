@@ -6030,3 +6030,130 @@ details.more[open] {
   align-items: center;
   gap: 6px;
 }
+
+/* ---------------- Startseite: Beschreibe dein Spiel (KI) ---------------- */
+.describe-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--accent-line);
+  background: radial-gradient(120% 90% at 0% 0%, rgba(232, 137, 176, 0.16), transparent 60%), var(--surface);
+}
+.describe-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.describe-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.describe-head p {
+  margin: 2px 0 0;
+  color: var(--text-3);
+  font-size: 13px;
+}
+.describe-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.describe-text {
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.45;
+  padding: 10px 12px;
+}
+.describe-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.describe-attach {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.describe-slot {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+.describe-slot-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px dashed var(--line-2);
+  background: var(--surface-2);
+  color: var(--text-2);
+  text-align: left;
+}
+.describe-slot.has-image .describe-slot-btn {
+  border-style: solid;
+  border-color: var(--accent-line);
+}
+.describe-slot-btn > img,
+.describe-slot-btn > svg {
+  flex: none;
+}
+.describe-slot-btn > img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.describe-slot-btn > img.is-pixel {
+  image-rendering: pixelated;
+  object-fit: contain;
+  background: var(--bg);
+}
+.describe-slot-btn span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.describe-slot-btn strong {
+  font-size: 13px;
+  color: var(--text);
+}
+.describe-slot-btn small {
+  font-size: 11px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.describe-slot .icon-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  border-radius: 50%;
+  background: var(--surface-4);
+}
+.describe-tips {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+@media (max-width: 420px) {
+  .describe-attach {
+    grid-template-columns: 1fr;
+  }
+}

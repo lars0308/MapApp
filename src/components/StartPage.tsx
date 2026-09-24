@@ -10,6 +10,7 @@ import { deserializeProject, PROJECT_EXTENSION } from '../persistence/projectFil
 import { readFileAsText } from '../utils/download';
 import { profileLabel } from '../profiles';
 import { APP_NAME, LogoMark } from './Logo';
+import { DescribeCard } from './DescribeCard';
 
 const when = (t: number) => new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -100,6 +101,8 @@ export function StartPage() {
           <h1 id="start-title">{APP_NAME}</h1>
           <p>Pixel-Art-Karten und Figuren für dein Spiel – fertig für Godot.</p>
         </section>
+
+        <DescribeCard />
 
         {!placeholder && (
           <button type="button" className="start-resume" onClick={() => goTo('map')}>

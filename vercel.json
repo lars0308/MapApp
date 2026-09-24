@@ -28,6 +28,9 @@
       "maxDuration": 150,
       "memory": 2048,
       "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
+    },
+    "api/describe.js": {
+      "maxDuration": 60
     }
   }
 }

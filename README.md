@@ -336,6 +336,18 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.23 – „Beschreibe dein Spiel“: Karten mit KI planen**
+
+- **Neues Feld auf der Startseite:** Du beschreibst in eigenen Worten, was für ein Spiel und welche Karte du willst, zum Beispiel „kleine Insel mit Dorf, viel Wald, gemütliches RPG“. Optional kommen dazu:
+  - ein **Referenzbild** („So soll es aussehen“)
+  - ein **eigenes Tileset** (PNG)
+- Die KI (Claude über das Vercel AI Gateway) wählt Ansicht, Genre, Perspektive, Größe, Kartenart, Räume, Gelände, Deko, Gegner und Aussehen. MapForge baut daraus Projekt und Karte mit dem eigenen Generator: echte Tiles, Kollision, Godot-Export. Alles bleibt danach bearbeitbar.
+- Ein **eigenes Tileset** wird ins Projekt übernommen und automatisch zugeordnet. Die Demo-Tilesets werden dann ausgeschaltet und füllen nur noch fehlende Rollen auf.
+- **Server:** `api/describe.js` ruft `https://ai-gateway.vercel.sh/v1/messages` auf.
+  - Anmeldung: `AI_GATEWAY_API_KEY`, sonst das OIDC-Token von Vercel (kein Schlüssel nötig).
+  - Modell: `anthropic/claude-sonnet-5`, änderbar über `MAPFORGE_AI_MODEL`.
+  - Anfragen werden nur von der eigenen Seite angenommen. Text und Bildgröße sind begrenzt.
+
 **Version 3.22 – Aussehen ein- und ausschaltbar, für alle Kartenarten**
 
 - Neuer Bereich **Aufbau → Aussehen** mit vier Schaltern (alle standardmäßig an, wirken beim nächsten Generieren):
