@@ -63,6 +63,16 @@ export const PERSPECTIVE_INFO: Record<Perspective, PerspectiveInfo> = {
   },
 };
 
+/** views whose walls can show a face under the top edge (the others keep their fixed look) */
+export const WALL_ROW_VIEWS: Perspective[] = ['top_down', 'low_top_down', 'isometric_45'];
+
+/** rows of wall face under the top edge for this map (own choice or the view's default) */
+export function faceRowsOf(map: { perspective: Perspective; wallRows?: number }): number {
+  const base = PERSPECTIVE_INFO[map.perspective].faceRows;
+  if (map.wallRows === undefined || !WALL_ROW_VIEWS.includes(map.perspective)) return base;
+  return Math.max(0, Math.min(2, Math.round(map.wallRows)));
+}
+
 /** Special rooms that each need a room of their own. */
 export function requiredRooms(specials: Record<SpecialRoomType, boolean>): number {
   return Object.values(specials).filter(Boolean).length;

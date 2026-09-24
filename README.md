@@ -336,6 +336,12 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.35 – Wände mit Vorderseite auch in Top-Down, keine zufälligen Weg-Tiles mehr**
+
+- **Aufbau → Karte → Wände:** „Nur Kante“, „+ 1 Reihe“ oder „+ 2 Reihen“ – für Top-Down, Low Top-Down und Schräg 45°. So bekommt auch eine Top-Down-Karte oben die Kante und darunter ein Stück Mauer.
+- **Raum bauen → Wand-Vorderseite** „1 Reihe“ oder „2 Reihen“ stellt die Karte automatisch passend ein, sobald du den Raum übernimmst. Der Dialog startet mit den Reihen, für die dein Tileset schon Front-Tiles hat.
+- **Keine gelben Pfeile mehr in Gängen:** Tiles, die die automatische Erkennung nur als „Weg“ vermutet hat (Pfeile, Schienen, Markierungen), legt der Generator nicht mehr zufällig in Gänge. Wege aus deinem Tileset nimmt er nur, wenn du sie bestätigt hast. In Dungeons ohne eigene Wege-Tiles behalten die Gänge den Boden der Räume.
+
 **Version 3.34 – Boden-Ränder im Raum-Baukasten**
 
 - **„Raum bauen → Raum füllen“ hat jetzt eigene Felder für den Boden:** Mitte, Rand oben, unten, links, rechts und die vier Boden-Ecken. So kannst du Tiles mit Schattenkante an der Wand oder mit Randverzierung genau dort einsetzen, wo sie hingehören.

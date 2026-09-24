@@ -127,7 +127,9 @@ class Tier {
         const meta = ts.tiles[i];
         if (!meta) continue;
         const t = { gid: ts.firstGid + i, weight: meta.weight, tags: meta.tags };
-        if (meta.category) {
+        // paths only when confirmed: a guessed "path" (arrows, rails, markings …) laid at random
+        // through every corridor looks broken
+        if (meta.category && !(meta.auto && meta.category === 'path')) {
           const list = this.pools.get(meta.category) ?? [];
           list.push(t);
           this.pools.set(meta.category, list);
@@ -270,6 +272,13 @@ export class TilePools {
       const cat = t.resolve(cats);
       return cat ? pickFrom(rng, t.pools.get(cat)!, prefer ? [prefer] : undefined, avoid) : 0;
     });
+  }
+
+  /** like pickPref, but only from the active tilesets that fit the view (no demo fallback) */
+  pickOwn(rng: Rng, cats: TileCategory[], prefer?: string, avoid?: string[]): number {
+    const t = this.tiers[0];
+    const cat = t.resolve(cats);
+    return cat ? pickFrom(rng, t.pools.get(cat)!, prefer ? [prefer] : undefined, avoid) : 0;
   }
 
   /** like pickPref, several preferred tags (each narrows the choice when tiles have it) */

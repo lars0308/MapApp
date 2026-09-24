@@ -4,7 +4,7 @@ import { PRESETS } from '../generator/presets';
 import { deriveConfig } from '../profiles';
 import { lookOf, type MapLook, type Perspective, type RoomShape, type SideSettings, type TerrainSettings } from '../types';
 import { CORRIDOR_OPTS, DISTRIBUTIONS, SHAPES, SPECIALS } from './generatorOptions';
-import { PERSPECTIVE_INFO } from '../generator/perspective';
+import { PERSPECTIVE_INFO, WALL_ROW_VIEWS, faceRowsOf } from '../generator/perspective';
 import { RoomCountGuard } from './RoomCountGuard';
 import { Button, Chip, IconButton, NumberField, Section, Segmented, Slider, Toggle } from './ui';
 import { Icon } from './icons';
@@ -123,6 +123,22 @@ export function MapSection({ manual = false }: { manual?: boolean }) {
             options={perspectives.map((p: Perspective) => ({ value: p, label: PERSPECTIVE_INFO[p].label.replace(' / Isometric-like', '') }))}
             onChange={(perspective) => setMapOptions({ perspective })}
           />
+        </div>
+      )}
+      {WALL_ROW_VIEWS.includes(map.perspective) && (
+        <div className="field">
+          <label>Wände</label>
+          <Segmented
+            label="Wände"
+            value={String(faceRowsOf(map))}
+            options={[
+              { value: '0', label: 'Nur Kante' },
+              { value: '1', label: '+ 1 Reihe' },
+              { value: '2', label: '+ 2 Reihen' },
+            ]}
+            onChange={(v) => setMapOptions({ wallRows: Number(v) })}
+          />
+          <p className="hint">Wie viele Reihen Wand-Vorderseite unter der oberen Kante stehen. Dein Tileset braucht dafür „Front“-Tiles (Raum bauen → Wand-Vorderseite). Wirkt beim nächsten Generieren.</p>
         </div>
       )}
       {!side && map.perspective !== 'hex' && map.perspective !== 'isometric' && <Toggle label="Schatten" description="Wände werfen Schatten" checked={map.shadows} onChange={(shadows) => setMapOptions({ shadows })} />}

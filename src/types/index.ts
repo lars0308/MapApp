@@ -237,6 +237,11 @@ export interface MapSettings {
   perspective: Perspective;
   /** generate subtle wall shadows into the shadow layer */
   shadows: boolean;
+  /**
+   * rows of wall face under the wall's top edge (Top-Down / Low Top-Down / 45°);
+   * undefined = what the view has by default (Top-Down 0, Low Top-Down 1, 45° 2)
+   */
+  wallRows?: number;
 }
 
 export type RoomShape = 'rect' | 'l' | 't' | 'cross' | 'irregular' | 'hall';

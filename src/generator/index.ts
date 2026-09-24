@@ -37,7 +37,7 @@ import { carveBranches, carveCorridors, computeNearRoom, makeNoise, type Grid } 
 import { assignSpecialRooms } from './specials';
 import { TilePools } from '../tilesets/tilePools';
 import { NO_ROLE, frontTilePrefs, resolveWalls, roleAt, wallNeighbourMask } from './autotile';
-import { PERSPECTIVE_INFO, requiredRooms } from './perspective';
+import { PERSPECTIVE_INFO, faceRowsOf, requiredRooms } from './perspective';
 import { createTerrainState, placeTerrain, placeTransitions } from './terrain';
 import { canPlace, occupy, placeObjects, type ObjectContext } from './objectsGen';
 import { objectDef } from '../objects/defs';
@@ -216,7 +216,7 @@ export function generate(input: GenerateInput): GenerateOutput {
           if (c !== CELL_VOID && c !== CELL_WALL) grid.cells[i] = CELL_WALL;
         }
     }
-  const walls = resolveWalls(grid, perspective, map.shadows ?? false);
+  const walls = resolveWalls(grid, perspective, map.shadows ?? false, faceRowsOf(map));
   const wallMask = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) if (grid.cells[i] === CELL_WALL) wallMask[i] = wallNeighbourMask(grid, i % W, (i / W) | 0);
 
@@ -453,7 +453,8 @@ export function generate(input: GenerateInput): GenerateOutput {
       if (pathL) pathL[i] = pools.pickRole(rTiles, b.role, [b.orient]);
     } else if (c === CELL_CORRIDOR && pathL && !cave && !softPaths && t !== T_WATER && t !== T_LAVA && t !== T_ABYSS)
       // outdoor: dirt paths; dungeons: no dirt; caves: natural floor, no laid paths
-      pathL[i] = outdoor ? pools.pickPref(rTiles, ['path'], 'dirt') : pools.pickPref(rTiles, ['path'], undefined, ['dirt']);
+      // indoors only paths of the own tilesets (else the corridor keeps the room floor)
+      pathL[i] = outdoor ? pools.pickPref(rTiles, ['path'], 'dirt') : pools.pickOwn(rTiles, ['path'], undefined, ['dirt']);
     if (t === T_TRANSITION && detailL && pools.hasRole('transition')) detailL[i] = pools.pickRole(rTiles, 'transition');
     if (softPaths && pathL && !waterCell(i) && t !== T_BRIDGE) {
       const m = vertexMask(i % W, (i / W) | 0, pathCell, false, 2);

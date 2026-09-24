@@ -7,7 +7,7 @@ import { TileThumb } from './TileThumb';
 import { AssignSummary, TileLabel, confirmedMetas, suggestMetas } from './TileLabel';
 import { autoAssign } from './autoAssign';
 import { QuickPick } from './QuickPick';
-import { RoomMarker, applyRoom } from './RoomMarker';
+import { RoomMarker, applyRoom, matchWallRows } from './RoomMarker';
 import { learnFrom, similarTiles } from './learning';
 import { TileInspector } from './TilesPanel';
 import { useEditor } from '../store/editorStore';
@@ -200,6 +200,8 @@ export function TilesetEditor({
             onClose={() => setMarking(false)}
             onApply={(room, clearOthers) => {
               const next = { ...upload, ...applyRoom(upload, room, clearOthers) };
+              const note = matchWallRows(room.front);
+              if (note) toast(note, 'success');
               setUpload(next);
               void learnFrom(next, Object.keys(room.tiles).map(Number));
               setMarking(false);

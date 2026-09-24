@@ -7,6 +7,7 @@ import { Rng, hashSeed } from '../generator/rng';
 import { groundRole } from '../generator/side';
 import { hexNeighbor } from '../generator/hex';
 import { metaTable } from './collision';
+import { faceRowsOf } from '../generator/perspective';
 
 // Keeps walls consistent while editing by hand ("Auto-Wände"):
 //  - painting ground on void/wall turns the cell walkable (room / corridor extended)
@@ -103,7 +104,7 @@ export function applyAutoWalls(changed: number[], paintedLayerId: string) {
         }
     }
   const grid = { W, H, cells, roomId: new Int16Array(W * H), nearRoom: new Int16Array(W * H) };
-  const walls = resolveWalls(grid, p.map.perspective, p.map.shadows);
+  const walls = resolveWalls(grid, p.map.perspective, p.map.shadows, faceRowsOf(p.map));
 
   // 3. rewrite the affected region (edited cells ± 4)
   let x0 = W,

@@ -35,7 +35,7 @@ import { createTilesetFromFile, findEmptyTiles, needsRepack, repackGrid } from '
 import { confirmedMetas, suggestMetas } from '../tilesets/TileLabel';
 import { learnFrom } from '../tilesets/learning';
 import { uid } from '../utils/id';
-import { applyRoom, roomMetas } from '../tilesets/RoomMarker';
+import { applyRoom, matchWallRows, roomMetas } from '../tilesets/RoomMarker';
 
 // Commands an AI (or any program) can run against the app: the same actions as the
 // buttons, as JSON in / JSON out. Used by the MCP bridge (src/api/bridge.ts) and available
@@ -561,9 +561,10 @@ const H: Record<string, Handler> = {
     const front = int(a.front_rows, 'front_rows', 0);
     if (r.x0 < 0 || r.y0 < 0 || r.x1 >= ts.columns || r.y1 >= ts.rows || r.x1 - r.x0 < 2 || r.y1 - r.y0 < 2 + front) fail(`Rahmen muss im Tileset liegen (${ts.columns} × ${ts.rows} Tiles) und mindestens 3 × ${3 + front} groß sein`);
     const room = roomMetas(ts, r, front);
-    const next = applyRoom(ts, { tiles: room, variants: [], replaceVariants: false }, a.clear_others !== false);
+    const next = applyRoom(ts, { tiles: room, variants: [], replaceVariants: false, front }, a.clear_others !== false);
     useProject.getState().editDoc('Raum im Tileset markiert', (p) => ({ ...p, tilesets: p.tilesets.map((t) => (t.id === ts.id ? { ...t, ...next } : t)) }));
-    return { text: `${Object.keys(room).length} Tiles als Raum zugeordnet (Ecken, Wände${front ? ', Wand-Vorderseite' : ''}, Boden). Mit generate neu bauen, mit render ansehen.`, data: { tileset: ts.id, roles: Object.fromEntries(Object.entries(room).map(([k, m]) => [ts.firstGid + Number(k), m.role])) } };
+    const rows = matchWallRows(front);
+    return { text: `${Object.keys(room).length} Tiles als Raum zugeordnet (Ecken, Wände${front ? ', Wand-Vorderseite' : ''}, Boden).${rows ? ` ${rows}.` : ''} Mit generate neu bauen, mit render ansehen.`, data: { tileset: ts.id, roles: Object.fromEntries(Object.entries(room).map(([k, m]) => [ts.firstGid + Number(k), m.role])) } };
   },
 
   tileset_remove: (a) => {

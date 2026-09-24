@@ -14,7 +14,7 @@ import { TileThumb } from './TileThumb';
 import { AssignSummary, TileLabel, confirmedMetas, suggestMetas } from './TileLabel';
 import { ROLE_SHORT } from './autoAssign';
 import { PICK_GROUPS, SIDE_PICK_GROUP, Sketch, isCurrent } from './QuickPick';
-import { RoomMarker, applyRoom } from './RoomMarker';
+import { RoomMarker, applyRoom, matchWallRows } from './RoomMarker';
 import { TilesetEditor } from './TilesetEditor';
 import { uid } from '../utils/id';
 import { learnFrom } from './learning';
@@ -573,6 +573,8 @@ function TilesetCard({ ts }: { ts: Tileset }) {
           onClose={() => setMarking(false)}
           onApply={(room, clearOthers) => {
             const next = applyRoom(ts, room, clearOthers);
+            const note = matchWallRows(room.front);
+            if (note) toast(note, 'success');
             useProject.getState().editDoc('Raum aus dem Tileset gebaut', (p) => ({ ...p, tilesets: p.tilesets.map((t) => (t.id === ts.id ? { ...t, ...next } : t)) }));
             void learnFrom({ ...ts, tiles: next.tiles }, Object.keys(room.tiles).map(Number));
             setMarking(false);

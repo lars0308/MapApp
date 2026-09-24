@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TileCategory, TileMeta, TileRole, TileVariant, Tileset } from '../types';
 import { Button, NumberField, Segmented } from '../components/ui';
 import { COMMON_TILE_SIZES } from './slicing';
+import { useProject } from '../store/projectStore';
+import { WALL_ROW_VIEWS, faceRowsOf } from '../generator/perspective';
 import { IconButton } from '../components/ui';
 import { Icon } from '../components/icons';
 import { imageUrl, tileStyle } from './TileThumb';
@@ -222,11 +224,19 @@ function framePieces(ts: Tileset, r: Rect, front: number): Pieces {
   return out;
 }
 
+/** wall face rows the tileset already has tiles for (front / upper front) */
+function initialFront(ts: Tileset): number {
+  const roles = new Set([...Object.values(ts.tiles).filter((m) => !m.auto).map((m) => m.role), ...(ts.variants ?? []).map((v) => v.role)]);
+  return roles.has('wall_front_upper') ? 2 : roles.has('wall_front') ? 1 : 0;
+}
+
 export interface RoomResult {
   tiles: Record<number, TileMeta>;
   variants: TileVariant[];
   /** builder: its variants replace the tileset's; frame: they are kept */
   replaceVariants: boolean;
+  /** rows of wall face the user built the room with (0 = only the top edge) */
+  front: number;
 }
 
 /** tile size of the sheet right in the room builder: the grid has to sit exactly on the tiles */
@@ -275,7 +285,8 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
   const [mode, setMode] = useState<'frame' | 'pieces'>('pieces');
   const [start, setStart] = useState<{ x: number; y: number } | null>(null);
   const [rect, setRect] = useState<Rect | null>(null);
-  const [front, setFront] = useState(0);
+  // starts with what the map uses (a Low Top-Down map has 1 row of wall face, a room with more keeps it)
+  const [front, setFront] = useState(() => initialFront(ts));
   const [clearOthers, setClearOthers] = useState(true);
   // builder: role → pieces (starts with the tileset's confirmed roles and its turned tiles)
   const [pieces, setPieces] = useState<Pieces>(() => {
@@ -524,7 +535,7 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Abbrechen
           </button>
-          <Button variant="primary" disabled={!ready} onClick={() => onApply({ ...piecesResult(shown), replaceVariants: mode === 'pieces' }, clearOthers)}>
+          <Button variant="primary" disabled={!ready} onClick={() => onApply({ ...piecesResult(shown), replaceVariants: mode === 'pieces', front }, clearOthers)}>
             {ready ? `${count} Tiles übernehmen` : mode === 'frame' ? 'Rahmen ziehen' : 'Raum füllen'}
           </Button>
         </footer>
@@ -532,6 +543,19 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
       </div>
     </div>
   );
+}
+
+/**
+ * the room was built with wall face rows: the map shows them too (Top-Down with one row of wall
+ * under the edge …). Returns a note for the user, or null when nothing changed.
+ */
+export function matchWallRows(front: number): string | null {
+  const st = useProject.getState();
+  const map = st.project.map;
+  // only more rows: a room built without face rows must not flatten a Low Top-Down map
+  if (!WALL_ROW_VIEWS.includes(map.perspective) || faceRowsOf(map) >= front) return null;
+  st.setMapOptions({ wallRows: front });
+  return `Wände der Karte: Kante + ${front} ${front === 1 ? 'Reihe' : 'Reihen'} (wirkt beim nächsten Generieren)`;
 }
 
 /** apply a room to a tileset: its tiles get their roles (confirmed), optionally the other suggestions go */

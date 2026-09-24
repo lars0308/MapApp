@@ -83,10 +83,9 @@ export interface WallStructure {
  * Resolve wall roles. In 3/4 views this may turn void cells above fronts into
  * wall cells (the wall's upper edge) – call it before doors/objects are placed.
  */
-export function resolveWalls(g: Grid, perspective: Perspective, shadows: boolean): WallStructure {
+export function resolveWalls(g: Grid, perspective: Perspective, shadows: boolean, faceRows = PERSPECTIVE_INFO[perspective].faceRows): WallStructure {
   const { W, H, cells } = g;
-  const info = PERSPECTIVE_INFO[perspective];
-  const faces = info.faceRows > 0;
+  const faces = faceRows > 0;
   const front = new Uint8Array(W * H);
   const idx = (x: number, y: number) => y * W + x;
   const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H;
@@ -100,7 +99,7 @@ export function resolveWalls(g: Grid, perspective: Perspective, shadows: boolean
         if (cells[i] !== CELL_WALL || front[i] || !walkable(x, y + 1)) continue;
         front[i] = 1;
         let yy = y - 1;
-        for (let k = 1; k < info.faceRows && yy >= 0; k++, yy--) {
+        for (let k = 1; k < faceRows && yy >= 0; k++, yy--) {
           const j = idx(x, yy);
           if (cells[j] === CELL_VOID || (cells[j] === CELL_WALL && !walkable(x, yy + 1) && !front[j])) {
             cells[j] = CELL_WALL;
