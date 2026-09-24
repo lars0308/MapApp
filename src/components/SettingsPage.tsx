@@ -1,6 +1,6 @@
 import { SettingsPanel } from './SettingsPanel';
 import { BackupSection } from '../persistence/BackupSection';
-import { AiSection } from '../api/AiSection';
+import { AiSection, RelaySection } from '../api/AiSection';
 
 export function SettingsPage({ desktop }: { desktop: boolean }) {
   return (
@@ -8,6 +8,7 @@ export function SettingsPage({ desktop }: { desktop: boolean }) {
       <div className="page-inner">
         <h1 className="page-title">Einstellungen</h1>
         <BackupSection />
+        <RelaySection />
         <AiSection />
         <SettingsPanel desktop={desktop} />
       </div>

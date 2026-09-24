@@ -5536,3 +5536,22 @@ body.is-resizing-y * {
 .own-object-del:hover {
   color: var(--danger, #e86f6f);
 }
+
+.ai-address {
+  display: flex;
+  gap: 6px;
+}
+.ai-address input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-hi);
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+}

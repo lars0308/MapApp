@@ -18,6 +18,7 @@ import { detectTileSize } from './tilesets/slicing';
 import { slicePieces } from './tilesets/pieces';
 import { ErrorBoundary, rememberError, takeLastError } from './components/ErrorBoundary';
 import { startAiBridge } from './api/bridge';
+import { startRelay } from './api/relay';
 import { setCustomObjects } from './objects/defs';
 
 // small debugging handle (used by automated browser tests)
@@ -44,6 +45,7 @@ useProject.subscribe((s) => setCustomObjects(s.project.customObjects));
 
 // AI connection (MCP server on this computer) – only active when switched on
 startAiBridge();
+startRelay();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
