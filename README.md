@@ -318,7 +318,7 @@ Wichtige Entscheidungen:
 
 ## Bekannte Einschränkungen
 
-- „Schräg 45°“ ist ein Quadratraster mit doppelt hohen Wandfronten. Die echte Rautenansicht heißt „Isometrisch (Raute)“; sie wird in der App gezeichnet, der Godot-Export liefert dafür aber noch eine quadratische TileMap (kein `TILE_SHAPE_ISOMETRIC`).
+- „Schräg 45°“ ist ein Quadratraster mit doppelt hohen Wandfronten. Die echte Rautenansicht heißt „Isometrisch (Raute)“ und wird als isometrische TileMap nach Godot exportiert (Map.tscn; aus map.json allein baut der Loader sie quadratisch).
 - Klippen und Plateaus sind Bildschirm-Höhe (eine Stufe), keine echten Höhenebenen; die Höhe steht in `navigation.heights`.
 - Die Wandrollen sind regelbasiert; eigene Tilesets brauchen Tiles mit passender Rolle (fehlende Rollen fallen auf verwandte Rollen bzw. Kategorien zurück).
 - Das Godot-Script ist gegen die Godot-4.3-API geschrieben und wird bei Änderungen in einem echten Godot 4.3 (headless) geprüft, aber nicht per CI.
@@ -329,12 +329,28 @@ Wichtige Entscheidungen:
 
 ## Sinnvolle nächste Erweiterungen
 
-- Godot-Export der Rautenansicht (isometrisches TileSet), mehrere Höhenebenen
+- Mehrere Höhenebenen
 - Tileset-Optionen für Rand/Abstand und nicht-quadratische Tiles
 
 ---
 
 ## Änderungen
+
+**Version 3.31 – Godot-Export der Rautenansicht**
+
+- **Isometrische Karten exportieren jetzt echt isometrisch:** `tileset.tres` nutzt `TILE_SHAPE_ISOMETRIC` mit `TILE_LAYOUT_DIAMOND_DOWN` und Kacheln von 2T × T. Das ist dasselbe Raster wie in MapForge, geprüft in Godot 4.3: Feldmitten stimmen exakt überein.
+- **Map.tscn zeigt alles wie in der App:**
+  - Böden liegen als Rauten.
+  - Wände stehen als Blöcke mit heller und dunkler Seite.
+  - Objekt-Kacheln und Objekte stehen aufrecht, alles y-sortiert im Node „World“.
+  - Kollision: Rauten-Polygone auf dem Kollisions-Layer und an Objekten.
+- **Rautenbilder:** Nur die benutzten Kacheln kommen als eigene Bilder ins Paket (`tilesets/*_iso_flat|block|stand.png`). Gedrehte oder gespiegelte Kacheln sind eingerechnet.
+- **Ladeskript:**
+  - `to_px(x, y)` rechnet Feld → Pixel für beide Raster.
+  - Spawn-Marker, Spielfigur und Raum-Mitten sitzen richtig.
+  - `AStarGrid2D` läuft im Rautenraster.
+  - Aus `map.json` allein kommt ein Hinweis, `Map.tscn` zu öffnen.
+- **Behoben:** In Dungeons konnte die Ziel-Markierung oder ein erhöhter Boden eine Gras-Treppe bzw. Wiesen-Kachel aus den Natur-Sets bekommen.
 
 **Version 3.30 – Klima: Sommer, Winter, Wüste**
 

@@ -78,6 +78,8 @@ func build_now() -> void:
 		info.get("name", ""), int(info.get("width", 0)), int(info.get("height", 0)), tile_size, perspective, str(info.get("seed", ""))
 	])
 	var base_dir := map_json_path.get_base_dir()
+	if perspective == "isometric" and not (baked and has_node("World")):
+		push_warning("MapForge: the diamond view (isometric) is built into Map.tscn – open that scene; built from map.json the map would be square")
 	if baked and has_node("World"):
 		_adopt_baked(map_data)
 	else:
@@ -270,6 +272,8 @@ func build_objects(data: Dictionary) -> void:
 
 
 func build_collision_rects(data: Dictionary) -> void:
+	if perspective == "isometric":
+		return  # diamond view: the collision layer's tiles carry diamond polygons
 	var body := StaticBody2D.new()
 	body.name = "CollisionRects"
 	add_child(body)
@@ -291,7 +295,7 @@ func build_spawn_markers(data: Dictionary) -> void:
 	for sp in data.get("spawnPoints", []):
 		var marker := Marker2D.new()
 		marker.name = "%s_%s" % [sp.get("type", "spawn"), str(sp.get("id", ""))]
-		marker.position = Vector2((float(sp["x"]) + 0.5) * tile_size, (float(sp["y"]) + 0.5) * tile_size)
+		marker.position = to_px(float(sp["x"]) + 0.5, float(sp["y"]) + 0.5)
 		marker.set_meta("type", sp.get("type", ""))
 		marker.set_meta("room_id", sp.get("roomId", -1))
 		marker.set_meta("properties", sp.get("properties", {}))
@@ -306,6 +310,9 @@ func build_astar(data: Dictionary) -> AStarGrid2D:
 	var grid := AStarGrid2D.new()
 	grid.region = Rect2i(0, 0, w, h)
 	grid.cell_size = Vector2(tile_size, tile_size)
+	if perspective == "isometric":
+		grid.cell_size = Vector2(tile_size * 2, tile_size)
+		grid.cell_shape = AStarGrid2D.CELL_SHAPE_ISOMETRIC_DOWN
 	grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
 	grid.update()
 	var walkable := rle_decode(data.get("navigation", {}).get("walkable", []), w * h)
@@ -329,7 +336,15 @@ func get_room_by_type(room_type: String) -> Dictionary:
 ## World position of a room centre (e.g. to place the camera or player)
 func room_center_position(room: Dictionary) -> Vector2:
 	var c: Array = room.get("center", [0, 0])
-	return Vector2((float(c[0]) + 0.5) * tile_size, (float(c[1]) + 0.5) * tile_size)
+	return to_px(float(c[0]) + 0.5, float(c[1]) + 0.5)
+
+
+## Map point in cells (fractions allowed) → pixels. The diamond view uses Godot's isometric
+## DIAMOND_DOWN grid (tile 2T × T): the centre of cell (x, y) is to_px(x + 0.5, y + 0.5).
+func to_px(x: float, y: float) -> Vector2:
+	if perspective == "isometric":
+		return Vector2((x - y) * tile_size + tile_size, (x + y) * tile_size / 2.0)
+	return Vector2(x * tile_size, y * tile_size)
 
 
 ## Add your player / NPC here so it sorts correctly against walls, cliffs and objects
@@ -353,7 +368,7 @@ func _spawn_player() -> void:
 	if not found and spawns.size() > 0:
 		pos = Vector2(float(spawns[0]["x"]), float(spawns[0]["y"]))
 	# feet on the bottom middle of the spawn tile
-	player.position = Vector2((pos.x + 0.5) * tile_size, (pos.y + 0.9) * tile_size)
+	player.position = to_px(pos.x + 0.5, pos.y + (0.5 if perspective == "isometric" else 0.9))
 	add_character(player)
 	var cam := Camera2D.new()
 	cam.zoom = Vector2(player_camera_zoom, player_camera_zoom)

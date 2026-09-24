@@ -11,6 +11,7 @@ import { renderMapPng, type PngOptions } from './pngExport';
 import { createZip, type ZipEntry } from './zip';
 import { GODOT_LOADER_FILENAME, GODOT_LOADER_SCRIPT, GODOT_README } from './godotScript';
 import { TILESET_RESOURCE, buildMapScene, buildTileSetResource } from './godotScene';
+import { buildIsoScene, buildIsoTileSet, isoSheetPng, planIso } from './isoExport';
 
 export function exportProjectFile(p: Project) {
   downloadText(serializeProject(p), `${safeFileName(p.name)}${PROJECT_EXTENSION}`);
@@ -48,6 +49,13 @@ export async function buildGodotPackage(p: Project, includeShadows = true): Prom
     const png = await scaledTilesetPng(ts, p.map.tileSize);
     entries.push({ path: `${folder}/tilesets/${tilesetImageName(ts)}`, data: new Uint8Array(await png.arrayBuffer()) });
   }
+  // diamond view: own iso sheets (diamonds, blocks, upright tiles) for the ready TileSet and scene
+  const iso = p.map.perspective === 'isometric' ? planIso(p, data) : null;
+  if (iso)
+    for (const sheet of iso.sheets) {
+      const png = await isoSheetPng(sheet, p.map.tileSize);
+      entries.push({ path: `${folder}/${sheet.image}`, data: new Uint8Array(await png.arrayBuffer()) });
+    }
   // ready scene + player figure: the own one ("Als Spielfigur verwenden"), else the figure from the builder
   const side = p.map.perspective === 'side_view';
   // hex maps are strategy maps: camera instead of a walking figure
@@ -91,8 +99,13 @@ export async function buildGodotPackage(p: Project, includeShadows = true): Prom
     );
   }
   // ready resources: TileSet and the scene with all tiles and objects (visible in the Godot editor)
-  entries.push({ path: `${folder}/${TILESET_RESOURCE}`, data: buildTileSetResource(data) });
-  entries.push({ path: `${folder}/Map.tscn`, data: buildMapScene(data, { player: !!player }) });
+  if (iso) {
+    entries.push({ path: `${folder}/${TILESET_RESOURCE}`, data: buildIsoTileSet(iso, data) });
+    entries.push({ path: `${folder}/Map.tscn`, data: buildIsoScene(iso, data, { player: !!player, tileset: TILESET_RESOURCE }) });
+  } else {
+    entries.push({ path: `${folder}/${TILESET_RESOURCE}`, data: buildTileSetResource(data) });
+    entries.push({ path: `${folder}/Map.tscn`, data: buildMapScene(data, { player: !!player }) });
+  }
   return { blob: createZip(entries), name: `${folder}-godot.zip` };
 }
 

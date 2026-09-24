@@ -438,7 +438,7 @@ export function generate(input: GenerateInput): GenerateOutput {
     } else if (floorL) {
       if (t === T_WATER || t === T_LAVA || t === T_ABYSS) floorL[i] = liquidTile(i, t);
       else if (t === T_BRIDGE) floorL[i] = liquidTile(i, ts.bridges.get(i)?.under ?? T_ABYSS);
-      else if (ts.heights[i] > 0) floorL[i] = pools.pickRole(rTiles, 'raised_floor', outdoor ? [tagAt(i), climate] : [tagAt(i)], outdoor ? otherClimates : undefined);
+      else if (ts.heights[i] > 0) floorL[i] = pools.pickRole(rTiles, 'raised_floor', outdoor ? [tagAt(i), climate] : [tagAt(i)], outdoor ? otherClimates : ['grass']);
       else floorL[i] = floorTile(i);
     }
     if (t === T_WATER || t === T_LAVA || t === T_ABYSS) block(i);
@@ -620,7 +620,8 @@ export function generate(input: GenerateInput): GenerateOutput {
       if (r.type === 'normal' || r.type === 'start') continue;
       const i = r.centerY * W + r.centerX;
       let gid = 0;
-      if (r.type === 'end') gid = pools.pick(rTiles, ['stairs', 'transition']);
+      // nature steps (grass) only outdoors, in the fitting climate
+      if (r.type === 'end') gid = pools.pickPrefs(rTiles, ['stairs', 'transition'], outdoor ? ['grass', climate] : [], outdoor ? otherClimates : ['grass']);
       if (!gid) gid = pools.pickTagged(rTiles, 'special', r.type);
       if (!gid) gid = pools.pickTagged(rTiles, 'special', 'marker');
       if (gid) {

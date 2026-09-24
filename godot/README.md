@@ -35,6 +35,15 @@ Y-sort
   front of them when it stands below.
 - Tall tiles carry TileData.y_sort_origin, objects are positioned at their base line.
 
+Isometrisch (Rautenansicht)
+- Map.tscn und tileset.tres nutzen Godots Rautenraster (TILE_SHAPE_ISOMETRIC, DIAMOND_DOWN,
+  Tile 2T × T) – genau wie in MapForge: Böden als Rauten, Wände als Blöcke, Objekte aufrecht,
+  alles im y-sortierten Node "World". Kollision: Rauten auf dem Kollisions-Layer und an Objekten.
+- Positionen: to_px(x, y) rechnet Feld → Pixel (Feldmitte = to_px(x + 0.5, y + 0.5)),
+  AStarGrid2D läuft im Rautenraster (CELL_SHAPE_ISOMETRIC_DOWN).
+- Die Rautenbilder liegen unter tilesets/*_iso_*.png. Bitte Map.tscn öffnen – aus map.json allein
+  baut der Loader die Karte quadratisch.
+
 Hex-Karten (Hexagonal)
 - TileSet im Hexagon-Modus (jede zweite Reihe versetzt). Kamera: Pfeiltasten/WASD, Mausrad = Zoom,
   rechte/mittlere Maustaste = ziehen. Klick auf ein Feld → Signal hex_clicked(cell, info).
