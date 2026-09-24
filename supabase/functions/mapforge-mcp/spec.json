@@ -383,6 +383,52 @@
       }
     },
     {
+      "name": "tileset_mark_room",
+      "description": "Fastest way to set up an own tileset: frame a drawn sample room in the tileset picture (tile columns/rows, see tileset_render). The frame's corners become outer corners, its edges walls (top/bottom/left/right), the inside floor; with front_rows the rows under the top edge become wall fronts (3/4 view). By default the automatic suggestions of all other tiles are dropped, so only the framed tiles build rooms.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "tileset": {
+            "type": "string",
+            "description": "Tileset id or name"
+          },
+          "x0": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "y0": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "x1": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "y1": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "front_rows": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "rows of wall front under the top edge (0 = flat walls)"
+          },
+          "clear_others": {
+            "type": "boolean",
+            "description": "drop automatic suggestions of the other tiles (default true)"
+          }
+        },
+        "required": [
+          "tileset",
+          "x0",
+          "y0",
+          "x1",
+          "y1"
+        ]
+      }
+    },
+    {
       "name": "tileset_remove",
       "description": "Remove an own (uploaded) tileset; its tiles disappear from the map (undo possible).",
       "input": {

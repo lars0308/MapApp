@@ -10,6 +10,7 @@ import { TileThumb } from '../../tilesets/TileThumb';
 import { AssignSummary, TileLabel, confirmedMetas, suggestMetas } from '../../tilesets/TileLabel';
 import { autoAssign } from '../../tilesets/autoAssign';
 import { QuickPick } from '../../tilesets/QuickPick';
+import { RoomMarker, applyRoom } from '../../tilesets/RoomMarker';
 import { learnFrom, similarTiles } from '../../tilesets/learning';
 import { TileInspector } from '../../tilesets/TilesPanel';
 import { useEditor } from '../../store/editorStore';
@@ -205,6 +206,7 @@ function UploadEditor({
   const [marked, setMarked] = useState<number[]>([]);
   /** tile whose quick menu is open (local index) */
   const [pick, setPick] = useState<number | null>(null);
+  const [marking, setMarking] = useState(false);
   const [multi, setMulti] = useState(false);
   const [autoNext, setAutoNext] = useState(true);
   const [detected, setDetected] = useState<number | null>(null);
@@ -344,6 +346,22 @@ function UploadEditor({
         <label>
           Tiles <span className="muted">· {indices.length} Tiles – antippen, um den Typ zu wählen</span>
         </label>
+        <Button variant="primary" block icon={<Icon.Grid size={16} />} onClick={() => setMarking(true)}>
+          Raum im Tileset markieren
+        </Button>
+        <p className="hint">Am schnellsten: einen gezeichneten Raum im Tileset einrahmen – Ecken, Wände und Boden in einem Schritt. Einzelne Tiles (Tür, Deko …) danach antippen.</p>
+        {marking && (
+          <RoomMarker
+            ts={upload}
+            onClose={() => setMarking(false)}
+            onApply={(room, clearOthers) => {
+              const next = { ...upload, tiles: applyRoom(upload.tiles, room, clearOthers) };
+              setUpload(next);
+              void learnFrom(next, Object.keys(room).map(Number));
+              setMarking(false);
+            }}
+          />
+        )}
         <div className="upload-grid-bar">
           <Toggle label="Mehrfachauswahl" checked={multi} onChange={(v) => (setMulti(v), setMarked([]))} />
           {multi && marked.length > 0 && (

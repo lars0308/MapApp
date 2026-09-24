@@ -33,6 +33,7 @@ import { createTilesetFromFile, findEmptyTiles, needsRepack, repackGrid } from '
 import { confirmedMetas, suggestMetas } from '../tilesets/TileLabel';
 import { learnFrom } from '../tilesets/learning';
 import { uid } from '../utils/id';
+import { applyRoom, roomMetas } from '../tilesets/RoomMarker';
 
 // Commands an AI (or any program) can run against the app: the same actions as the
 // buttons, as JSON in / JSON out. Used by the MCP bridge (src/api/bridge.ts) and available
@@ -431,6 +432,17 @@ const H: Record<string, Handler> = {
     if (a.auto_assign !== false) s.mergeTileMetas(t.id, await autoAssign(t));
     const now = P().tilesets.find((x) => x.id === ts.id)!;
     return { text: `„${now.name}“ neu zugeschnitten: ${now.columns * now.rows - now.emptyTiles.length} Tiles à ${now.tileSize} px. Platzierte Tiles dieses Tilesets wurden entfernt.`, data: { id: now.id, gids: [now.firstGid, now.firstGid + now.columns * now.rows - 1], tileSize: now.tileSize, cut } };
+  },
+
+  tileset_mark_room: (a) => {
+    const ts = findTileset(P(), a.tileset);
+    const r = { x0: int(a.x0, 'x0'), y0: int(a.y0, 'y0'), x1: int(a.x1, 'x1'), y1: int(a.y1, 'y1') };
+    const front = int(a.front_rows, 'front_rows', 0);
+    if (r.x0 < 0 || r.y0 < 0 || r.x1 >= ts.columns || r.y1 >= ts.rows || r.x1 - r.x0 < 2 || r.y1 - r.y0 < 2 + front) fail(`Rahmen muss im Tileset liegen (${ts.columns} × ${ts.rows} Tiles) und mindestens 3 × ${3 + front} groß sein`);
+    const room = roomMetas(ts, r, front);
+    const tiles = applyRoom(ts.tiles, room, a.clear_others !== false);
+    useProject.getState().editDoc('Raum im Tileset markiert', (p) => ({ ...p, tilesets: p.tilesets.map((t) => (t.id === ts.id ? { ...t, tiles } : t)) }));
+    return { text: `${Object.keys(room).length} Tiles als Raum zugeordnet (Ecken, Wände${front ? ', Wand-Vorderseite' : ''}, Boden). Mit generate neu bauen, mit render ansehen.`, data: { tileset: ts.id, roles: Object.fromEntries(Object.entries(room).map(([k, m]) => [ts.firstGid + Number(k), m.role])) } };
   },
 
   tileset_remove: (a) => {

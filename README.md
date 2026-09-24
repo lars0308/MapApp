@@ -342,6 +342,16 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.14 – Raum im Tileset markieren**
+
+- Tiles → *Tilesets* → Karte (und im Assistenten beim Hochladen) → **Raum im Tileset markieren**.
+  - Einen gezeichneten Beispielraum im Tileset einrahmen: am PC ziehen, am Handy erst eine Ecke und dann die gegenüberliegende antippen.
+  - Die Ecken des Rahmens werden Außenecken, die Ränder Wände (oben, unten, links, rechts), das Innere Boden.
+  - Unter **Wand-Vorderseite** 1 oder 2 Reihen wählen: Dann werden die Reihen unter der oberen Wand zur Mauer-Front (3/4-Ansicht).
+- Ein **Probe-Raum** zeigt sofort, wie der Generator mit diesen Tiles einen Raum baut. Fehlende Teile sind rot markiert.
+- Standardmäßig werden die automatischen Vorschläge aller übrigen Tiles verworfen. So landen Banner, Gitter oder Feuerschalen nicht mehr als „Boden“ in der Karte. Türen, Deko usw. danach einzeln antippen.
+- KI: `tileset_mark_room` mit `tileset`, `x0`, `y0`, `x1`, `y1` und `front_rows`.
+
 **Version 3.13 – Fertige Godot-Szene**
 
 - Das Godot-Paket enthält jetzt **`tileset.tres`**, einen fertigen TileSet. Er hat alle Kacheln, Y-Sort-Ursprünge, Custom Data „category“ und „role“, Kollisionspolygone und bei Hex-Karten die Hexagon-Form.

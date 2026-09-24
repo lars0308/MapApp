@@ -5586,3 +5586,70 @@ body.is-resizing-y * {
 .play-hearts span.is-full {
   color: #e8546b;
 }
+
+/* Raum im Tileset markieren */
+.room-marker {
+  width: min(640px, 100%);
+}
+.room-sheet-wrap {
+  max-height: 46vh;
+  overflow: auto;
+  margin: 8px 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: repeating-conic-gradient(#1b1b22 0% 25%, #23232c 0% 50%) 0 0 / 16px 16px;
+}
+.room-sheet {
+  position: relative;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  touch-action: none;
+  cursor: crosshair;
+  background-color: transparent;
+}
+.room-sheet::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: var(--cell) var(--cell);
+}
+.room-frame {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  outline: 2px solid var(--accent);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.room-frame.is-bad {
+  outline-color: #e86f6f;
+}
+.room-cell {
+  width: var(--cell);
+  height: var(--cell);
+  box-sizing: border-box;
+  border: 1px solid transparent;
+}
+.room-cell.r-wall {
+  background: rgba(240, 179, 107, 0.28);
+}
+.room-cell.r-front {
+  background: rgba(120, 170, 255, 0.3);
+}
+.room-cell.r-floor {
+  background: rgba(110, 200, 120, 0.18);
+}
+.room-sample {
+  display: block;
+  max-width: 100%;
+  margin: 6px 0 10px;
+  border-radius: 8px;
+  image-rendering: pixelated;
+  box-shadow: 0 0 0 1px var(--line-2);
+}
+.hint.is-warn {
+  color: #f0b36b;
+}

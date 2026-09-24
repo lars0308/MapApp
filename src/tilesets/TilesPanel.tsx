@@ -11,6 +11,7 @@ import { CATEGORIES, CATEGORY_LABEL, SUGGESTED_TAGS } from './categories';
 import { TileThumb } from './TileThumb';
 import { AssignSummary, TileLabel, assignmentStats, confirmedMetas, suggestMetas } from './TileLabel';
 import { autoAssign } from './autoAssign';
+import { RoomMarker, applyRoom } from './RoomMarker';
 import { learnFrom } from './learning';
 import { resolveGid, createTilesetFromFile, COMMON_TILE_SIZES } from './slicing';
 import { Button, Chip, IconButton, NumberField, PanelTabs, Segmented, Slider, Toggle } from '../components/ui';
@@ -438,6 +439,7 @@ function TilesetCard({ ts }: { ts: Tileset }) {
   const updateTileset = useProject((s) => s.updateTileset);
   const removeTileset = useProject((s) => s.removeTileset);
   const [confirm, setConfirm] = useState(false);
+  const [marking, setMarking] = useState(false);
   const count = ts.columns * ts.rows - ts.emptyTiles.length;
   const categorized = Object.values(ts.tiles).filter((m) => m.category).length;
   const perspective = useProject((s) => s.project.map.perspective);
@@ -461,6 +463,23 @@ function TilesetCard({ ts }: { ts: Tileset }) {
         </div>
       </div>
       <Toggle label="Aktiv" description="Im Generator und in der Palette verwenden" checked={ts.active} onChange={(v) => updateTileset(ts.id, { active: v })} />
+      <Button variant="primary" block icon={<Icon.Grid size={16} />} onClick={() => setMarking(true)}>
+        Raum im Tileset markieren
+      </Button>
+      <p className="hint">Schnellster Weg zu richtigen Wänden: einen gezeichneten Raum im Tileset einrahmen – Ecken, Wände und Boden werden in einem Schritt zugeordnet.</p>
+      {marking && (
+        <RoomMarker
+          ts={ts}
+          onClose={() => setMarking(false)}
+          onApply={(room, clearOthers) => {
+            const tiles = applyRoom(ts.tiles, room, clearOthers);
+            useProject.getState().editDoc('Raum im Tileset markiert', (p) => ({ ...p, tilesets: p.tilesets.map((t) => (t.id === ts.id ? { ...t, tiles } : t)) }));
+            void learnFrom({ ...ts, tiles }, Object.keys(room).map(Number));
+            setMarking(false);
+            toast(`${Object.keys(room).length} Tiles als Raum zugeordnet – jetzt neu generieren`, 'success');
+          }}
+        />
+      )}
       <AssignSummary
         ts={ts}
         busy={detecting}
