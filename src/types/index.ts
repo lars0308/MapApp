@@ -244,6 +244,10 @@ export interface GeneratorSettings {
   obstacleDensity: number;
   terrain: TerrainSettings;
   objects: { trees: number; rocks: number; arches: number; pillars: boolean };
+  /** room layout: built rooms (default) or natural caves */
+  layout?: 'rooms' | 'cave';
+  /** caves: 0 = smooth, 100 = very ragged with niches and pillars */
+  caveRoughness?: number;
   /** enemies and loot placed by room type and distance from the start (0–100, missing = none) */
   population?: { enemies: number; loot: number };
   /** side-scroller levels (perspective side_view) */

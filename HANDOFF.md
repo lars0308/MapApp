@@ -1,6 +1,6 @@
 # Übergabe – MapForge (Stand 2026-09-24, Version 3.1)
 
-Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (Version 3.6 im README).
+Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (Version 3.7 im README).
 Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI auf Deutsch, UI selbsterklärend, mobil zuerst, keine Fake-Features.
 
 ## Stand (fertig, gepusht)
@@ -32,7 +32,7 @@ Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI 
 - Generator: `populate()` in `src/generator/index.ts` (Einstellung `generator.population {enemies, loot}`), Truhen als Objekte. Testspiel-Kampf: `src/playtest/combat.ts` (Gegner, Truhen, HUD-Store), eingebunden in `controller.ts` (`renderer.playItems`). Side-Scroller hat noch keinen Kampf im App-Testspiel.
 
 ## Danach offen
-6. Weitere Biome (Höhlen per Cellular Automata, Außenbereiche, Dörfer).
+6. Außenbereiche und Dörfer (Höhlen fertig: `src/generator/cave.ts`, `generator.layout = 'cave'`). Braucht neue Demo-Tiles: Gras, Erdweg, Hauswand/Dach.
 7. Echtes isometrisches Rautenraster + Höhenebenen.
 8. Godot-Terrain-Set für Wände; direkter `.tscn`/`.tres`-Export.
 9. Tilesets mit Rand/Abstand, nicht-quadratische Tiles; Generator im Web Worker.

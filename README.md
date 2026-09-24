@@ -335,12 +335,16 @@ Wichtige Entscheidungen:
 - Echtes isometrisches Raster für 45°, mehrere Höhenebenen
 - Direkter `.tscn`/`.tres`-Export (TileSet-Ressource + Szene)
 - Generator im Web Worker, Fortschrittsanzeige für sehr große Maps
-- Weitere Biome (Höhlen per Cellular Automata, Außenbereiche, Dörfer)
+- Außenbereiche und Dörfer (brauchen Gras-/Haus-Tiles im Demo-Set)
 - Tileset-Optionen für Rand/Abstand und nicht-quadratische Tiles
 
 ---
 
 ## Änderungen
+
+**Version 3.7 – Natürliche Höhlen**
+
+- Generator → *Räume* → **Aufbau: Natürliche Höhle** (auch im Assistenten): Räume und Gänge werden per Zellautomat zu Höhlen mit unregelmäßigen Wänden, Ausbuchtungen, Nischen und Felssäulen, ohne Türen. Regler **Zerklüftung** (glatt … sehr zerklüftet). Raummitten und Gangverläufe bleiben offen, abgetrennte Stücke werden entfernt – alle Kammern bleiben erreichbar (geprüft für Top-Down, Low Top-Down und 45°). Spezialräume, Gelände, Gegner und Beute, Export funktionieren wie gewohnt. KI: `set_generator` mit `{ "layout": "cave", "caveRoughness": 60 }`.
 
 **Version 3.6 – KI verwaltet eigene Tilesets**
 

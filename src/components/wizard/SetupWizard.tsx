@@ -379,6 +379,16 @@ function WizardDialog() {
 
           {id === 'rooms' && (
             <StepSection title="Räume">
+              <Segmented
+                label="Aufbau"
+                value={gen.layout ?? 'rooms'}
+                onChange={(v) => setGen({ layout: v })}
+                options={[
+                  { value: 'rooms', label: 'Gebaute Räume' },
+                  { value: 'cave', label: 'Natürliche Höhle' },
+                ]}
+              />
+              {gen.layout === 'cave' && <Slider label="Zerklüftung" value={gen.caveRoughness ?? 60} unit="%" onChange={(v) => setGen({ caveRoughness: v })} />}
               <Slider label="Anzahl Räume" value={gen.roomCount} min={2} max={60} onChange={(v) => setGen({ roomCount: v })} />
               <div className="grid-2">
                 <NumberField label="Min. Breite" value={gen.roomMinW} min={3} max={gen.roomMaxW} onChange={(v) => setGen({ roomMinW: v })} />

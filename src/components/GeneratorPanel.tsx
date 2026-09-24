@@ -133,6 +133,21 @@ export function GeneratorPanel() {
       </Section>
 
       <Section title="Räume">
+        <Segmented
+          label="Aufbau"
+          value={g.layout ?? 'rooms'}
+          onChange={(v) => update({ layout: v })}
+          options={[
+            { value: 'rooms', label: 'Gebaute Räume' },
+            { value: 'cave', label: 'Natürliche Höhle' },
+          ]}
+        />
+        {g.layout === 'cave' && (
+          <>
+            <Slider label="Zerklüftung" value={g.caveRoughness ?? 60} unit=" %" onChange={(v) => update({ caveRoughness: v })} />
+            <p className="hint">Räume und Gänge werden zu Höhlen mit unregelmäßigen Wänden, Nischen und Felssäulen – ohne Türen. Alle Kammern bleiben erreichbar.</p>
+          </>
+        )}
         <Slider label="Anzahl" value={g.roomCount} min={2} max={60} onChange={(v) => update({ roomCount: v })} />
         <div className="grid-2">
           <NumberField label="Min. Breite" value={g.roomMinW} min={3} max={g.roomMaxW} onChange={(v) => update({ roomMinW: v })} />

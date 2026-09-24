@@ -43,6 +43,7 @@ import { objectDef } from '../objects/defs';
 import { isWalkable } from './nav';
 import { generateSide } from './side';
 import { generateHex } from './hexgen';
+import { cavify } from './cave';
 
 export interface GenerateInput {
   settings: GeneratorSettings;
@@ -130,6 +131,12 @@ export function generate(input: GenerateInput): GenerateOutput {
   const edges = buildGraph(placed, s, rGraph, W, H);
   const corridors = carveCorridors(grid, placed, edges, s, rCorr);
   const deadEnds = carveBranches(grid, s, rBranch, placed.length);
+  // natural caves: the same layout, reshaped by a cellular automaton
+  const cave = s.layout === 'cave';
+  if (cave) {
+    cavify(grid, placed, corridors.map((c) => c.path), s.caveRoughness ?? 60, root.fork(127));
+    computeNearRoom(grid);
+  }
 
   // special rooms (start is needed to validate terrain reachability)
   const specials = assignSpecialRooms(placed, edges, s, rSpecial);
@@ -171,7 +178,8 @@ export function generate(input: GenerateInput): GenerateOutput {
   for (let i = 0; i < W * H; i++) if (grid.cells[i] === CELL_WALL) wallMask[i] = wallNeighbourMask(grid, i % W, (i / W) | 0);
 
   // 12: doors where corridors meet rooms (narrow openings only) + door frames
-  const doors = findDoors(grid).filter((d) => {
+  // caves have no doors (openings stay open)
+  const doors = (cave ? [] : findDoors(grid)).filter((d) => {
     const t = ts.terrain[d.y * W + d.x];
     return t === T_NONE || t === T_TRANSITION;
   });
