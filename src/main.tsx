@@ -40,6 +40,18 @@ if (last) {
   setTimeout(() => useEditor.getState().toast(`Letzter Fehler (${last.area}, ${new Date(last.at).toLocaleTimeString()}): ${last.message}`, 'error'), 1500);
 }
 
+// manual building (Baukasten): no automatic neighbour walls unless switched on in the toolbar;
+// generated maps keep them (painting floor then adjusts walls around it)
+let autoWallsFor = '';
+const syncAutoWalls = () => {
+  const p = useProject.getState().project;
+  if (p.id === autoWallsFor) return;
+  autoWallsFor = p.id;
+  useEditor.getState().setFlag('autoWalls', p.mode !== 'manual');
+};
+syncAutoWalls();
+useProject.subscribe(syncAutoWalls);
+
 // own objects (figures on the map) of the open project → object atlas
 setCustomObjects(useProject.getState().project.customObjects);
 useProject.subscribe((s) => setCustomObjects(s.project.customObjects));

@@ -5653,3 +5653,111 @@ body.is-resizing-y * {
 .hint.is-warn {
   color: #f0b36b;
 }
+
+.room-board-wrap {
+  margin: 8px 0 4px;
+}
+.room-board {
+  display: grid;
+  gap: 2px;
+  justify-content: start;
+}
+.room-slot {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px dashed var(--line-2);
+  background-color: var(--surface);
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  color: var(--text-3);
+  font-size: 9.5px;
+  line-height: 1.1;
+  text-align: center;
+  overflow: hidden;
+}
+.room-slot.is-set {
+  border-style: solid;
+  border-color: transparent;
+}
+.room-slot.is-active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  color: var(--accent-hi);
+}
+.room-extra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.room-slot-wide {
+  aspect-ratio: auto;
+  display: inline-flex;
+  gap: 6px;
+  min-height: 34px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.room-slot-wide .tile-thumb {
+  border-radius: 4px;
+}
+.room-mark {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+.room-mark.is-active {
+  border-color: var(--accent);
+  background: rgba(232, 111, 170, 0.25);
+}
+
+.room-marker.is-builder {
+  width: min(960px, 100%);
+}
+.room-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+}
+.room-split .room-sheet-wrap {
+  max-height: 60vh;
+  margin: 0;
+}
+.room-slot-tile {
+  display: block;
+  image-rendering: pixelated;
+  pointer-events: auto;
+}
+.room-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.room-tools-label {
+  flex: 1 1 100%;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.room-complete {
+  margin-top: 8px;
+  width: 100%;
+}
+.room-drag {
+  position: fixed;
+  z-index: 100;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 2px var(--accent);
+  image-rendering: pixelated;
+  pointer-events: none;
+}

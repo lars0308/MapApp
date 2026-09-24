@@ -68,7 +68,11 @@ const CONTENT_ROLES = new Set<LayerRole>(['floor', 'groundDetails', 'paths', 'de
 
 export function metaTable(p: Project): (TileMeta | undefined)[] {
   const table: (TileMeta | undefined)[] = [];
-  for (const ts of p.tilesets) for (let i = 0; i < ts.columns * ts.rows; i++) table[ts.firstGid + i] = ts.tiles[i];
+  for (const ts of p.tilesets) {
+    for (let i = 0; i < ts.columns * ts.rows; i++) table[ts.firstGid + i] = ts.tiles[i];
+    // a tile used only turned (room builder) blocks / walks like its turned role
+    for (const v of ts.variants ?? []) table[ts.firstGid + v.index] ??= { category: v.category, role: v.role, tags: [], weight: 60 };
+  }
   return table;
 }
 

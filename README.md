@@ -342,6 +342,16 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.15 – Raum-Baukasten mit Drehen, Auto-Wände im Baukasten aus**
+
+- **Raum aus dem Tileset bauen → Baukasten (Teile ziehen)** für Tilesets mit losen Einzelteilen:
+  - Links das Tileset, rechts ein Raum-Bauplan. Tiles auf die Felder ziehen, am Handy Feld wählen und dann das Tile antippen.
+  - **↻ Drehen** und **⇋ Spiegeln** passen ein Tile an.
+  - **„Fehlende Ecken und Wände durch Drehen ergänzen“**: eine Ecke und ein Wandstück reichen, die anderen drei werden gedreht gesetzt.
+  - Mehrere Tiles pro Feld sind Varianten.
+  - Gedrehte Tiles werden als `Tileset.variants` gespeichert. Der Generator setzt sie gedreht in die Karte, und im Godot-Export kommen sie als Tile-Alternativen an.
+- **Auto-Wände** sind im Baukasten-Modus (manuell) jetzt standardmäßig aus: Malen setzt nur das gewählte Tile. Bei generierten Karten bleiben sie an. Neben der Pinselgröße gibt es den Schalter **„Auto-Wände an/aus“**.
+
 **Version 3.14 – Raum im Tileset markieren**
 
 - Tiles → *Tilesets* → Karte (und im Assistenten beim Hochladen) → **Raum im Tileset markieren**.

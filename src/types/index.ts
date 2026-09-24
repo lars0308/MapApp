@@ -159,6 +159,16 @@ export interface Tileset {
   sourceDataUrl?: string;
   /** how sourceDataUrl was cut */
   cut?: GridCut;
+  /** turned / mirrored uses of tiles with their own role (e.g. one corner tile turned = all four corners) */
+  variants?: TileVariant[];
+}
+
+/** a tile of the tileset turned / mirrored (gid transform bits, see tilesets/gid.ts) with its own role */
+export interface TileVariant {
+  index: number;
+  transform: number;
+  role: TileRole;
+  category?: TileCategory;
 }
 
 /** grid of a tileset image: tile size (may be non-square), margin around the sheet, spacing between tiles */

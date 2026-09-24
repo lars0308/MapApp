@@ -347,17 +347,17 @@ function UploadEditor({
           Tiles <span className="muted">· {indices.length} Tiles – antippen, um den Typ zu wählen</span>
         </label>
         <Button variant="primary" block icon={<Icon.Grid size={16} />} onClick={() => setMarking(true)}>
-          Raum im Tileset markieren
+          Raum aus dem Tileset bauen
         </Button>
-        <p className="hint">Am schnellsten: einen gezeichneten Raum im Tileset einrahmen – Ecken, Wände und Boden in einem Schritt. Einzelne Tiles (Tür, Deko …) danach antippen.</p>
+        <p className="hint">Am schnellsten: Ecken, Wände und Boden auf einen Raum-Bauplan ziehen (auch gedreht) oder einen gezeichneten Raum einrahmen. Einzelne Tiles (Tür, Deko …) danach antippen.</p>
         {marking && (
           <RoomMarker
             ts={upload}
             onClose={() => setMarking(false)}
             onApply={(room, clearOthers) => {
-              const next = { ...upload, tiles: applyRoom(upload.tiles, room, clearOthers) };
+              const next = { ...upload, ...applyRoom(upload, room, clearOthers) };
               setUpload(next);
-              void learnFrom(next, Object.keys(room).map(Number));
+              void learnFrom(next, Object.keys(room.tiles).map(Number));
               setMarking(false);
             }}
           />

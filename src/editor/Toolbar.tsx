@@ -49,6 +49,7 @@ export function BrushSize() {
   const setSize = useEditor((s) => s.setBrushSize);
   const eraseRect = useEditor((s) => s.eraseRect);
   const eraseAll = useEditor((s) => s.eraseAllLayers);
+  const autoWalls = useEditor((s) => s.autoWalls);
   const setFlag = useEditor((s) => s.setFlag);
   const [more, setMore] = useState(false);
   if (tool !== 'brush' && tool !== 'eraser') return null;
@@ -91,6 +92,15 @@ export function BrushSize() {
           <span>{size}×{size}</span>
         </label>
       )}
+      <button
+        type="button"
+        aria-pressed={autoWalls}
+        title={autoWalls ? 'Auto-Wände an: Boden malen setzt Wände, Ecken und Kollision drumherum automatisch' : 'Auto-Wände aus: es wird nur das gewählte Tile gesetzt'}
+        className={`brush-all${autoWalls ? ' is-active' : ''}`}
+        onClick={() => setFlag('autoWalls', !autoWalls)}
+      >
+        Auto-Wände {autoWalls ? 'an' : 'aus'}
+      </button>
       {tool === 'eraser' && (
         <>
           <button type="button" role="radio" aria-checked={rect} aria-label="Rechteck radieren" title="Rechteck aufziehen und löschen" className={rect ? 'is-active' : ''} onClick={() => setFlag('eraseRect', true)}>

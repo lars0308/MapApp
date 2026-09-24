@@ -464,19 +464,19 @@ function TilesetCard({ ts }: { ts: Tileset }) {
       </div>
       <Toggle label="Aktiv" description="Im Generator und in der Palette verwenden" checked={ts.active} onChange={(v) => updateTileset(ts.id, { active: v })} />
       <Button variant="primary" block icon={<Icon.Grid size={16} />} onClick={() => setMarking(true)}>
-        Raum im Tileset markieren
+        Raum aus dem Tileset bauen
       </Button>
-      <p className="hint">Schnellster Weg zu richtigen Wänden: einen gezeichneten Raum im Tileset einrahmen – Ecken, Wände und Boden werden in einem Schritt zugeordnet.</p>
+      <p className="hint">Schnellster Weg zu richtigen Wänden: Ecken, Wände und Boden auf einen Raum-Bauplan ziehen (auch gedreht) – oder einen gezeichneten Raum im Tileset einrahmen.</p>
       {marking && (
         <RoomMarker
           ts={ts}
           onClose={() => setMarking(false)}
           onApply={(room, clearOthers) => {
-            const tiles = applyRoom(ts.tiles, room, clearOthers);
-            useProject.getState().editDoc('Raum im Tileset markiert', (p) => ({ ...p, tilesets: p.tilesets.map((t) => (t.id === ts.id ? { ...t, tiles } : t)) }));
-            void learnFrom({ ...ts, tiles }, Object.keys(room).map(Number));
+            const next = applyRoom(ts, room, clearOthers);
+            useProject.getState().editDoc('Raum aus dem Tileset gebaut', (p) => ({ ...p, tilesets: p.tilesets.map((t) => (t.id === ts.id ? { ...t, ...next } : t)) }));
+            void learnFrom({ ...ts, tiles: next.tiles }, Object.keys(room.tiles).map(Number));
             setMarking(false);
-            toast(`${Object.keys(room).length} Tiles als Raum zugeordnet – jetzt neu generieren`, 'success');
+            toast(`Raum übernommen (${Object.keys(room.tiles).length} Tiles${room.variants.length ? `, ${room.variants.length} gedreht` : ''}) – jetzt neu generieren`, 'success');
           }}
         />
       )}

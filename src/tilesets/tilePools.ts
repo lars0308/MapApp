@@ -1,3 +1,4 @@
+import { withTransform } from './gid';
 import type { Perspective, TileCategory, TileRole, Tileset } from '../types';
 import { Rng, weightedIndex } from '../generator/rng';
 
@@ -130,6 +131,13 @@ class Tier {
           list.push(t);
           this.roles.set(meta.role, list);
         }
+      }
+      // turned / mirrored uses of tiles (room builder: one corner turned = the other corners)
+      for (const v of ts.variants ?? []) {
+        if (v.index < 0 || v.index >= count) continue;
+        const t = { gid: withTransform(ts.firstGid + v.index, v.transform), weight: ts.tiles[v.index]?.weight ?? 60, tags: ts.tiles[v.index]?.tags ?? [] };
+        if (v.category) this.pools.set(v.category, [...(this.pools.get(v.category) ?? []), t]);
+        this.roles.set(v.role, [...(this.roles.get(v.role) ?? []), t]);
       }
     }
   }

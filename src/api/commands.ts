@@ -440,8 +440,8 @@ const H: Record<string, Handler> = {
     const front = int(a.front_rows, 'front_rows', 0);
     if (r.x0 < 0 || r.y0 < 0 || r.x1 >= ts.columns || r.y1 >= ts.rows || r.x1 - r.x0 < 2 || r.y1 - r.y0 < 2 + front) fail(`Rahmen muss im Tileset liegen (${ts.columns} × ${ts.rows} Tiles) und mindestens 3 × ${3 + front} groß sein`);
     const room = roomMetas(ts, r, front);
-    const tiles = applyRoom(ts.tiles, room, a.clear_others !== false);
-    useProject.getState().editDoc('Raum im Tileset markiert', (p) => ({ ...p, tilesets: p.tilesets.map((t) => (t.id === ts.id ? { ...t, tiles } : t)) }));
+    const next = applyRoom(ts, { tiles: room, variants: [], replaceVariants: false }, a.clear_others !== false);
+    useProject.getState().editDoc('Raum im Tileset markiert', (p) => ({ ...p, tilesets: p.tilesets.map((t) => (t.id === ts.id ? { ...t, ...next } : t)) }));
     return { text: `${Object.keys(room).length} Tiles als Raum zugeordnet (Ecken, Wände${front ? ', Wand-Vorderseite' : ''}, Boden). Mit generate neu bauen, mit render ansehen.`, data: { tileset: ts.id, roles: Object.fromEntries(Object.entries(room).map(([k, m]) => [ts.firstGid + Number(k), m.role])) } };
   },
 
