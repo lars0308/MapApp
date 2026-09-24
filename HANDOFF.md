@@ -1,6 +1,6 @@
 # Übergabe – MapForge (Stand 2026-09-24, Version 3.1)
 
-Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (Version 3.4 im README).
+Repo `lars0308/MapApp`, Branch `claude/pixelart-map-generator-tnosue` (Version 3.5 im README).
 Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI auf Deutsch, UI selbsterklärend, mobil zuerst, keine Fake-Features.
 
 ## Stand (fertig, gepusht)
@@ -28,8 +28,10 @@ Vite + React + TypeScript + zustand. `npm run build` (tsc + vite). Antworten/UI 
 - Nach Änderungen an `src/api/spec.json` Edge Function neu deployen (spec.json liegt daneben, `npm run build` kopiert sie).
 - Noch nicht Ende-zu-Ende getestet (Sandbox blockt supabase.co) – erster echter Test durch den Nutzer.
 
+## Gegner & Beute (Version 3.5)
+- Generator: `populate()` in `src/generator/index.ts` (Einstellung `generator.population {enemies, loot}`), Truhen als Objekte. Testspiel-Kampf: `src/playtest/combat.ts` (Gegner, Truhen, HUD-Store), eingebunden in `controller.ts` (`renderer.playItems`). Side-Scroller hat noch keinen Kampf im App-Testspiel.
+
 ## Danach offen
-5. Gegner/Beute automatisch nach Raumtyp/Distanz platzieren; Gegner auch im App-Testspiel.
 6. Weitere Biome (Höhlen per Cellular Automata, Außenbereiche, Dörfer).
 7. Echtes isometrisches Rautenraster + Höhenebenen.
 8. Godot-Terrain-Set für Wände; direkter `.tscn`/`.tres`-Export.

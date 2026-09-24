@@ -5555,3 +5555,29 @@ body.is-resizing-y * {
   font: inherit;
   cursor: pointer;
 }
+
+.play-hud {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 12px;
+  background: rgba(19, 19, 24, 0.85);
+  border: 1px solid var(--line-2);
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 5;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.play-hearts span {
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 15px;
+}
+.play-hearts span.is-full {
+  color: #e8546b;
+}

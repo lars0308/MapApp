@@ -48,6 +48,7 @@ export function defaultGenerator(seed = randomSeed()): GeneratorSettings {
     obstacleDensity: 20,
     terrain: defaultTerrain(),
     objects: { trees: 15, rocks: 20, arches: 30, pillars: true },
+    population: { enemies: 40, loot: 35 },
   };
 }
 

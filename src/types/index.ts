@@ -244,6 +244,8 @@ export interface GeneratorSettings {
   obstacleDensity: number;
   terrain: TerrainSettings;
   objects: { trees: number; rocks: number; arches: number; pillars: boolean };
+  /** enemies and loot placed by room type and distance from the start (0–100, missing = none) */
+  population?: { enemies: number; loot: number };
   /** side-scroller levels (perspective side_view) */
   side?: SideSettings;
   /** hex world maps (perspective hex) */

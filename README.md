@@ -336,12 +336,16 @@ Wichtige Entscheidungen:
 - Direkter `.tscn`/`.tres`-Export (TileSet-Ressource + Szene)
 - Generator im Web Worker, Fortschrittsanzeige für sehr große Maps
 - Weitere Biome (Höhlen per Cellular Automata, Außenbereiche, Dörfer)
-- Automatische Platzierung von Gegnern/Loot nach Raumtyp und Distanz zum Start
 - Tileset-Optionen für Rand/Abstand und nicht-quadratische Tiles
 
 ---
 
 ## Änderungen
+
+**Version 3.5 – Gegner & Beute automatisch, Kampf im Testspiel**
+
+- Generator (Top-Down / Isometrisch): neue Regler **Gegner** und **Beute (Truhen)** unter *Ausstattung* (auch im Assistenten). Verteilung nach Entfernung zum Start: der Startraum bleibt frei, weiter hinten mehr und stärkere Gegner (Stufe 1–5, 25 % Fernkämpfer), der Boss bekommt Wachen; Truhen in Schatzräumen, Sackgassen und selten sonst (Stufe 1–3), jede Truhe als echtes Objekt. Genres setzen passende Werte (Puzzle: keine Gegner). Alles als Spawnpunkte mit Eigenschaften im Godot-Export.
+- **Testspiel**: Gegner (Schleime, Farbe nach Stufe, Boss lila und größer) wandern um ihren Platz und verfolgen die Figur, wenn sie näher als 6 Felder kommt; Berührung kostet ein Herz (Boss zwei), bei 0 zurück zum Start. **Angriff** mit Leertaste / J oder dem Knopf *Angriff* am Handy trifft, was vor der Figur steht (mit Rückstoß, Lebensbalken). Truhen öffnen sich beim Drüberlaufen. Anzeige oben: Herzen, besiegte Gegner, geöffnete Truhen.
 
 **Version 3.4 – KI von überall (auch am Handy)**
 

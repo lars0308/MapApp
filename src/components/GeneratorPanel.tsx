@@ -207,6 +207,9 @@ export function GeneratorPanel() {
         <Slider label="Große Felsen" value={g.objects.rocks} unit=" %" onChange={(v) => update({ objects: { ...g.objects, rocks: v } })} />
         <Slider label="Torbögen" value={g.objects.arches} unit=" %" onChange={(v) => update({ objects: { ...g.objects, arches: v } })} />
         <Toggle label="Säulen in großen Hallen" checked={g.objects.pillars} onChange={(pillars) => update({ objects: { ...g.objects, pillars } })} />
+        <Slider label="Gegner" value={g.population?.enemies ?? 0} unit=" %" onChange={(v) => update({ population: { loot: g.population?.loot ?? 0, enemies: v } })} />
+        <Slider label="Beute (Truhen)" value={g.population?.loot ?? 0} unit=" %" onChange={(v) => update({ population: { enemies: g.population?.enemies ?? 0, loot: v } })} />
+        <p className="hint">Gegner und Truhen werden nach Entfernung zum Start verteilt: der Startraum bleibt frei, weiter hinten mehr und stärkere Gegner (Stufe 1–5), Truhen in Schatzräumen und Sackgassen. Sie stehen als Spawnpunkte im Godot-Export.</p>
         <p className="hint">Wasser, Lava, Abgründe, Klippen und Brücken: Panel „Terrain“.</p>
       </Section>
     </div>

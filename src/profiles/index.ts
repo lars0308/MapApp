@@ -62,7 +62,7 @@ export const GENRES: GenreInfo[] = [
     text: 'Kompakte Kampfräume, Schätze, Boss am Ende, Rundwege.',
     views: ['top_down', 'isometric'],
     map: { width: 64, height: 64 },
-    apply: (g) => specials({ ...g, roomCount: 12, roomMinW: 7, roomMaxW: 14, roomMinH: 6, roomMaxH: 12, connectivity: 50, corridor: { ...g.corridor, loops: true } }, ['start', 'end', 'boss', 'treasure', 'arena']),
+    apply: (g) => ({ ...specials({ ...g, roomCount: 12, roomMinW: 7, roomMaxW: 14, roomMinH: 6, roomMaxH: 12, connectivity: 50, corridor: { ...g.corridor, loops: true } }, ['start', 'end', 'boss', 'treasure', 'arena']), population: { enemies: 60, loot: 40 } }),
   },
   {
     id: 'dungeon_crawler',
@@ -70,7 +70,7 @@ export const GENRES: GenreInfo[] = [
     text: 'Verzweigte, verwinkelte Gänge, Sackgassen und Geheimräume.',
     views: ['top_down', 'isometric'],
     map: preset('maze').map,
-    apply: (g) => specials(preset('maze').apply(g), ['start', 'end', 'treasure', 'secret']),
+    apply: (g) => ({ ...specials(preset('maze').apply(g), ['start', 'end', 'treasure', 'secret']), population: { enemies: 45, loot: 60 } }),
   },
   {
     id: 'rpg',
@@ -78,7 +78,7 @@ export const GENRES: GenreInfo[] = [
     text: 'Große, offene Bereiche, Händler, Aufgaben, viel zu entdecken.',
     views: ['top_down', 'isometric'],
     map: preset('exploration').map,
-    apply: (g) => specials(preset('exploration').apply(g), ['start', 'end', 'merchant', 'quest', 'secret', 'treasure']),
+    apply: (g) => ({ ...specials(preset('exploration').apply(g), ['start', 'end', 'merchant', 'quest', 'secret', 'treasure']), population: { enemies: 30, loot: 45 } }),
   },
   {
     id: 'tactics',
@@ -95,7 +95,7 @@ export const GENRES: GenreInfo[] = [
     text: 'Linearer Ablauf mit Rätselräumen – ein Raum nach dem anderen.',
     views: ['top_down', 'isometric'],
     map: preset('linear').map,
-    apply: (g) => specials(preset('linear').apply(g), ['start', 'end', 'puzzle', 'secret']),
+    apply: (g) => ({ ...specials(preset('linear').apply(g), ['start', 'end', 'puzzle', 'secret']), population: { enemies: 0, loot: 20 } }),
   },
   { id: 'strategy', label: 'Strategie / 4X', text: 'Weltkarte mit Völkern, Städten, Rohstoffen – erkunden, ausbauen, erobern.', views: ['hexagonal'] },
   { id: 'platformer', label: 'Platformer', text: 'Springen, Plattformen, Leitern, Gruben – Level von links nach rechts.', views: ['side_scroller'] },

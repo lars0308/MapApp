@@ -38,7 +38,7 @@ import { TilePools } from '../tilesets/tilePools';
 import { NO_ROLE, frontTilePrefs, resolveWalls, roleAt, wallNeighbourMask } from './autotile';
 import { PERSPECTIVE_INFO, requiredRooms } from './perspective';
 import { createTerrainState, placeTerrain, placeTransitions } from './terrain';
-import { placeObjects, type ObjectContext } from './objectsGen';
+import { canPlace, occupy, placeObjects, type ObjectContext } from './objectsGen';
 import { objectDef } from '../objects/defs';
 import { isWalkable } from './nav';
 import { generateSide } from './side';
@@ -259,7 +259,18 @@ export function generate(input: GenerateInput): GenerateOutput {
     const room = rooms.find((r) => r.type === roomType);
     if (!room) continue;
     const [sx, sy] = spawnCell(W, room, free);
-    spawnPoints.push({ id: `${spawnType}_${room.id}`, type: spawnType, x: sx, y: sy, roomId: room.id, properties: roomType === 'boss' ? { boss: true } : {} });
+    spawnPoints.push({ id: `${spawnType}_${room.id}`, type: spawnType, x: sx, y: sy, roomId: room.id, properties: roomType === 'boss' ? { boss: true, level: 5 } : {} });
+  }
+  // enemies and loot: more and stronger the further a room is from the start
+  if (s.population && (s.population.enemies > 0 || s.population.loot > 0)) {
+    const extra = populate(W, rooms, placed, grid, free, (i) => canPlace(octx, 'chest', i % W, (i / W) | 0), s.population, root.fork(113));
+    for (const sp of extra.spawns) spawnPoints.push(sp);
+    // loot stands in a chest (a real object with collision)
+    for (const sp of extra.spawns)
+      if (sp.type === 'loot' && canPlace(octx, 'chest', sp.x, sp.y)) {
+        occupy(octx, 'chest', sp.x, sp.y);
+        objects.push({ id: `chest_loot_${sp.id}`, type: 'chest', x: sp.x, y: sp.y });
+      }
   }
 
   // 14: paint layers
@@ -559,3 +570,86 @@ function spawnCell(W: number, room: Room, free: (i: number) => boolean): [number
   return [room.centerX, room.centerY];
 }
 
+
+/** hops through the room graph from the start room (unreachable = the largest distance) */
+function roomDistances(rooms: Room[]): Map<number, number> {
+  const d = new Map<number, number>();
+  const start = rooms.find((r) => r.isStart) ?? rooms[0];
+  if (!start) return d;
+  d.set(start.id, 0);
+  const queue = [start.id];
+  while (queue.length) {
+    const id = queue.shift()!;
+    const r = rooms.find((x) => x.id === id);
+    for (const n of r?.connections ?? []) if (!d.has(n)) (d.set(n, d.get(id)! + 1), queue.push(n));
+  }
+  const max = Math.max(1, ...d.values());
+  for (const r of rooms) if (!d.has(r.id)) d.set(r.id, max);
+  return d;
+}
+
+/**
+ * Enemy and loot spawn points. Rooms far from the start get more and stronger enemies and
+ * better loot; the start room stays safe, the boss gets guards, treasure rooms and dead ends
+ * (rooms with one door) hold the chests.
+ */
+function populate(
+  W: number,
+  rooms: Room[],
+  placed: { id: number; x: number; y: number; w: number; h: number }[],
+  grid: Grid,
+  free: (i: number) => boolean,
+  /** a chest fits here (free ring, no doorway) */
+  chestOk: (i: number) => boolean,
+  pop: { enemies: number; loot: number },
+  rng: Rng,
+): { spawns: SpawnPoint[] } {
+  const spawns: SpawnPoint[] = [];
+  const dist = roomDistances(rooms);
+  const maxD = Math.max(1, ...dist.values());
+  const taken = new Set<number>();
+  const near = (i: number) => {
+    for (const t of taken) if (Math.abs((t % W) - (i % W)) <= 1 && Math.abs(((t / W) | 0) - ((i / W) | 0)) <= 1) return true;
+    return false;
+  };
+  const cellsOf = (id: number) => {
+    const p = placed.find((q) => q.id === id);
+    const out: number[] = [];
+    if (!p) return out;
+    // keep a ring of 1 to the walls: enemies do not start inside doorways
+    for (let y = p.y + 1; y < p.y + p.h - 1; y++)
+      for (let x = p.x + 1; x < p.x + p.w - 1; x++) {
+        const i = y * W + x;
+        if (grid.roomId[i] === id && free(i)) out.push(i);
+      }
+    return out;
+  };
+  const put = (room: Room, type: 'enemy' | 'loot', props: Record<string, string | number | boolean>) => {
+    const cells = cellsOf(room.id).filter((i) => !taken.has(i) && !near(i) && (type !== 'loot' || chestOk(i)));
+    if (!cells.length) return false;
+    const i = cells[rng.int(0, cells.length - 1)];
+    taken.add(i);
+    spawns.push({ id: `${type}_${room.id}_${spawns.length}`, type, x: i % W, y: (i / W) | 0, roomId: room.id, properties: props });
+    return true;
+  };
+  for (const r of rooms) {
+    if (r.isStart || r.type === 'merchant') continue;
+    const t = (dist.get(r.id) ?? 0) / maxD; // 0 near the start … 1 farthest away
+    const level = 1 + Math.round(t * 4);
+    // enemies: per ~40 floor cells at 100 %, twice as many far away
+    if (pop.enemies > 0) {
+      const want = (r.area / 40) * (pop.enemies / 100) * (0.5 + t);
+      let n = Math.floor(want + rng.next());
+      if (r.isBoss) n = Math.max(n, 2);
+      for (let k = 0; k < Math.min(n, 8); k++) put(r, 'enemy', { level, kind: rng.chance(0.25) ? 'ranged' : 'melee', ...(r.isBoss ? { guard: true } : {}) });
+    }
+    // loot: treasure rooms and dead ends, sometimes elsewhere
+    if (pop.loot > 0) {
+      const tier = 1 + Math.round(t * 2);
+      const dead = r.connections.length === 1 && !r.isEnd;
+      const chests = r.type === 'treasure' ? 2 : dead ? (rng.chance(Math.min(1, (pop.loot / 100) * (0.6 + t))) ? 1 : 0) : rng.chance((pop.loot / 100) * 0.18 * (0.5 + t)) ? 1 : 0;
+      for (let k = 0; k < chests; k++) put(r, 'loot', { tier });
+    }
+  }
+  return { spawns };
+}

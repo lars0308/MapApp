@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useEditor } from '../store/editorStore';
 import { useProject } from '../store/projectStore';
 import { joystick, stopPlaytest } from './controller';
+import { queueAttack, usePlayHud } from './combat';
 import { Icon } from '../components/icons';
 
 /** Touch joystick (bottom left). Writes a normalised vector into `joystick`. */
@@ -70,6 +71,51 @@ function JumpButton() {
   );
 }
 
+/** hearts, defeated enemies, opened chests (top-down maps with enemies / chests) */
+function Hud() {
+  const h = usePlayHud();
+  if (!h.enemies && !h.chests) return null;
+  return (
+    <div className="play-hud" aria-live="polite">
+      <span className="play-hearts" aria-label={`${h.hp} von ${h.max} Herzen`}>
+        {Array.from({ length: h.max }, (_, i) => (
+          <span key={i} className={i < h.hp ? 'is-full' : ''}>
+            ♥
+          </span>
+        ))}
+      </span>
+      {h.enemies > 0 && (
+        <span>
+          ⚔ {h.kills}/{h.enemies}
+        </span>
+      )}
+      {h.chests > 0 && (
+        <span>
+          ▣ {h.opened}/{h.chests}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** attack button (phones, top-down maps) */
+function AttackButton() {
+  return (
+    <button
+      type="button"
+      className="jump-btn attack-btn"
+      aria-label="Angreifen"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        queueAttack();
+      }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      Angriff
+    </button>
+  );
+}
+
 export function PlaytestOverlay({ touch }: { touch: boolean }) {
   const on = useEditor((s) => s.playtest);
   const side = useProject((s) => s.project.map.perspective === 'side_view');
@@ -85,8 +131,8 @@ export function PlaytestOverlay({ touch }: { touch: boolean }) {
               ? 'Joystick: laufen, hoch = Leiter · Knopf rechts: springen'
               : 'A/D laufen · W/Leertaste springen (lang = höher) · ↓ durch Plattformen · Esc'
             : touch
-              ? 'Joystick links unten'
-              : 'WASD / Pfeiltasten · Esc beendet'}
+              ? 'Joystick links unten · Knopf rechts: angreifen'
+              : 'WASD / Pfeiltasten · Leertaste / J greift an · Esc beendet'}
         </span>
         <button type="button" className="btn btn-primary playtest-stop" onClick={stopPlaytest}>
           <Icon.Close size={16} />
@@ -95,6 +141,8 @@ export function PlaytestOverlay({ touch }: { touch: boolean }) {
       </div>
       {touch && <Joystick />}
       {touch && side && <JumpButton />}
+      {!side && <Hud />}
+      {touch && !side && <AttackButton />}
     </>
   );
 }

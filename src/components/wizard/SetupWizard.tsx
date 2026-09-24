@@ -505,6 +505,8 @@ function WizardDialog() {
               <Slider label="Große Felsen" value={gen.objects.rocks} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, rocks: v } })} />
               <Slider label="Torbögen" value={gen.objects.arches} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, arches: v } })} />
               <Toggle label="Säulen in großen Hallen" checked={gen.objects.pillars} onChange={(pillars) => setGen({ objects: { ...gen.objects, pillars } })} />
+              <Slider label="Gegner" value={gen.population?.enemies ?? 0} unit="%" onChange={(v) => setGen({ population: { loot: gen.population?.loot ?? 0, enemies: v } })} />
+              <Slider label="Beute (Truhen)" value={gen.population?.loot ?? 0} unit="%" onChange={(v) => setGen({ population: { enemies: gen.population?.enemies ?? 0, loot: v } })} />
             </StepSection>
           )}
 

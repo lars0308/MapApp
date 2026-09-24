@@ -4,6 +4,7 @@ import { mapEvents } from '../store/events';
 import { getRenderer } from '../editor/rendererRef';
 import { computeBlocked } from '../editor/collision';
 import type { CharacterState } from '../renderer/character';
+import { combat, drawChest, drawEnemy, drawSwing, initCombat, queueAttack, stepCombat } from './combat';
 import { buildSideMap, jumpSpeed, liftRow, newBody, stepSide, type SideBody, type SideMap, type SideTuning } from './sidePhysics';
 
 // Editor-only playtest: a neutral character walks over the current map.
@@ -102,6 +103,12 @@ function onKey(e: KeyboardEvent) {
     stopPlaytest();
     return;
   }
+  // top-down: Space / J attack
+  if (!side && e.type === 'keydown' && (k === ' ' || k === 'j') && !e.repeat) {
+    e.preventDefault();
+    queueAttack();
+    return;
+  }
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) {
     e.preventDefault();
     if (e.type === 'keydown') keys.add(k);
@@ -183,6 +190,12 @@ function tick(now: number) {
     char.step += dt * 4;
   }
   char.moving = moving;
+  // enemies, attacks, chests
+  const msg = stepCombat(dt, char, boxFree, () => {
+    const pos = spawnPosition();
+    if (pos && char) (char.x = pos[0]), (char.y = pos[1]);
+  });
+  if (msg) useEditor.getState().toast(msg, msg.startsWith('Besiegt') ? 'error' : 'success');
   const r = getRenderer();
   if (r) {
     r.character = char;
@@ -207,6 +220,8 @@ export function startPlaytest(): boolean {
   char = { x: pos[0], y: pos[1], dir: side ? 'right' : 'down', step: 0, moving: false };
   body = side ? newBody(pos[0], pos[1]) : null;
   showLifts(true);
+  // enemies / chests only on top-down maps (the side-scroller has its own rules)
+  initCombat(side ? [] : (useProject.getState().project.result?.spawnPoints ?? []));
   running = true;
   editor.setPlaytest(true);
   const r = getRenderer();
@@ -214,6 +229,14 @@ export function startPlaytest(): boolean {
     r.cam.zoom = Math.max(r.cam.zoom, 36);
     r.character = char;
     r.follow(char.x, char.y - 0.5, true);
+    // spawn markers are editor hints – in the game the enemies / chests themselves stand there
+    const p = useProject.getState().project;
+    r.setDocument(p.map.width, p.map.height, p.layers.filter((l) => l.role !== 'spawn'), null);
+    r.playItems = (ctx, sx, sy, z) => [
+      ...combat.enemies.filter((e) => e.alive).map((e) => ({ key: e.y, draw: () => drawEnemy(ctx, e, sx, sy, z) })),
+      ...combat.chests.filter((c) => c.open).map((c) => ({ key: c.y + 0.01, draw: () => drawChest(ctx, c, sx, sy, z) })),
+      ...(char ? [{ key: char.y + 0.02, draw: () => char && drawSwing(ctx, char, sx, sy, z) }] : []),
+    ];
   }
   window.addEventListener('keydown', onKey);
   window.addEventListener('keyup', onKey);
@@ -247,8 +270,19 @@ export function stopPlaytest() {
   const r = getRenderer();
   if (r) {
     r.character = null;
+    r.playItems = null;
+    const p = useProject.getState().project;
+    r.setDocument(p.map.width, p.map.height, p.layers, null);
     r.requestRender();
   }
+  combat.enemies = [];
+  combat.chests = [];
   char = null;
   useEditor.getState().setPlaytest(false);
 }
+
+/** move the figure (automated tests) */
+export function teleport(x: number, y: number) {
+  if (char) (char.x = x), (char.y = y);
+}
+export { combat, usePlayHud } from './combat';

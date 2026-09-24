@@ -39,6 +39,8 @@ export function Stats() {
     ['Räume', result.rooms.length],
     ['Verbindungen', result.connections.length],
     ['Sackgassen', result.deadEnds],
+    ['Gegner', count('enemy')],
+    ['Truhen', count('loot')],
     ['Spezial', specials],
     ['Ansicht', PERSPECTIVE_INFO[result.perspective ?? 'top_down'].label.replace(' / Isometric-like', '')],
     ['Seed', result.seed],

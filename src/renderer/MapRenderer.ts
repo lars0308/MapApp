@@ -87,6 +87,8 @@ export class MapRenderer {
   };
   objects: MapObject[] = [];
   character: CharacterState | null = null;
+  /** playtest extras (enemies, chests, attack arc): y-sorted items to draw */
+  playItems: ((ctx: CanvasRenderingContext2D, sx: (x: number) => number, sy: (y: number) => number, zoom: number) => { key: number; draw: () => void }[]) | null = null;
   /** tiles not drawn in place (lifts during the playtest – drawn as movers instead) */
   hiddenGids = new Set<number>();
   movers: { gid: number; x: number; y: number }[] = [];
@@ -410,6 +412,7 @@ export class MapRenderer {
     }
     const ch = this.character;
     if (ch) items.push({ key: ch.y, draw: () => drawCharacter(ctx, ch, sx, sy, z) });
+    if (this.playItems) for (const it of this.playItems(ctx, sx, sy, z)) items.push(it);
     // moving tiles (lifts in the side-scroller playtest)
     for (const mv of this.movers)
       items.push({
