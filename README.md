@@ -335,6 +335,14 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.40 – Einfacher erstellen, zusammenhängende Wege**
+
+- **„Sofort erstellen“ in jedem Schritt des Assistenten:** Spiel und Genre wählen und gleich loslegen. Die übrigen Schritte (Ansicht, Tiles, Karte, Inhalt) sind optional und bleiben danach unter Aufbau änderbar.
+- Die Größe, die das Spiel vorschlägt, erscheint als eigener Knopf („Passend 80 × 80“). Bei der Raumgröße heißt die Vorgabe jetzt „Passend zum Spiel“ statt „Eigene“.
+- **Außen, Dorf, Insel:** Die Erdwege bilden jetzt ein zusammenhängendes Netz. Getrennte Wegstücke werden über die Lichtungen verbunden, und jede Haustür bekommt einen Pfad zum nächsten Weg. Auf den Pfaden liegen keine Objekte und keine Deko.
+- **Keine Bäume mehr in Dungeons und Höhlen.** Der Regler „Bäume in Lichtungen“ erscheint nur noch bei Außen, Dorf und Insel.
+- Geprüft: alle Ansichten und Karten-Arten (Top-Down, Low Top-Down, Schräg 45°, Raute, Hex, Seitenansicht; Räume, Höhle, Außen, Dorf, Insel), dazu Pinsel, Radierer, Rückgängig, Wiederholen und Testspiel – ohne Fehler.
+
 **Version 3.39 – Ebenen: mehrere Karten in einem Projekt**
 
 - **Aufbau → Karte → Ebenen:** „+ Ebene“ legt eine weitere Karte im selben Projekt an, etwa Stockwerk 2, Keller oder Höhle unter dem Dorf. Sie hat dieselben Einstellungen, aber einen eigenen Seed, und wird gleich generiert. Tippen auf eine Ebene öffnet sie. Unter den Ebenen kannst du die offene Ebene umbenennen und löschen.

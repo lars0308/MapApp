@@ -87,7 +87,9 @@ export function placeObjects(
     // big rocks and trees scale with room area
     const area = cells.length;
     const rocks = Math.round((s.objects.rocks / 100) * (area / 45));
-    const trees = Math.round((s.objects.trees / 100) * (area / 35));
+    // trees grow outdoors only – a big tree in a dungeon room looks wrong
+    const outside = s.layout === 'outdoor' || s.layout === 'village' || s.layout === 'island';
+    const trees = outside ? Math.round((s.objects.trees / 100) * (area / 35)) : 0;
     for (let k = 0, made = 0; k < rocks * 6 && made < rocks; k++) {
       const [x, y] = rng.pick(cells);
       if (add('rock', x, y)) made++;

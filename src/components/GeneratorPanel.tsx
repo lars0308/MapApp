@@ -118,6 +118,11 @@ export function MapSection({ manual = false }: { manual?: boolean }) {
                 {z.label}
               </Chip>
             ))}
+            {!SIZES.some((z) => map.width === z.n && map.height === z.n) && (
+              <Chip active onClick={() => undefined}>
+                {map.width} × {map.height}
+              </Chip>
+            )}
           </div>
         </div>
       )}
@@ -336,7 +341,7 @@ export function GeneratorPanel() {
           <summary>Objekte und Boden-Varianten</summary>
           <Slider label="Boden-Varianten" value={g.floorVariation} unit=" %" onChange={(v) => update({ floorVariation: v })} />
           <Slider label="Kleine Hindernisse" value={g.obstacleDensity} unit=" %" onChange={(v) => update({ obstacleDensity: v })} />
-          <Slider label="Bäume" value={g.objects.trees} unit=" %" onChange={(v) => update({ objects: { ...g.objects, trees: v } })} />
+          {(g.layout === 'outdoor' || g.layout === 'village' || g.layout === 'island') && <Slider label="Bäume in Lichtungen" value={g.objects.trees} unit=" %" onChange={(v) => update({ objects: { ...g.objects, trees: v } })} />}
           <Slider label="Große Felsen" value={g.objects.rocks} unit=" %" onChange={(v) => update({ objects: { ...g.objects, rocks: v } })} />
           <Slider label="Torbögen" value={g.objects.arches} unit=" %" onChange={(v) => update({ objects: { ...g.objects, arches: v } })} />
           <Toggle label="Säulen in großen Hallen" checked={g.objects.pillars} onChange={(pillars) => update({ objects: { ...g.objects, pillars } })} />

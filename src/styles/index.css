@@ -2254,6 +2254,27 @@ input[type='range']:active::-webkit-slider-thumb {
 .btn-create {
   flex: 0 1 220px;
 }
+.wizard-foot-space {
+  flex: 0 1 120px;
+}
+.wizard-foot .btn-quick {
+  flex: 0 1 200px;
+  gap: 6px;
+}
+@media (max-width: 480px) {
+  .wizard-foot .btn {
+    min-width: 0;
+    padding-inline: 10px;
+  }
+  .wizard-foot-space {
+    display: none;
+  }
+  .wizard-foot .btn-quick,
+  .wizard-foot .btn-next,
+  .wizard-foot .btn-create {
+    flex: 1 1 0;
+  }
+}
 .btn-create {
   text-transform: uppercase;
   letter-spacing: 0.07em;

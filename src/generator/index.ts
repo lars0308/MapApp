@@ -241,6 +241,8 @@ export function generate(input: GenerateInput): GenerateOutput {
   const houses: MapObject[] = s.layout === 'village' || (outdoor && s.houses) ? placeHouses(octx, forest, placed, specials, W, root.fork(131)) : [];
   // village life: a fenced field next to each house (tiles painted further down)
   const fields = houses.length ? planFields(octx, forest, houses, W, root.fork(191)) : [];
+  // outdoors every house door (and the well) gets a footpath to the nearest path
+  const trail = outdoor ? layTrails(grid, forest, ts.terrain, octx, houses, fields, W, H) : new Uint8Array(0);
   const objects = [...houses, ...placeObjects(octx, placed, (id) => specials.get(id) ?? 'normal', s, rObjects)];
 
   // small obstacles (single tiles) in room interiors
@@ -397,7 +399,7 @@ export function generate(input: GenerateInput): GenerateOutput {
   // Path vertices touch at least two path cells (paths keep their width, ends and bends round off);
   // shore vertices lie between water cells only (the beach stays inside the blocked water cells).
   const waterCell = (i: number) => ts.terrain[i] === T_WATER || (ts.terrain[i] === T_BRIDGE && ts.bridges.get(i)?.under === T_WATER);
-  const pathCell = (i: number) => grid.cells[i] === CELL_CORRIDOR && !waterCell(i) && ts.terrain[i] !== T_BRIDGE;
+  const pathCell = (i: number) => (grid.cells[i] === CELL_CORRIDOR || trail[i] === 1) && !waterCell(i) && ts.terrain[i] !== T_BRIDGE;
   const vertexMask = (x: number, y: number, on: (i: number) => boolean, all: boolean, min = 1) => {
     const vert = (vx: number, vy: number) => {
       let n = 0;
@@ -451,7 +453,7 @@ export function generate(input: GenerateInput): GenerateOutput {
     if (t === T_BRIDGE) {
       const b = ts.bridges.get(i)!;
       if (pathL) pathL[i] = pools.pickRole(rTiles, b.role, [b.orient]);
-    } else if (c === CELL_CORRIDOR && pathL && !cave && !softPaths && t !== T_WATER && t !== T_LAVA && t !== T_ABYSS)
+    } else if ((c === CELL_CORRIDOR || trail[i]) && pathL && !cave && !softPaths && t !== T_WATER && t !== T_LAVA && t !== T_ABYSS)
       // outdoor: dirt paths; dungeons: no dirt; caves: natural floor, no laid paths
       // indoors only paths of the own tilesets (else the corridor keeps the room floor)
       pathL[i] = outdoor ? pools.pickPref(rTiles, ['path'], 'dirt') : pools.pickOwn(rTiles, ['path'], undefined, ['dirt']);
@@ -583,7 +585,7 @@ export function generate(input: GenerateInput): GenerateOutput {
     const p = (s.decoDensity / 100) * 0.14;
     for (let i = 0; i < W * H; i++) {
       const c = grid.cells[i];
-      if ((c !== CELL_ROOM && c !== CELL_CORRIDOR) || doorSet.has(i) || obstacles.has(i) || octx.occupied[i]) continue;
+      if ((c !== CELL_ROOM && c !== CELL_CORRIDOR) || doorSet.has(i) || obstacles.has(i) || octx.occupied[i] || trail[i]) continue;
       if (ts.terrain[i] !== T_NONE && ts.terrain[i] !== T_PLATEAU) continue;
       // outdoor: only deco meant for outside (tag grass), no bones in the meadow
       if (!look.smartDeco) {
@@ -843,6 +845,107 @@ function populate(
     }
   }
   return { spawns };
+}
+
+/**
+ * Outdoor footpaths: from every house door (and the well) the shortest way over open ground to the
+ * nearest path, so the village hangs together. The cells are reserved – no objects on the way.
+ */
+function layTrails(g: Grid, forest: Uint8Array, terrain: Uint8Array, c: ObjectContext, houses: MapObject[], fields: { crops: number[]; fence: number[]; hay: number }[], W: number, H: number): Uint8Array {
+  const trail = new Uint8Array(W * H);
+  // what really stands in the way: house / well footprints, fields, fences, hay (the free ring
+  // around a house counts as occupied for other objects, but a path may cross it)
+  const solid = new Uint8Array(W * H);
+  for (const h of houses) {
+    const def = objectDef(h.type)!;
+    for (let yy = h.y - def.h + 1; yy <= h.y; yy++) for (let xx = h.x; xx < h.x + def.w; xx++) if (xx >= 0 && yy >= 0 && xx < W && yy < H) solid[yy * W + xx] = 1;
+  }
+  for (const f of fields) for (const i of [...f.crops, ...f.fence, ...(f.hay >= 0 ? [f.hay] : [])]) solid[i] = 1;
+  const isPath = (i: number) => g.cells[i] === CELL_CORRIDOR || trail[i] === 1;
+  const open = (i: number) => (g.cells[i] === CELL_ROOM || g.cells[i] === CELL_CORRIDOR) && !forest[i] && (terrain[i] === T_NONE || terrain[i] === T_TRANSITION) && !solid[i];
+  const nb = (i: number) => {
+    const x = i % W;
+    const out: number[] = [];
+    if (i < W * (H - 1)) out.push(i + W);
+    if (x > 0) out.push(i - 1);
+    if (x < W - 1) out.push(i + 1);
+    if (i >= W) out.push(i - W);
+    return out;
+  };
+  for (const h of houses) {
+    const def = objectDef(h.type)!;
+    // start at the open row in front of the door
+    const doorX = h.x + (def.w >> 1);
+    const start = (h.y + 1) * W + doorX;
+    if (h.y + 1 >= H || !open(start)) continue;
+    const prev = new Map<number, number>([[start, -1]]);
+    const queue = [start];
+    let hit = -1;
+    for (let q = 0; q < queue.length && hit < 0 && q < 4000; q++) {
+      const i = queue[q];
+      if (isPath(i)) {
+        hit = i;
+        break;
+      }
+      for (const j of nb(i))
+        if (!prev.has(j) && open(j)) {
+          prev.set(j, i);
+          queue.push(j);
+        }
+    }
+    // no path within reach: the door stays as it is
+    if (hit < 0) continue;
+    for (let k = prev.get(hit)!; k >= 0; k = prev.get(k)!) trail[k] = 1;
+  }
+  // paths end at the edge of a clearing: join separate pieces over the open ground (shortest first)
+  for (let round = 0; round < 40; round++) {
+    const comp = new Int32Array(W * H).fill(-1);
+    const sizes: number[] = [];
+    for (let i = 0; i < W * H; i++) {
+      if (comp[i] >= 0 || !isPath(i)) continue;
+      const id = sizes.length;
+      let n = 0;
+      const stack = [i];
+      comp[i] = id;
+      while (stack.length) {
+        const k = stack.pop()!;
+        n++;
+        for (const j of nb(k)) if (comp[j] < 0 && isPath(j)) (comp[j] = id), stack.push(j);
+      }
+      sizes.push(n);
+    }
+    if (sizes.length < 2) break;
+    // the smallest piece looks for the nearest other piece (at most 30 steps over open ground)
+    const small = sizes.indexOf(Math.min(...sizes));
+    const prev = new Map<number, number>();
+    const queue: number[] = [];
+    for (let i = 0; i < W * H; i++) if (comp[i] === small) (prev.set(i, -1), queue.push(i));
+    const dist = new Map<number, number>(queue.map((i) => [i, 0]));
+    let hit = -1;
+    for (let q = 0; q < queue.length && hit < 0; q++) {
+      const i = queue[q];
+      if ((dist.get(i) ?? 0) > 30) continue;
+      for (const j of nb(i)) {
+        if (prev.has(j)) continue;
+        if (comp[j] >= 0 && comp[j] !== small) {
+          hit = i;
+          break;
+        }
+        if (!open(j)) continue;
+        prev.set(j, i);
+        dist.set(j, (dist.get(i) ?? 0) + 1);
+        queue.push(j);
+      }
+    }
+    if (hit < 0) {
+      // too far: this piece stays alone – mark it so it is not picked again
+      for (let i = 0; i < W * H; i++) if (comp[i] === small && !trail[i] && g.cells[i] !== CELL_CORRIDOR) trail[i] = 0;
+      break;
+    }
+    for (let k = hit; k >= 0 && comp[k] !== small; k = prev.get(k)!) trail[k] = 1;
+  }
+  for (let i = 0; i < W * H; i++) if (trail[i]) c.reserved.add(i);
+  return trail;
 }
 
 /** village houses: along the upper part of each clearing, doors facing the open ground */

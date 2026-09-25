@@ -308,6 +308,12 @@ function WizardDialog() {
                         {z.label} ({z.n} × {z.n})
                       </Chip>
                     ))}
+                    {/* the size the game type suggests, when it is none of the buttons */}
+                    {!MAP_SIZES.some((z) => map.width === z.n && map.height === z.n) && (
+                      <Chip active onClick={() => undefined}>
+                        Passend ({map.width} × {map.height})
+                      </Chip>
+                    )}
                   </div>
                 </div>
               )}
@@ -385,7 +391,7 @@ function WizardDialog() {
                       value={ROOM_SIZES.find((r) => r.v.roomMinW === gen.roomMinW && r.v.roomMaxW === gen.roomMaxW && r.v.roomMinH === gen.roomMinH && r.v.roomMaxH === gen.roomMaxH)?.id ?? 'custom'}
                       options={[
                         ...ROOM_SIZES.map((r) => ({ value: r.id, label: r.label })),
-                        ...(ROOM_SIZES.some((r) => r.v.roomMinW === gen.roomMinW && r.v.roomMaxW === gen.roomMaxW && r.v.roomMinH === gen.roomMinH && r.v.roomMaxH === gen.roomMaxH) ? [] : [{ value: 'custom', label: 'Eigene' }]),
+                        ...(ROOM_SIZES.some((r) => r.v.roomMinW === gen.roomMinW && r.v.roomMaxW === gen.roomMaxW && r.v.roomMinH === gen.roomMinH && r.v.roomMaxH === gen.roomMaxH) ? [] : [{ value: 'custom', label: 'Passend zum Spiel' }]),
                       ]}
                       onChange={(v) => {
                         const r = ROOM_SIZES.find((x) => x.id === v);
@@ -488,7 +494,7 @@ function WizardDialog() {
                 <summary>Objekte und Boden-Varianten</summary>
                 <Slider label="Boden-Varianten" value={gen.floorVariation} unit="%" onChange={(v) => setGen({ floorVariation: v })} />
                 <Slider label="Kleine Hindernisse" value={gen.obstacleDensity} unit="%" onChange={(v) => setGen({ obstacleDensity: v })} />
-                <Slider label="Bäume" value={gen.objects.trees} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, trees: v } })} />
+                {(gen.layout === 'outdoor' || gen.layout === 'village' || gen.layout === 'island') && <Slider label="Bäume in Lichtungen" value={gen.objects.trees} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, trees: v } })} />}
                 <Slider label="Große Felsen" value={gen.objects.rocks} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, rocks: v } })} />
                 <Slider label="Torbögen" value={gen.objects.arches} unit="%" onChange={(v) => setGen({ objects: { ...gen.objects, arches: v } })} />
                 <Toggle label="Säulen in großen Hallen" checked={gen.objects.pillars} onChange={(pillars) => setGen({ objects: { ...gen.objects, pillars } })} />
@@ -507,9 +513,20 @@ function WizardDialog() {
           </p>
         )}
         <footer className="wizard-foot">
-          <Button variant="secondary" disabled={step === 0 || busy} onClick={() => setStep(step - 1)} icon={<Icon.Undo size={16} />}>
-            Zurück
-          </Button>
+          {step > 0 ? (
+            <Button variant="secondary" disabled={busy} onClick={() => setStep(step - 1)} icon={<Icon.Undo size={16} />}>
+              Zurück
+            </Button>
+          ) : (
+            <span className="wizard-foot-space" />
+          )}
+          {/* the other steps are optional: create right away with what is chosen so far */}
+          {!last && (
+            <button type="button" className="btn btn-secondary btn-quick" disabled={busy || !!blocked} title={blocked ?? 'Mit den bisherigen Angaben erstellen – alles bleibt danach änderbar'} onClick={() => void create()}>
+              <Icon.Spark size={16} />
+              <span>{busy ? 'Erstelle …' : 'Sofort erstellen'}</span>
+            </button>
+          )}
           {last ? (
             <button type="button" className="btn btn-primary btn-create" disabled={busy} onClick={() => void create()}>
               <Icon.Spark size={18} />
@@ -597,7 +614,7 @@ function Summary({ draft, library, onName, onFixRooms }: { draft: Draft; library
     ['Vernetzung', `${gen.connectivity} %`],
     ['Gelände', terrainList],
     ['Terrains', draft.terrains.filter((x) => x.active).map((x) => x.name).join(', ')],
-    ['Ausstattung', `Deko ${gen.decoDensity} % · Bäume ${gen.objects.trees} % · Felsen ${gen.objects.rocks} %`],
+    ['Ausstattung', `Deko ${gen.decoDensity} %${gen.layout === 'outdoor' || gen.layout === 'village' || gen.layout === 'island' ? ` · Bäume ${gen.objects.trees} %` : ''} · Felsen ${gen.objects.rocks} %`],
     ['Seed', gen.seed],
   ];
   const sd = resolveSide(gen.side);
