@@ -1,4 +1,4 @@
-import type { GenerationResult, Layer, Project } from '../types';
+import type { GenerationResult, Layer, Level, LevelData, Project } from '../types';
 import { rleDecode, rleEncode } from '../utils/rle';
 import { defaultGenerator } from '../generator/presets';
 import { uid } from '../utils/id';
@@ -21,12 +21,43 @@ interface FileResult extends Omit<GenerationResult, 'cells' | 'wallMask' | 'floo
   heights?: number[];
 }
 
+interface FileLevel extends Omit<Level, 'data'> {
+  data?: Omit<LevelData, 'layers' | 'result'> & { layers: FileLayer[]; result: FileResult | null };
+}
+
 interface ProjectFile {
   format: typeof FORMAT;
   formatVersion: 1;
   app: 'MapForge';
   exportedAt: string;
-  project: Omit<Project, 'layers' | 'result'> & { layers: FileLayer[]; result: FileResult | null };
+  project: Omit<Project, 'layers' | 'result' | 'levels'> & { layers: FileLayer[]; result: FileResult | null; levels?: FileLevel[] };
+}
+
+const encodeLayers = (layers: Layer[]): FileLayer[] => layers.map((l) => ({ ...l, data: rleEncode(l.data) }));
+const encodeResult = (r: GenerationResult | null): FileResult | null =>
+  r
+    ? {
+        ...r,
+        cells: rleEncode(r.cells),
+        wallMask: rleEncode(r.wallMask),
+        floorMask: rleEncode(r.floorMask ?? new Uint8Array(0)),
+        terrain: rleEncode(r.terrain ?? new Uint8Array(0)),
+        heights: rleEncode(r.heights ?? new Uint8Array(0)),
+      }
+    : null;
+const decodeLayers = (layers: FileLayer[], size: number): Layer[] => layers.map((l) => ({ ...l, data: rleDecode(l.data, new Uint32Array(size)) }));
+function decodeResult(r: FileResult | null, fallbackPerspective: GenerationResult['perspective']): GenerationResult | null {
+  if (!r) return null;
+  const n = r.width * r.height;
+  return {
+    ...r,
+    cells: rleDecode(r.cells, new Uint8Array(n)),
+    wallMask: rleDecode(r.wallMask, new Uint8Array(n)),
+    floorMask: rleDecode(r.floorMask ?? [], new Uint8Array(n)),
+    terrain: rleDecode(r.terrain ?? [], new Uint8Array(n)),
+    heights: rleDecode(r.heights ?? [], new Uint8Array(n)),
+    perspective: r.perspective ?? fallbackPerspective ?? 'top_down',
+  };
 }
 
 export function serializeProject(p: Project): string {
@@ -37,17 +68,9 @@ export function serializeProject(p: Project): string {
     exportedAt: new Date().toISOString(),
     project: {
       ...p,
-      layers: p.layers.map((l) => ({ ...l, data: rleEncode(l.data) })),
-      result: p.result
-        ? {
-            ...p.result,
-            cells: rleEncode(p.result.cells),
-            wallMask: rleEncode(p.result.wallMask),
-            floorMask: rleEncode(p.result.floorMask ?? new Uint8Array(0)),
-            terrain: rleEncode(p.result.terrain ?? new Uint8Array(0)),
-            heights: rleEncode(p.result.heights ?? new Uint8Array(0)),
-          }
-        : null,
+      layers: encodeLayers(p.layers),
+      result: encodeResult(p.result),
+      levels: p.levels?.map((l) => (l.data ? { ...l, data: { ...l.data, layers: encodeLayers(l.data.layers), result: encodeResult(l.data.result) } } : { id: l.id, name: l.name })),
     },
   };
   return JSON.stringify(file);
@@ -63,18 +86,11 @@ export function deserializeProject(text: string, keepId = false): Project {
   if (parsed?.format !== FORMAT || !parsed.project) throw new Error('Keine MapForge-Projektdatei');
   const fp = parsed.project;
   const size = fp.map.width * fp.map.height;
-  const layers: Layer[] = fp.layers.map((l) => ({ ...l, data: rleDecode(l.data, new Uint32Array(size)) }));
-  const result: GenerationResult | null = fp.result
-    ? {
-        ...fp.result,
-        cells: rleDecode(fp.result.cells, new Uint8Array(fp.result.width * fp.result.height)),
-        wallMask: rleDecode(fp.result.wallMask, new Uint8Array(fp.result.width * fp.result.height)),
-        floorMask: rleDecode(fp.result.floorMask ?? [], new Uint8Array(fp.result.width * fp.result.height)),
-        terrain: rleDecode(fp.result.terrain ?? [], new Uint8Array(fp.result.width * fp.result.height)),
-        heights: rleDecode(fp.result.heights ?? [], new Uint8Array(fp.result.width * fp.result.height)),
-        perspective: fp.result.perspective ?? fp.map.perspective ?? 'top_down',
-      }
-    : null;
+  const layers = decodeLayers(fp.layers, size);
+  const result = decodeResult(fp.result, fp.map.perspective);
+  const levels: Level[] | undefined = fp.levels?.map((l) =>
+    l.data ? { ...l, data: { ...l.data, layers: decodeLayers(l.data.layers, l.data.map.width * l.data.map.height), result: decodeResult(l.data.result, l.data.map.perspective) } } : { id: l.id, name: l.name },
+  );
   return migrateProject({
     ...fp,
     // imported copies get a fresh id so they never overwrite an existing local project
@@ -82,6 +98,7 @@ export function deserializeProject(text: string, keepId = false): Project {
     generator: { ...defaultGenerator(fp.generator?.seed), ...fp.generator },
     layers,
     result,
+    levels,
     activeLayerId: layers.some((l) => l.id === fp.activeLayerId) ? fp.activeLayerId : layers[0]?.id,
     updatedAt: keepId ? (fp.updatedAt ?? Date.now()) : Date.now(),
   });

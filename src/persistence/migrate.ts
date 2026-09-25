@@ -140,5 +140,11 @@ export function migrateProject(p: Project): Project {
     objects: p.objects ?? [],
     mode: p.mode ?? 'generate',
     profile: p.profile ?? profileFromPerspective(map.perspective),
+    // parked levels (Ebenen) get the same layer / structure updates as the open one
+    levels: p.levels?.map((l) => {
+      if (!l.data) return l;
+      const m = migrateProject({ ...p, ...l.data, levels: undefined });
+      return { ...l, data: { map: m.map, generator: m.generator, layers: m.layers, activeLayerId: m.activeLayerId, result: m.result, objects: m.objects } };
+    }),
   };
 }

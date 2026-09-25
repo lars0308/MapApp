@@ -36,6 +36,7 @@ import { confirmedMetas, suggestMetas } from '../tilesets/TileLabel';
 import { learnFrom } from '../tilesets/learning';
 import { uid } from '../utils/id';
 import { applyRoom, matchWallRows, roomMetas } from '../tilesets/RoomMarker';
+import { levelsOf, openLevelId } from '../store/levels';
 
 // Commands an AI (or any program) can run against the app: the same actions as the
 // buttons, as JSON in / JSON out. Used by the MCP bridge (src/api/bridge.ts) and available
@@ -747,6 +748,27 @@ const H: Record<string, Handler> = {
     useProject.getState().loadProject(p);
     useApp.getState().goTo('map');
     return { data: summary(P()) };
+  },
+
+  // ------------------------------------------------------------------ levels (Ebenen)
+  level_list: () => {
+    const p = P();
+    const open = openLevelId(p);
+    return { data: { open, levels: levelsOf(p).map((l, k) => ({ id: l.id, name: l.name, number: k + 1, open: l.id === open })) } };
+  },
+
+  level_add: async (a) => {
+    const id = useProject.getState().addLevel(a.name ? String(a.name) : undefined);
+    if (a.generate !== false && P().mode === 'generate') await useProject.getState().runGenerate();
+    return { data: { id, name: levelsOf(P()).find((l) => l.id === id)?.name, hint: 'Die neue Ebene ist jetzt offen – set_generator / generate / paint wirken auf sie' } };
+  },
+
+  level_switch: (a) => {
+    const p = P();
+    const want = String(a.level ?? '');
+    const level = levelsOf(p).find((l, k) => l.id === want || l.name === want || String(k + 1) === want) ?? fail(`Ebene "${want}" gibt es nicht – level_list zeigt alle`);
+    useProject.getState().switchLevel(level!.id);
+    return { data: { open: level!.id, name: level!.name } };
   },
 
   // ------------------------------------------------------------------ figures

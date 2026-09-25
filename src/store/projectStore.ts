@@ -4,6 +4,7 @@ import { CELL_VOID } from '../types';
 import type { GeneratorSettings, Layer, LayerRole, MapObject, MapSettings, Project, ProjectMode, TerrainSet, TileMeta, Tileset, CustomObject, GridCut } from '../types';
 import { DEFAULT_MAP, PRESETS, defaultGenerator, defaultTerrainSets } from '../generator/presets';
 import { randomSeed } from '../generator/rng';
+import { captureLevel, clearGidsInLevels, levelsOf, openLevelId } from './levels';
 import { emptyResult } from '../generator';
 import { generateAsync } from '../generator/runner';
 import { createDemoTileset } from '../tilesets/demoTileset';
@@ -108,6 +109,11 @@ interface ProjectState {
   generating: boolean;
 
   loadProject: (p: Project) => void;
+  /** new level (Ebene) with the map settings of the open one; it becomes the open level */
+  addLevel: (name?: string) => string;
+  switchLevel: (id: string) => void;
+  renameLevel: (id: string, name: string) => void;
+  removeLevel: (id: string) => void;
   markSaved: (rev: number) => void;
   setName: (name: string) => void;
 
@@ -249,6 +255,65 @@ export const useProject = create<ProjectState>((set, get) => {
       set({ project, revision: 0, savedRevision: 0, canUndo: false, canRedo: false });
       mapEvents.emit({ type: 'all' });
     },
+    addLevel: (name) => {
+      const p = get().project;
+      const list = levelsOf(p);
+      const cur = openLevelId(p);
+      const id = uid('lvl');
+      const size = p.map.width * p.map.height;
+      const layers = namesFor(createDefaultLayers(size), p.map.perspective);
+      const generator = { ...p.generator, seed: randomSeed() };
+      const side = p.map.perspective === 'side_view';
+      // the open level is parked, the new one opens (same map settings, own seed)
+      const levels = [...list.map((l) => (l.id === cur ? { id: l.id, name: l.name, data: captureLevel(p) } : l)), { id, name: name?.trim() || `Ebene ${list.length + 1}` }];
+      history.clear();
+      stroke = null;
+      touch(
+        {
+          ...p,
+          levels,
+          levelId: id,
+          generator,
+          layers,
+          activeLayerId: (side && layers.find((l) => l.role === 'walls')?.id) || layers[0].id,
+          result: p.mode === 'manual' ? emptyResult(p.map.width, p.map.height, generator.seed, p.map.perspective) : null,
+          objects: [],
+        },
+        { canUndo: false, canRedo: false },
+      );
+      mapEvents.emit({ type: 'all' });
+      return id;
+    },
+    switchLevel: (id) => {
+      const p = get().project;
+      const cur = openLevelId(p);
+      if (id === cur) return;
+      const target = levelsOf(p).find((l) => l.id === id);
+      if (!target?.data) return;
+      const levels = levelsOf(p).map((l) => (l.id === cur ? { id: l.id, name: l.name, data: captureLevel(p) } : l.id === id ? { id: l.id, name: l.name } : l));
+      // undo steps belong to one level
+      history.clear();
+      stroke = null;
+      touch({ ...p, ...target.data, levels, levelId: id }, { canUndo: false, canRedo: false });
+      mapEvents.emit({ type: 'all' });
+    },
+    renameLevel: (id, name) => {
+      const p = get().project;
+      const levels = levelsOf(p).map((l) => (l.id === id ? { ...l, name: name.slice(0, 40) } : l));
+      touch({ ...p, levels, levelId: openLevelId(p) });
+    },
+    removeLevel: (id) => {
+      const list = levelsOf(get().project);
+      if (list.length < 2) return;
+      // the open one goes: open its neighbour first
+      if (id === openLevelId(get().project)) {
+        const k = list.findIndex((l) => l.id === id);
+        get().switchLevel(list[k > 0 ? k - 1 : 1].id);
+      }
+      const p = get().project;
+      const levels = levelsOf(p).filter((l) => l.id !== id);
+      touch({ ...p, levels, levelId: openLevelId(p) });
+    },
     markSaved: (rev) => set({ savedRevision: rev }),
     setName: (name) => touch({ ...get().project, name }),
 
@@ -329,6 +394,7 @@ export const useProject = create<ProjectState>((set, get) => {
       docChange('Tileset entfernen', (p) => ({
         ...p,
         tilesets: p.tilesets.filter((t) => t.id !== id),
+        levels: clearGidsInLevels(p.levels, lo, hi),
         layers: p.layers.map((l) => {
           const data = l.data.slice();
           for (let i = 0; i < data.length; i++) if ((data[i] & 0x0fffffff) >= lo && (data[i] & 0x0fffffff) < hi) data[i] = 0;
@@ -384,6 +450,7 @@ export const useProject = create<ProjectState>((set, get) => {
               }
             : t,
         ),
+        levels: clearGidsInLevels(p.levels, lo, hi),
         layers: p.layers.map((l) => {
           const data = l.data.slice();
           for (let i = 0; i < data.length; i++) if ((data[i] & 0x0fffffff) >= lo && (data[i] & 0x0fffffff) < hi) data[i] = 0;

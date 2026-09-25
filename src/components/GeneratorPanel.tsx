@@ -17,6 +17,7 @@ import { TerrainSets } from './TerrainPanel';
 import { SideFields, resolveSide } from './SideFields';
 import { HexFields, resolveHex } from './HexFields';
 import { AiRefineCard } from './AiRefineCard';
+import { levelsOf, openLevelId } from '../store/levels';
 
 export function SeedField() {
   const seed = useProject((s) => s.project.generator.seed);
@@ -107,6 +108,7 @@ export function MapSection({ manual = false }: { manual?: boolean }) {
   const ownWithoutFront = own.length > 0 && !own.some(hasFront);
   return (
     <Section title="Karte">
+      <LevelsField />
       {!side && (
         <div className="field">
           <label>Größe</label>
@@ -503,6 +505,65 @@ export function GenerateButtons({ compact }: { compact?: boolean }) {
           <span>Gleiche Karte</span>
         </button>
       )}
+    </div>
+  );
+}
+
+/** Ebenen: several maps in one project (floors of a dungeon, a cellar under a house …) */
+function LevelsField() {
+  const project = useProject((s) => s.project);
+  const addLevel = useProject((s) => s.addLevel);
+  const switchLevel = useProject((s) => s.switchLevel);
+  const renameLevel = useProject((s) => s.renameLevel);
+  const removeLevel = useProject((s) => s.removeLevel);
+  const run = useProject((s) => s.runGenerate);
+  const toast = useEditor((s) => s.toast);
+  const levels = levelsOf(project);
+  const open = openLevelId(project);
+  const current = levels.find((l) => l.id === open) ?? levels[0];
+  return (
+    <div className="field">
+      <label>Ebenen</label>
+      <div className="chips">
+        {levels.map((l) => (
+          <Chip
+            key={l.id}
+            active={l.id === open}
+            onClick={() => {
+              if (l.id === open) return;
+              switchLevel(l.id);
+              toast(`${l.name} geöffnet`);
+            }}
+          >
+            {l.name}
+          </Chip>
+        ))}
+        <Chip
+          active={false}
+          onClick={() => {
+            addLevel();
+            // a new level starts as a fresh map with the same settings
+            if (useProject.getState().project.mode === 'generate') void run();
+            toast('Neue Ebene angelegt – gleiche Einstellungen, eigene Karte');
+          }}
+        >
+          <Icon.Plus size={14} /> Ebene
+        </Chip>
+      </div>
+      {levels.length > 1 && (
+        <div className="level-edit">
+          <input className="input" value={current.name} aria-label="Name der Ebene" maxLength={40} onChange={(e) => renameLevel(current.id, e.target.value)} />
+          <IconButton
+            label="Diese Ebene löschen"
+            onClick={() => {
+              if (window.confirm(`Ebene „${current.name}“ mit ihrer Karte löschen?`)) removeLevel(current.id);
+            }}
+          >
+            <Icon.Trash size={16} />
+          </IconButton>
+        </div>
+      )}
+      <p className="hint">Jede Ebene ist eine eigene Karte – z. B. Stockwerke eines Dungeons oder ein Keller. Tilesets und eigene Objekte gelten für alle. Der Godot-Export enthält jede Ebene als eigene Szene.</p>
     </div>
   );
 }

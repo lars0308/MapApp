@@ -857,6 +857,45 @@
       }
     },
     {
+      "name": "level_list",
+      "description": "The levels (Ebenen) of the project – floors of a dungeon, a cellar … Each level is a map of its own; all map commands work on the open level. Tilesets and own objects are shared.",
+      "input": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "level_add",
+      "description": "Add a level with the map settings of the open one and open it (generates it unless generate=false). Use for several floors / areas the user asks for.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "e.g. Keller, Stockwerk 2"
+          },
+          "generate": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "name": "level_switch",
+      "description": "Open another level (id, name or number from level_list).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "level"
+        ]
+      }
+    },
+    {
       "name": "figure_status",
       "description": "The figure in the builder (character, creature or object): name, size (pixels, square), layers (id, slot, part, drawn, own_views), colours and the anatomy – where head, torso, arms, legs (character), body, eyes, ground (creature) or the bounds (object) sit in pixel coordinates of this view, so own drawings line up with the parts and animate correctly.",
       "input": {

@@ -12,6 +12,7 @@ import { createZip, type ZipEntry } from './zip';
 import { GODOT_LOADER_FILENAME, GODOT_LOADER_SCRIPT, GODOT_README } from './godotScript';
 import { TILESET_RESOURCE, buildMapScene, buildTileSetResource } from './godotScene';
 import { buildIsoScene, buildIsoTileSet, isoSheetPng, planIso } from './isoExport';
+import { levelProject, levelsOf } from '../store/levels';
 
 export function exportProjectFile(p: Project) {
   downloadText(serializeProject(p), `${safeFileName(p.name)}${PROJECT_EXTENSION}`);
@@ -35,8 +36,31 @@ export async function exportGodotPackage(p: Project, includeShadows = true) {
 
 /** the Godot package as a zip (map.json, loader, tilesets, player figure, Map.tscn) */
 export async function buildGodotPackage(p: Project, includeShadows = true): Promise<{ blob: Blob; name: string }> {
+  const root = safeFileName(p.name);
+  const levels = levelsOf(p);
+  if (levels.length < 2) return { blob: createZip(await godotEntries(p, root, includeShadows)), name: `${root}-godot.zip` };
+  // Ebenen: every level is a complete Godot folder of its own (scene, map.json, tilesets, loader)
+  const entries: ZipEntry[] = [];
+  const folders: string[] = [];
+  for (const [k, level] of levels.entries()) {
+    const folder = `${root}/${String(k + 1).padStart(2, '0')}-${safeFileName(level.name)}`;
+    folders.push(`- \`${folder.slice(root.length + 1)}/Map.tscn\` – ${level.name}`);
+    const dir = (j: number) => (levels[j] ? `../${String(j + 1).padStart(2, '0')}-${safeFileName(levels[j].name)}/Map.tscn` : null);
+    const info = { index: k + 1, count: levels.length, name: level.name, previous: dir(k - 1), next: dir(k + 1) };
+    entries.push(...(await godotEntries(levelProject(p, level), folder, includeShadows, info)));
+  }
+  entries.push({
+    path: `${root}/EBENEN.md`,
+    data: `# ${p.name} – Ebenen\n\nJede Ebene ist ein eigener Ordner mit eigener Szene (Map.tscn), map.json, Tilesets und Loader:\n\n${folders.join('\n')}\n\nÜbergänge: In jeder map.json steht unter \`level\` die Nummer der Ebene und der Pfad zur vorherigen / nächsten Szene (\`previous\`, \`next\`). Der Raum mit \`end: true\` (Treppe / Ausgang) führt zur nächsten Ebene, der mit \`start: true\` zurück – dort z. B. mit get_tree().change_scene_to_file() wechseln.\n`,
+  });
+  return { blob: createZip(entries), name: `${root}-godot.zip` };
+}
+
+/** all files of one map's Godot folder */
+async function godotEntries(p: Project, folder: string, includeShadows: boolean, level?: Record<string, unknown>): Promise<ZipEntry[]> {
   const data = await buildGodotData(p, { embedImages: false, includeShadows });
-  const folder = safeFileName(p.name);
+  // Ebenen: which level this is and where the neighbours are
+  if (level) (data as unknown as Record<string, unknown>).level = level;
   const entries: ZipEntry[] = [
     { path: `${folder}/map.json`, data: JSON.stringify(data, null, 1) },
     { path: `${folder}/${GODOT_LOADER_FILENAME}`, data: GODOT_LOADER_SCRIPT },
@@ -106,7 +130,7 @@ export async function buildGodotPackage(p: Project, includeShadows = true): Prom
     entries.push({ path: `${folder}/${TILESET_RESOURCE}`, data: buildTileSetResource(data) });
     entries.push({ path: `${folder}/Map.tscn`, data: buildMapScene(data, { player: !!player }) });
   }
-  return { blob: createZip(entries), name: `${folder}-godot.zip` };
+  return entries;
 }
 
 export function exportGodotScript() {

@@ -563,6 +563,31 @@ export interface Project {
   objects: MapObject[];
   /** own objects from the figure builder (see CustomObject) */
   customObjects?: CustomObject[];
+  /**
+   * Ebenen (floors / levels): every level is a map of its own. The open level lives in the fields
+   * above (map, generator, layers, result, objects); the others keep their data here. Tilesets and
+   * own objects belong to the whole project. Undefined = one level.
+   */
+  levels?: Level[];
+  /** id of the open level (its entry in `levels` has no data) */
+  levelId?: string;
+}
+
+/** what makes one level: its own map, settings, layers, structure and objects */
+export interface LevelData {
+  map: MapSettings;
+  generator: GeneratorSettings;
+  layers: Layer[];
+  activeLayerId: string;
+  result: GenerationResult | null;
+  objects: MapObject[];
+}
+
+export interface Level {
+  id: string;
+  name: string;
+  /** undefined for the open level (its data is in the project itself) */
+  data?: LevelData;
 }
 
 export type ToolId = 'brush' | 'eraser' | 'fill' | 'rect' | 'pipette' | 'select' | 'move' | 'stamp' | 'hand';

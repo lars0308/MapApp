@@ -329,12 +329,19 @@ Wichtige Entscheidungen:
 
 ## Sinnvolle nächste Erweiterungen
 
-- Mehrere Höhenebenen
 - Tileset-Optionen für Rand/Abstand und nicht-quadratische Tiles
 
 ---
 
 ## Änderungen
+
+**Version 3.39 – Ebenen: mehrere Karten in einem Projekt**
+
+- **Aufbau → Karte → Ebenen:** „+ Ebene“ legt eine weitere Karte im selben Projekt an, etwa Stockwerk 2, Keller oder Höhle unter dem Dorf. Sie hat dieselben Einstellungen, aber einen eigenen Seed, und wird gleich generiert. Tippen auf eine Ebene öffnet sie. Unter den Ebenen kannst du die offene Ebene umbenennen und löschen.
+- Jede Ebene hat eigene Karte, Layer, Objekte und Generator-Einstellungen. **Tilesets und eigene Objekte gelten für alle Ebenen.** Rückgängig machen gilt jeweils für die offene Ebene.
+- **Speichern, Projektdatei und Sicherung** enthalten alle Ebenen. Beim Entfernen oder Neuzuschneiden eines Tilesets werden dessen Tiles auch aus den anderen Ebenen entfernt.
+- **Godot-Export:** Jede Ebene ist ein eigener Ordner mit eigener Szene (`01-ebene-1/Map.tscn`, `02-keller/Map.tscn` …). In jeder `map.json` steht unter `level` die Nummer der Ebene und der Pfad zur vorherigen und nächsten Szene. `EBENEN.md` erklärt die Übergänge über die Räume mit `start` und `end`.
+- **KI:** neue Befehle `level_list`, `level_add` und `level_switch`. Beschreibst du mehrere Stockwerke, kann die KI sie anlegen.
 
 **Version 3.38 – Kleine Verbesserungen**
 
