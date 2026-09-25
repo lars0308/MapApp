@@ -857,6 +857,14 @@
       }
     },
     {
+      "name": "style_colors",
+      "description": "The look of the project's tiles: most used colours (with share %), the darkest (outline) colour and the tile size. Use it before drawing figures for a map so they match its style.",
+      "input": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
       "name": "level_list",
       "description": "The levels (Ebenen) of the project – floors of a dungeon, a cellar … Each level is a map of its own; all map commands work on the open level. Tilesets and own objects are shared.",
       "input": {
@@ -897,7 +905,7 @@
     },
     {
       "name": "figure_status",
-      "description": "The figure in the builder (character, creature or object): name, size (pixels, square), layers (id, slot, part, drawn, own_views), colours and the anatomy – where head, torso, arms, legs (character), body, eyes, ground (creature) or the bounds (object) sit in pixel coordinates of this view, so own drawings line up with the parts and animate correctly.",
+      "description": "The figure in the builder (character, creature or object): name, size (pixels, square), layers (id, slot, part, drawn, own_views), colours and the anatomy – where head, torso, arms, legs (character), body, eyes, ground (creature) or the bounds (object) sit in pixel coordinates of this view, so own drawings line up with the parts and animate correctly, and its animations (built-in and own).",
       "input": {
         "type": "object",
         "properties": {
@@ -1031,6 +1039,161 @@
         },
         "required": [
           "kind"
+        ]
+      }
+    },
+    {
+      "name": "figure_anim_frames",
+      "description": "One frame of an animation of the figure as text pixels (rows + palette + x/y), plus frame count, fps and frame size. Built-in animations (walk, idle, attack, k_hop … – see figure_status) are computed from the figure's parts; own animations come from figure_anim_new. Frames are bigger than the figure (room for jumps and swings): the figure sits figure_offset pixels in.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "animation": {
+            "type": "string"
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "front",
+              "fside",
+              "side",
+              "bside",
+              "back"
+            ]
+          },
+          "frame": {
+            "type": "integer",
+            "description": "frame index, default 0"
+          }
+        },
+        "required": [
+          "kind",
+          "animation"
+        ]
+      }
+    },
+    {
+      "name": "figure_anim_draw",
+      "description": "Change pixels of one animation frame (same text format as figure_draw; coordinates in the frame). For built-in animations this overrides the computed frame (reset: true goes back to the automatic one); own animations are changed directly. Use it to let capes, tails, hair or wings follow the motion, fix a weapon, add effects (dust, sparks, magic).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "animation": {
+            "type": "string"
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "front",
+              "fside",
+              "side",
+              "bside",
+              "back"
+            ]
+          },
+          "frame": {
+            "type": "integer"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "lines of the picture, one character per pixel ('.' = unchanged)"
+          },
+          "palette": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "character → '#rrggbb' / '#rrggbbaa' / 'none' (erase)"
+          },
+          "x": {
+            "type": "integer"
+          },
+          "y": {
+            "type": "integer"
+          },
+          "mirror": {
+            "type": "boolean"
+          },
+          "clear": {
+            "type": "boolean",
+            "description": "start from an empty frame"
+          },
+          "reset": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "animation",
+          "frame"
+        ]
+      }
+    },
+    {
+      "name": "figure_anim_new",
+      "description": "Create an own animation (e.g. cast a spell, dodge, dance, sleep, open): frames start as copies of an existing animation (from) or of the standing figure; then change them frame by frame with figure_anim_draw. It is exported to Godot with the figure.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "frames": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16
+          },
+          "fps": {
+            "type": "integer"
+          },
+          "loop": {
+            "type": "boolean"
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "front",
+              "fside",
+              "side",
+              "bside",
+              "back"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "description": "animation to start from (id), else the standing figure"
+          }
+        },
+        "required": [
+          "kind",
+          "name"
         ]
       }
     },
@@ -1223,7 +1386,7 @@
           },
           "animation": {
             "type": "string",
-            "description": "animation id, e.g. walk, attack (see figure_parts → animations)"
+            "description": "animation id or own animation (see figure_status → animations)"
           },
           "scale": {
             "type": "integer",

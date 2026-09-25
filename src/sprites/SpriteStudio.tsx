@@ -1,3 +1,4 @@
+import { FigureAiPanel } from './FigureAiPanel';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ExportPanel } from './ExportPanel';
 import { HelpTip } from '../components/HelpTip';
@@ -59,12 +60,13 @@ const TOOLS: { id: SpriteTool; label: string; short: string; key: string; icon: 
   { id: 'hand', label: 'Ansicht verschieben (Leertaste)', key: 'H', short: 'Ansicht', icon: Icon.Hand },
 ];
 
-type Tab = 'parts' | 'layers' | 'colors' | 'palette' | 'gallery' | 'export';
+type Tab = 'parts' | 'layers' | 'colors' | 'palette' | 'ai' | 'gallery' | 'export';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'parts', label: 'Teile' },
   { id: 'layers', label: 'Ebenen' },
   { id: 'colors', label: 'Farben' },
   { id: 'palette', label: 'Palette' },
+  { id: 'ai', label: 'KI' },
   { id: 'gallery', label: 'Galerie' },
   { id: 'export', label: 'Export' },
 ];
@@ -140,6 +142,7 @@ export function SpriteStudio({ kind, desktop }: { kind: SpriteKind; desktop: boo
         {tab === 'layers' && <LayersList kind={kind} onSavePart={(layerId) => setSavePart({ layerId })} />}
         {tab === 'colors' && <ColorsPanel kind={kind} />}
         {tab === 'palette' && <PalettePanel kind={kind} />}
+        {tab === 'ai' && <FigureAiPanel kind={kind} />}
         {tab === 'gallery' && <GalleryPanel kind={kind} />}
         {tab === 'export' && <ExportPanel kind={kind} />}
       </div>

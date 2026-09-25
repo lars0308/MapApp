@@ -68,7 +68,18 @@ Pixel-Art-Regeln:
 - Objekte in 3/4-Draufsicht wie die Karte: Oberseite sichtbar und heller, Vorderseite darunter dunkler, unten eine Standfläche mit weichem Schatten (#00000055).
 - figure_draw: rows alle gleich lang, ein Zeichen pro Pixel, "." = unverändert. Zeichne pro Aufruf eine Ansicht eines Layers; symmetrische Vorderansichten mit mirror (nur die linke Hälfte zeichnen).
 - Referenzbild: Form, Farben und Merkmale übernehmen und in sauberes Pixel-Art im Stil der Figur übersetzen.
-- Für Figuren sind 10–30 Werkzeugaufrufe normal. Qualität geht vor Tempo.`;
+
+STIL – die Figur muss zum Spiel passen:
+- Gehört die Figur zu einer Karte (oder hat das Projekt eigene Tiles), rufe zuerst style_colors auf: nimm deren Farben als Grundlage (Schatten und Lichter aus diesen Tönen ableiten), denselben Umriss-Stil (outline) und dieselbe Pixeldichte wie die Tiles (size = tile_px; nur große Figuren/Bosse 2 × tile_px). Achtung: Die Bauteile sind für 32 px gemacht – bei size 16 zeichne die Figur selbst.
+- Gibt es ein Referenzbild, hat dessen Stil Vorrang (Farben, Umriss, Proportionen, Detailgrad).
+- Mehrere Figuren eines Projekts wirken wie aus einem Guss: gleiche Umrissfarbe, gleiche Lichtrichtung, ähnliche Proportionen.
+
+ANIMATION – Figuren sollen sich gut bewegen:
+- Eingebaute Animationen (figure_status → animations: idle, walk, attack, hurt … bzw. k_idle, k_hop, k_fly …) entstehen automatisch aus den Teilen. Prüfe die wichtigsten (Charakter: idle, walk, attack; Kreatur: k_idle und ihre Fortbewegung) mit figure_render (animation).
+- Gehen eigene Teile nicht richtig mit (Umhang, Haare, Schwanz, Flügel, große Waffe, Hut), lies das Bild mit figure_anim_frames und korrigiere es mit figure_anim_draw – Bild für Bild.
+- Wünscht der Nutzer eine besondere Bewegung (Zauber, Ausweichen, Tanzen, Sterben, Öffnen …), lege sie mit figure_anim_new an (from: ähnlichste vorhandene Animation, sonst die stehende Figur) und zeichne jedes Bild mit figure_anim_draw.
+- Regeln für Animationen: nur Farben der Figur verwenden (Palette aus figure_grid / figure_anim_frames), Umriss und Proportionen gleich lassen, Bewegungen klein und klar (1–2 px pro Bild), zuerst die Schlüsselposen, dann die Zwischenbilder; Füße bleiben am Boden (außer Sprung / Flug); 4–8 Bilder, fps 6–10; Wiederholungen (loop) nahtlos. Zum Schluss mit figure_render (animation) ansehen.
+- Für Figuren sind 10–40 Werkzeugaufrufe normal. Qualität geht vor Tempo.`;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST' });

@@ -335,6 +335,17 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.41 – KI animiert Figuren im Stil deiner Karte**
+
+- **Neuer Reiter „KI“ im Figuren-Baukasten:** Schreib, was die KI an der offenen Figur machen soll, zum Beispiel „Umhang beim Laufen mitschwingen lassen“, „Neue Animation: Feuerzauber“, „An den Stil meiner Karte anpassen“ oder „Details verbessern“. Du siehst live, was sie tut, und kannst im Banner stoppen.
+- **Die KI kann jetzt animieren.**
+  - Sie liest einzelne Bilder einer Animation und zeichnet sie nach (`figure_anim_frames`, `figure_anim_draw`). So schwingen Umhang, Haare, Schwanz oder Flügel mit, und Effekte wie Staub oder Funken kommen dazu. Mit `reset` kehrt ein Bild zur automatischen Version zurück.
+  - Sie legt eigene Animationen an (`figure_anim_new`), etwa Zauber, Ausweichen, Tanz oder Öffnen, ausgehend von einer vorhandenen Animation oder der stehenden Figur. Diese Animationen gehen mit in den Godot-Export.
+  - `figure_status` listet alle Animationen, `figure_render` zeigt auch die eigenen.
+- **Stil der Karte (`style_colors`):** liefert die meistgenutzten Farben, die Umrissfarbe und die Pixelgröße der Tiles. Genutzt werden die eigenen Tilesets, sonst die Tiles, die wirklich auf der Karte liegen. Figuren, die zu einer Karte gehören, übernimmt die KI damit in Farben, Umriss und Pixeldichte. Ein Referenzbild hat Vorrang.
+- **Figuren von der Startseite:** Die KI prüft danach die wichtigsten Animationen (Laufen, Stehen, Angriff bzw. Hüpfen) und bessert Bilder aus, in denen eigene Teile nicht mitgehen. Beschreibst du eine besondere Bewegung, legt sie diese als eigene Animation an.
+- Die Reiterleiste im Figuren-Baukasten lässt sich seitlich wischen, wenn der Platz nicht reicht.
+
 **Version 3.40 – Einfacher erstellen, zusammenhängende Wege**
 
 - **„Sofort erstellen“ in jedem Schritt des Assistenten:** Spiel und Genre wählen und gleich loslegen. Die übrigen Schritte (Ansicht, Tiles, Karte, Inhalt) sind optional und bleiben danach unter Aufbau änderbar.

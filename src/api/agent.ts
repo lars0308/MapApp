@@ -54,6 +54,10 @@ const STEP: Record<string, string> = {
   figure_color: 'Wählt die Farben',
   figure_draw: 'Zeichnet Pixel',
   figure_grid: 'Liest die Pixel',
+  figure_anim_frames: 'Schaut sich ein Animationsbild an',
+  figure_anim_draw: 'Zeichnet ein Animationsbild',
+  figure_anim_new: 'Legt eine neue Animation an',
+  style_colors: 'Liest den Stil der Karte',
   figure_render: 'Prüft die Figur',
   figure_save: 'Speichert die Figur',
   figure_to_map: 'Stellt eine Figur auf die Karte',
@@ -72,7 +76,7 @@ export const stopAgent = () => useAgent.setState({ stop: true, step: 'Wird gesto
 
 const MAX_TURNS = 20;
 /** figures take more careful steps (draw, look, improve) */
-const MAX_TURNS_FIGURES = 32;
+const MAX_TURNS_FIGURES = 40;
 
 /** Einstellungen → KI: "standard" (Claude Sonnet, gründlich) or "sparsam" (Claude Haiku, about half the price) */
 export type AiMode = 'standard' | 'sparsam';

@@ -159,7 +159,14 @@ export async function buildFigure(fig: FigurePlan & { kind: SpriteKind }, wish: 
     fig.brief ? `Beschreibung: ${fig.brief}` : '',
     wish.trim() ? `Wunsch des Nutzers im Original: ${wish.trim()}` : '',
     image ? 'Das Referenzbild oben zeigt, wie sie aussehen soll.' : '',
-    `Beginne mit figure_new (kind "${kind}", name, size ${size}). Nutze Teile, eigene Farben und figure_draw für alle Details; prüfe mit figure_render und verbessere, bis sie wirklich gut aussieht. Zum Schluss figure_save.`,
+    onMap || useProject.getState().project.tilesets.some((t) => t.active && t.source !== 'demo')
+      ? 'Die Figur gehört zu dieser Karte: lies zuerst style_colors und halte dich an Farben, Umriss und Pixelgröße der Tiles.'
+      : '',
+    `Beginne mit figure_new (kind "${kind}", name, size ${size}). Nutze Teile, eigene Farben und figure_draw für alle Details; prüfe mit figure_render und verbessere, bis sie wirklich gut aussieht.`,
+    kind === 'object'
+      ? 'Braucht das Objekt eine Bewegung (Truhe öffnen, Fackel flackern …), prüfe die passende Animation und verbessere sie bei Bedarf.'
+      : 'Prüfe danach die Animationen (Charakter: idle, walk, attack; Kreatur: k_idle und ihre Fortbewegung) und korrigiere Bilder, in denen eigene Teile nicht mitgehen. Beschreibt der Nutzer eine besondere Bewegung, lege sie als eigene Animation an.',
+    'Zum Schluss figure_save.',
     onMap && fig.use === 'player' && kind !== 'object' ? 'Mach sie danach mit figure_use_as_player zur Spielfigur.' : '',
     onMap && fig.use !== 'player' ? 'Stelle sie danach mit figure_to_map und place_object passend auf die Karte (1–3 Mal, an sinnvolle Stellen).' : '',
   ].filter(Boolean).join('\n');

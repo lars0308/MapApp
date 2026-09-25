@@ -22,11 +22,11 @@ import { loadImage } from '../utils/image';
 import { useSprites, DEMO_PARTS, SLOTS, blank, composeView, fitContext, layerPixels, partById, toPng } from '../sprites/store';
 import { S as DESIGN } from '../sprites/painter';
 import { RAMP_PRESETS, CHANNELS, type Channel, type Ramp } from '../sprites/palette';
-import { animsFor, framesOf, frameSize } from '../sprites/animation';
+import { animsFor, frameKey, framesOf, frameSize, renderFrame, type AnimDef } from '../sprites/animation';
 import { buildSpriteGodot } from '../sprites/exportSprite';
 import { setPlayerSprite } from '../playtest/playerSprite';
 import { figureToObject } from '../objects/fromFigure';
-import { VIEWS, VIEWS4, type OtherView, type SpriteDoc, type SpriteKind, type SpriteLayer, type View } from '../sprites/types';
+import { VIEWS, VIEWS4, type CustomAnim, type OtherView, type SpriteDoc, type SpriteKind, type SpriteLayer, type View } from '../sprites/types';
 import type { GeneratorSettings, Layer, ObjectType, Perspective, Project, TileCategory, TileMeta, TileRole, Tileset } from '../types';
 import { SIDE_THEMES, TILE_ROLES } from '../types';
 import { CATEGORIES } from '../tilesets/categories';
@@ -212,6 +212,44 @@ function parseColor(v: unknown, key: string): [number, number, number, number] |
   return [parseInt(m![1], 16), parseInt(m![2], 16), parseInt(m![3], 16), m![4] ? parseInt(m![4], 16) : 255];
 }
 
+/** check rows + palette of a text picture (figure_draw / figure_anim_draw) */
+function textPicture(a: Args, n: number) {
+  const rows = Array.isArray(a.rows) ? a.rows.map(String) : fail('rows: Liste von Zeilen, ein Zeichen pro Pixel');
+  if (rows.length > n) fail(`Höchstens ${n} Zeilen (Bild ist ${n}×${n})`);
+  const pal = new Map<string, [number, number, number, number] | null>();
+  for (const [k, v] of Object.entries((a.palette ?? {}) as Record<string, unknown>)) {
+    if (k.length !== 1 || k === '.' || k === ' ') fail('palette: ein Zeichen pro Farbe, "." und Leerzeichen bedeuten „unverändert“');
+    pal.set(k, parseColor(v, k));
+  }
+  const unknown = new Set<string>();
+  for (const row of rows) for (const ch of row) if (ch !== '.' && ch !== ' ' && !pal.has(ch)) unknown.add(ch);
+  if (unknown.size) fail(`Zeichen ohne Farbe in palette: ${[...unknown].join(' ')}`);
+  return { rows, pal, x0: int(a.x, 'x', 0), y0: int(a.y, 'y', 0), mirror: !!a.mirror };
+}
+
+/** paint a checked text picture into n × n pixels; returns how many pixels were set / fell outside */
+function paintPicture(target: Uint8ClampedArray, n: number, pic: ReturnType<typeof textPicture>) {
+  let painted = 0;
+  let outside = 0;
+  const put = (x: number, y: number, c: [number, number, number, number] | null) => {
+    if (x < 0 || y < 0 || x >= n || y >= n) return void outside++;
+    const i = (y * n + x) * 4;
+    if (c) target.set(c, i);
+    else target.fill(0, i, i + 4);
+    painted++;
+  };
+  pic.rows.forEach((row, ry) =>
+    [...row].forEach((ch, rx) => {
+      if (ch === '.' || ch === ' ') return;
+      const c = pic.pal.get(ch)!;
+      put(pic.x0 + rx, pic.y0 + ry, c);
+      // mirror: the same pixel on the other side of the middle
+      if (pic.mirror) put(n - 1 - (pic.x0 + rx), pic.y0 + ry, c);
+    }),
+  );
+  return { painted, outside };
+}
+
 const GRID_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&*+=?@^~<>';
 
 /** pixels → rows of characters + palette (cropped to what is drawn) */
@@ -267,6 +305,23 @@ function toGrid(data: Uint8ClampedArray, size: number) {
 }
 
 const OTHER_VIEWS: OtherView[] = ['fside', 'side', 'bside', 'back'];
+
+/** a built-in animation (walk, k_hop …) or an own one (id or name) */
+function animOf(doc: SpriteDoc, kind: SpriteKind, want: unknown): { anim: AnimDef | CustomAnim; custom: boolean } {
+  const id = str(want, 'animation');
+  const own = (doc.customAnims ?? []).find((x) => x.id === id || x.name === id);
+  if (own) return { anim: own, custom: true };
+  const built = animsFor(kind).find((x) => x.id === id);
+  if (!built) fail(`Animation "${id}" gibt es nicht – figure_status zeigt alle`);
+  return { anim: built!, custom: false };
+}
+
+function viewOf(v: unknown, kind: SpriteKind): View {
+  const view = (v ?? 'front') as View;
+  if (!VIEWS.some((x) => x.id === view)) fail(`view: ${VIEWS.map((x) => x.id).join(', ')}`);
+  if (kind === 'object' && view !== 'front') fail('Objekte haben nur die Vorderansicht');
+  return view;
+}
 
 /** a part layer about to be drawn on: keep what it looks like in every view (it no longer refits) */
 function materialize(doc: SpriteDoc, layer: SpriteLayer): SpriteLayer {
@@ -750,6 +805,82 @@ const H: Record<string, Handler> = {
     return { data: summary(P()) };
   },
 
+  style_colors: async () => {
+    const p = P();
+    // own tilesets: their whole sheets (the look of the user's game); otherwise the tiles the map
+    // really uses (not every demo set in the project)
+    const own = p.tilesets.filter((t) => t.active && t.source !== 'demo' && tilesetSupports(t, p.map.perspective));
+    const count = new Map<string, number>();
+    let total = 0;
+    const tally = (d: Uint8ClampedArray) => {
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 128) continue;
+        // 5 bits per channel: close shades count together
+        const hex = '#' + [d[i], d[i + 1], d[i + 2]].map((v) => ((v >> 3) << 3).toString(16).padStart(2, '0')).join('');
+        count.set(hex, (count.get(hex) ?? 0) + 1);
+        total++;
+      }
+    };
+    const canvasOf = (w: number, h: number) => {
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, w);
+      c.height = Math.max(1, h);
+      return c.getContext('2d', { willReadFrequently: true })!;
+    };
+    let from: string[] = [];
+    let tilePx = p.map.tileSize;
+    // no own tilesets and an empty map: the active tilesets of this view
+    const mapEmpty = !p.layers.some((l) => l.data.some(Boolean));
+    const sheets = own.length ? own : mapEmpty ? p.tilesets.filter((t) => t.active && tilesetSupports(t, p.map.perspective)).slice(0, 2) : [];
+    if (sheets.length) {
+      for (const t of sheets.slice(0, 4)) {
+        const img = await loadImage(t.dataUrl);
+        const k = Math.min(1, 384 / Math.max(img.naturalWidth, img.naturalHeight));
+        const g = canvasOf(Math.round(img.naturalWidth * k), Math.round(img.naturalHeight * k));
+        g.imageSmoothingEnabled = false;
+        g.drawImage(img, 0, 0, g.canvas.width, g.canvas.height);
+        tally(g.getImageData(0, 0, g.canvas.width, g.canvas.height).data);
+      }
+      from = sheets.map((t) => t.name);
+      tilePx = sheets[0].tileSize;
+    } else {
+      // how often each tile is used on the map
+      const used = new Map<number, number>();
+      for (const l of p.layers) for (const v of l.data) if (v) used.set(v & 0x0fffffff, (used.get(v & 0x0fffffff) ?? 0) + 1);
+      const top = [...used.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60);
+      const imgs = new Map<string, HTMLImageElement>();
+      for (const [gid, times] of top) {
+        const t = p.tilesets.find((x) => gid >= x.firstGid && gid < x.firstGid + x.columns * x.rows);
+        if (!t) continue;
+        if (!imgs.has(t.id)) imgs.set(t.id, await loadImage(t.dataUrl));
+        const i = gid - t.firstGid;
+        const g = canvasOf(t.tileSize, t.tileSize);
+        g.drawImage(imgs.get(t.id)!, (i % t.columns) * t.tileSize, Math.floor(i / t.columns) * t.tileSize, t.tileSize, t.tileSize, 0, 0, t.tileSize, t.tileSize);
+        const d = g.getImageData(0, 0, t.tileSize, t.tileSize).data;
+        // frequent tiles weigh more (at most 8×)
+        for (let r = 0; r < Math.min(8, Math.ceil(Math.log2(times + 1))); r++) tally(d);
+        if (!from.includes(t.name)) from.push(t.name);
+        tilePx = t.tileSize;
+      }
+    }
+    const top = [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 24);
+    const lum = (h: string) => {
+      const v = [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16));
+      return 0.3 * v[0] + 0.59 * v[1] + 0.11 * v[2];
+    };
+    const darkest = top.length ? top.reduce((a, b) => (lum(b[0]) < lum(a[0]) ? b : a))[0] : '#1b1427';
+    return {
+      data: {
+        from,
+        tile_px: tilePx,
+        map_tile_size: p.map.tileSize,
+        colors: top.map(([hex, n]) => ({ hex, share: Math.round((n / Math.max(1, total)) * 1000) / 10 })),
+        outline: darkest,
+        hint: 'Figuren für diese Karte: Farben aus dieser Palette (Schatten/Lichter daraus ableiten), Umriss wie die Tiles, gleiche Pixeldichte wie die Tiles: figure size = tile_px (eine Figur ist etwa 1 Kachel breit), für große Figuren 2 × tile_px.',
+      },
+    };
+  },
+
   // ------------------------------------------------------------------ levels (Ebenen)
   level_list: () => {
     const p = P();
@@ -782,6 +913,10 @@ const H: Record<string, Handler> = {
         layers: doc.layers.map((l) => ({ id: l.id, slot: l.slot, part: l.partId, name: l.name, drawn: l.edited, own_views: Object.keys(l.views ?? {}), visible: l.visible })),
         colors: doc.ramps,
         anatomy: anatomy(doc, (a.view as View) ?? 'front'),
+        animations: [
+          ...animsFor(kind).map((x) => ({ id: x.id, label: x.label, frames: x.poses.length, hint: x.hint })),
+          ...(doc.customAnims ?? []).map((x) => ({ id: x.id, label: x.name, frames: x.frames.length, own: true, view: x.view })),
+        ],
       },
     };
   },
@@ -793,15 +928,7 @@ const H: Record<string, Handler> = {
     const view = (a.view ?? 'front') as View;
     if (!VIEWS.some((v) => v.id === view)) fail(`view: ${VIEWS.map((v) => v.id).join(', ')}`);
     if (kind === 'object' && view !== 'front') fail('Objekte haben nur die Vorderansicht');
-    const rows = Array.isArray(a.rows) ? a.rows.map(String) : fail('rows: Liste von Zeilen, ein Zeichen pro Pixel');
-    if (rows.length > n) fail(`Höchstens ${n} Zeilen (Figur ist ${n}×${n})`);
-    const pal = new Map<string, [number, number, number, number] | null>();
-    for (const [k, v] of Object.entries((a.palette ?? {}) as Record<string, unknown>)) {
-      if (k.length !== 1 || k === '.' || k === ' ') fail('palette: ein Zeichen pro Farbe, "." und Leerzeichen bedeuten „unverändert“');
-      pal.set(k, parseColor(v, k));
-    }
-    const x0 = int(a.x, 'x', 0);
-    const y0 = int(a.y, 'y', 0);
+    const pic = textPicture(a, n);
 
     const layers = doc.layers.slice();
     let at = a.layer ? layers.findIndex((l) => l.id === a.layer || l.name === a.layer) : -1;
@@ -825,27 +952,7 @@ const H: Record<string, Handler> = {
       layer = { ...layer, views };
     }
     const target = new Uint8ClampedArray(a.clear ? blank(n) : view === 'front' ? layer.data : layerPixels(doc, layer, view));
-    let painted = 0;
-    let outside = 0;
-    const put = (x: number, y: number, c: [number, number, number, number] | null) => {
-      if (x < 0 || y < 0 || x >= n || y >= n) return void outside++;
-      const i = (y * n + x) * 4;
-      if (c) target.set(c, i);
-      else target.fill(0, i, i + 4);
-      painted++;
-    };
-    const unknown = new Set<string>();
-    rows.forEach((row, ry) => {
-      [...row].forEach((ch, rx) => {
-        if (ch === '.' || ch === ' ') return;
-        if (!pal.has(ch)) return void unknown.add(ch);
-        const c = pal.get(ch)!;
-        put(x0 + rx, y0 + ry, c);
-        // mirror: the same pixel on the other side of the figure's middle
-        if (a.mirror) put(n - 1 - (x0 + rx), y0 + ry, c);
-      });
-    });
-    if (unknown.size) fail(`Zeichen ohne Farbe in palette: ${[...unknown].join(' ')}`);
+    const { painted, outside } = paintPicture(target, n, pic);
     layers[at] = view === 'front' ? { ...layer, data: target } : { ...layer, views: { ...layer.views, [view]: target } };
     useSprites.getState().setDocument(kind, { ...doc, layers, updatedAt: Date.now() });
     return { data: { layer: layers[at].id, name: layers[at].name, slot: layers[at].slot, view, painted, ...(outside ? { outside } : {}) } };
@@ -863,6 +970,81 @@ const H: Record<string, Handler> = {
     } else data = composeView(doc, view);
     return { data: { size: doc.size, view, ...toGrid(data, doc.size), hint: '"." = leer; x/y = linke obere Ecke der Zeilen – passt direkt zu figure_draw' } };
   },
+  figure_anim_frames: async (a) => {
+    const kind = kindOf(a.kind);
+    const doc = await figureReady(kind);
+    const { anim, custom } = animOf(doc, kind, a.animation);
+    const view = custom ? (anim as CustomAnim).view : viewOf(a.view, kind);
+    const frames = framesOf(doc, anim, view);
+    const k = int(a.frame, 'frame', 0);
+    if (k < 0 || k >= frames.length) fail(`frame 0–${frames.length - 1}`);
+    const n = frameSize(doc.size);
+    return {
+      data: {
+        animation: anim.id,
+        own: custom,
+        view,
+        frames: frames.length,
+        fps: anim.fps,
+        loop: anim.loop,
+        frame_size: n,
+        figure_offset: Math.floor((n - doc.size) / 2),
+        frame: k,
+        ...toGrid(frames[k], n),
+        edited: custom || !!doc.frames?.[frameKey(view, anim.id, k)],
+        hint: 'Koordinaten im Bild (frame_size × frame_size); die Figur steht um figure_offset versetzt darin. Mit figure_anim_draw ändern.',
+      },
+    };
+  },
+
+  figure_anim_draw: async (a) => {
+    const kind = kindOf(a.kind);
+    const doc = await figureReady(kind);
+    const { anim, custom } = animOf(doc, kind, a.animation);
+    const view = custom ? (anim as CustomAnim).view : viewOf(a.view, kind);
+    const frames = framesOf(doc, anim, view);
+    const k = int(a.frame, 'frame', 0);
+    if (k < 0 || k >= frames.length) fail(`frame 0–${frames.length - 1}`);
+    const n = frameSize(doc.size);
+    const st = useSprites.getState();
+    // back to the automatic frame (built-in animations only)
+    if (a.reset && !custom) {
+      st.setFrame(kind, frameKey(view, anim.id, k), null);
+      return { data: { animation: anim.id, frame: k, reset: true } };
+    }
+    const pic = textPicture(a, n);
+    const target = new Uint8ClampedArray(a.clear ? new Uint8ClampedArray(n * n * 4) : frames[k]);
+    const { painted, outside } = paintPicture(target, n, pic);
+    if (custom) {
+      const all = (anim as CustomAnim).frames.slice();
+      all[k] = target;
+      st.updateCustomAnim(kind, anim.id, { frames: all });
+    } else st.setFrame(kind, frameKey(view, anim.id, k), target);
+    return { data: { animation: anim.id, view, frame: k, painted, ...(outside ? { outside } : {}) } };
+  },
+
+  figure_anim_new: async (a) => {
+    const kind = kindOf(a.kind);
+    const doc = await figureReady(kind);
+    const view = viewOf(a.view, kind);
+    const count = Math.max(1, Math.min(16, int(a.frames, 'frames', 4)));
+    const n = frameSize(doc.size);
+    let frames: Uint8ClampedArray[];
+    if (a.from) {
+      // start from an existing animation (its frames for this view, repeated or cut to the count)
+      const src = framesOf(doc, animOf(doc, kind, a.from).anim, view);
+      frames = Array.from({ length: count }, (_, i) => new Uint8ClampedArray(src[i % src.length]));
+    } else {
+      // every frame starts as the figure standing still (the pose without motion)
+      const still = renderFrame(doc, {}, view);
+      frames = Array.from({ length: count }, () => new Uint8ClampedArray(still));
+    }
+    const name = String(a.name ?? 'KI-Animation').slice(0, 40);
+    const id = uid('anim');
+    useSprites.getState().addCustomAnim(kind, { id, name, fps: Math.max(1, Math.min(30, int(a.fps, 'fps', 8))), loop: a.loop !== false, view, frames });
+    return { data: { animation: id, name, view, frames: count, frame_size: n, figure_offset: Math.floor((n - doc.size) / 2), hint: 'Jetzt Bild für Bild mit figure_anim_draw anpassen, mit figure_render (animation) prüfen.' } };
+  },
+
 
   figure_parts: (a) => {
     const kind = kindOf(a.kind);
@@ -929,10 +1111,10 @@ const H: Record<string, Handler> = {
     const scale = int(a.scale, 'scale', 6);
     const view = (a.view as View | 'all') ?? (a.animation ? 'front' : 'all');
     if (a.animation) {
-      const anim = animsFor(kind).find((x) => x.id === a.animation) ?? fail(`Animation "${a.animation}" gibt es nicht`);
-      const v = view === 'all' ? 'front' : view;
+      const { anim, custom } = animOf(doc, kind, a.animation);
+      const v = custom ? (anim as CustomAnim).view : view === 'all' ? 'front' : view;
       const frames = framesOf(doc, anim, v);
-      return { text: `${anim.label} (${v}), ${frames.length} Bilder`, binary: { kind: 'image', mime: 'image/png', name: `${anim.id}.png`, base64: dataUrlBase64(strip(frames, frameSize(doc.size), Math.max(1, Math.round(scale / 2)))) } };
+      return { text: `${"label" in anim ? anim.label : anim.name} (${v}), ${frames.length} Bilder`, binary: { kind: 'image', mime: 'image/png', name: `${anim.id}.png`, base64: dataUrlBase64(strip(frames, frameSize(doc.size), Math.max(1, Math.round(scale / 2)))) } };
     }
     const views: View[] = view === 'all' ? (kind === 'object' ? ['front'] : VIEWS.map((v) => v.id)) : [view];
     const url = views.length === 1 ? toPng(composeView(doc, views[0]), doc.size, scale) : strip(views.map((v) => composeView(doc, v)), doc.size, scale);

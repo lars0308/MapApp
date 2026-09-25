@@ -4106,9 +4106,17 @@ body.is-resizing-y * {
   gap: 2px;
   padding: 8px 8px 0;
   border-bottom: 1px solid var(--line);
+  /* seven tabs: scroll sideways instead of cutting the last one off */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sprite-tabs::-webkit-scrollbar {
+  display: none;
 }
 .sprite-tabs button {
-  flex: 1;
+  flex: 1 0 auto;
+  padding: 0 8px;
+  white-space: nowrap;
   height: 36px;
   border: 0;
   border-bottom: 2px solid transparent;
@@ -6331,4 +6339,13 @@ details.more[open] {
 .level-edit .input {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* figure builder → KI */
+.figure-ai {
+  display: grid;
+  gap: 10px;
+}
+.figure-ai .hint {
+  margin: 0;
 }
