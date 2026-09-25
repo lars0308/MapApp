@@ -5764,9 +5764,15 @@ body.is-resizing-y * {
   font-size: 12.5px;
   color: var(--text-2);
 }
-.room-complete {
+.btn.room-complete {
   margin-top: 8px;
   width: 100%;
+  height: auto;
+  min-height: 40px;
+  padding-block: 8px;
+  white-space: normal;
+  line-height: 1.3;
+  text-align: center;
 }
 .room-drag {
   position: fixed;
