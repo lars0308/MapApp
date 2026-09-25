@@ -100,6 +100,11 @@ export function MapSection({ manual = false }: { manual?: boolean }) {
   const offered = deriveConfig(profile).perspectives;
   const perspectives: Perspective[] = offered.includes(map.perspective) ? offered : [map.perspective, ...offered];
   const side = map.perspective === 'side_view';
+  // own tilesets are active but none has wall face tiles: the rows under the edge fall back to demo tiles
+  const tilesets = useProject((s) => s.project.tilesets);
+  const own = tilesets.filter((t) => t.active && t.source !== 'demo');
+  const hasFront = (t: (typeof tilesets)[number]) => Object.values(t.tiles).some((m) => m.role === 'wall_front' || m.category === 'wallFront') || (t.variants ?? []).some((v) => v.role === 'wall_front');
+  const ownWithoutFront = own.length > 0 && !own.some(hasFront);
   return (
     <Section title="Karte">
       {!side && (
@@ -139,6 +144,7 @@ export function MapSection({ manual = false }: { manual?: boolean }) {
             onChange={(v) => setMapOptions({ wallRows: Number(v) })}
           />
           <p className="hint">Wie viele Reihen Wand-Vorderseite unter der oberen Kante stehen. Dein Tileset braucht dafür „Front“-Tiles (Raum bauen → Wand-Vorderseite). Wirkt beim nächsten Generieren.</p>
+          {faceRowsOf(map) > 0 && ownWithoutFront && <p className="hint is-warn">Dein Tileset hat noch keine Front-Tiles – die Mauer darunter kommt deshalb aus den Demo-Tiles. Lege sie unter Tiles → Tilesets → Raum bauen mit „Wand-Vorderseite: 1 Reihe“ fest.</p>}
         </div>
       )}
       {!side && map.perspective !== 'hex' && map.perspective !== 'isometric' && <Toggle label="Schatten" description="Wände werfen Schatten" checked={map.shadows} onChange={(shadows) => setMapOptions({ shadows })} />}

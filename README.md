@@ -336,6 +336,12 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.38 – Kleine Verbesserungen**
+
+- **Hinweis bei fehlenden Front-Tiles:** Stellst du unter Aufbau → Karte → Wände „+ 1 Reihe“ oder „+ 2 Reihen“ ein und dein eigenes Tileset hat noch keine Front-Tiles, sagt die App dir, wo du sie festlegst. Sonst käme die Mauer darunter aus den Demo-Tiles.
+- **„Einzeln setzen“ gilt überall:** auch für die KI-Befehle `paint` und `fill`. Ist der Knopf an, ändert sich wirklich nur das gesetzte Tile. Die Ränder passen sich nur noch mit Auto-Wänden an.
+- **Handy:** Im Raum-Baukasten bricht der lange Knopftext um, statt über den Rand zu laufen.
+
 **Version 3.37 – KI-Plan zuverlässiger**
 
 - **„KI-Plan fehlgeschlagen: Die KI hat keinen Bauplan geliefert“ behoben.** Die KI gibt den Plan jetzt über ein Werkzeug ab (`submit_plan`). Er kommt damit immer als gültige Daten an: kein kaputtes JSON mehr und kein Text drumherum.
