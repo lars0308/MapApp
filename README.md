@@ -336,6 +336,12 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.37 – KI-Plan zuverlässiger**
+
+- **„KI-Plan fehlgeschlagen: Die KI hat keinen Bauplan geliefert“ behoben.** Die KI gibt den Plan jetzt über ein Werkzeug ab (`submit_plan`). Er kommt damit immer als gültige Daten an: kein kaputtes JSON mehr und kein Text drumherum.
+- Antwortet die KI trotzdem nur mit Text oder einer Rückfrage (etwa bei „sag wenn etwas nicht klappt“), fragt die App automatisch noch einmal nach dem Plan.
+- Mehr Platz für die Antwort und mehr Zeit für den Server, damit lange Beschreibungen mit Referenzbild und eigenem Tileset nicht abgeschnitten werden.
+
 **Version 3.36 – Einzeln setzen**
 
 - **Neuer Knopf „Einzeln setzen“ (Fadenkreuz) in der Werkzeugleiste**, am Desktop links unter den Werkzeugen, am Handy ganz rechts. Ist er an, kommt das gewählte Tile genau dorthin, wo du tippst oder malst. Wände, Ecken, Boden-Ränder und weiche Übergänge drumherum werden nicht angepasst. Beim Einschalten wird der Stift gewählt.

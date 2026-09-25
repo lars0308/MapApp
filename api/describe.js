@@ -12,16 +12,16 @@ function system(context) {
 Der Nutzer beschreibt sein Spiel oder seine Karte – oder eine Figur (Charakter, Kreatur/Monster, Objekt) –, manchmal mit Referenzbild und/oder eigenem Tileset.
 
 Entscheide zuerst, was er erstellen will:
-- Nur eine Figur (z. B. „Ritter mit rotem Umhang“, „Schleim-Monster mit Krone“, „goldene Schatztruhe“, ein Referenzbild einer Figur): antworte NUR mit
+- Nur eine Figur (z. B. „Ritter mit rotem Umhang“, „Schleim-Monster mit Krone“, „goldene Schatztruhe“, ein Referenzbild einer Figur): submit_plan mit
 {
   "create": "figure",
   "summary": "1 deutscher Satz (du-Form), was du baust",
   "figures": [ { "kind": "character" | "creature" | "object", "name": "kurzer deutscher Name", "brief": "ausführliche Beschreibung für den Pixel-Artist: Form, Proportionen, Kleidung/Material, Farben (gern Hex), Besonderheiten, Stimmung, was vom Referenzbild übernommen wird", "size": 32 | 48 | 64 } ]
 }
   character = Menschen und menschenähnliche Figuren (Held, Händler, Ork, Skelett-Krieger mit Waffe …), creature = Tiere und Monster (Schleim, Fledermaus, Spinne, Drache …), object = Dinge (Truhe, Fass, Laterne, Baum, Statue …). Größe meist 32 (die Bauteile sind für 32 px gemacht); 48 oder 64 nur für wirklich große Bosse oder Objekte. Höchstens 3 Figuren.
-- Sonst eine Karte bzw. ein Spiel: antworte NUR mit dem Kartenplan unten. Beschreibt der Nutzer darin auch eigene Figuren (Spielfigur, Gegner, Händler), trage sie in "figures" ein (gleiche Form wie oben, dazu "use": "player" für die Spielfigur, sonst "map"), höchstens 2.
+- Sonst eine Karte bzw. ein Spiel: submit_plan mit dem Kartenplan unten. Beschreibt der Nutzer darin auch eigene Figuren (Spielfigur, Gegner, Händler), trage sie in "figures" ein (gleiche Form wie oben, dazu "use": "player" für die Spielfigur, sonst "map"), höchstens 2.
 
-Du antwortest NUR mit einem JSON-Objekt (kein Text davor oder danach). Kartenplan:
+Gib den Plan IMMER über das Werkzeug submit_plan ab (genau ein Aufruf, kein Text dazu, keine Rückfragen). Kartenplan (Felder von submit_plan):
 {
   "create": "map",
   "name": "kurzer deutscher Projektname",
@@ -64,11 +64,48 @@ Regeln:
 - Karten fürs Handy spielbar halten: meist 48–96 Kacheln pro Seite.`;
 }
 
-function extractJson(text) {
+// the plan comes as tool input: always valid JSON, no prose around it
+const PLAN_TOOL = {
+  name: 'submit_plan',
+  description: 'Den fertigen Bauplan abgeben (Karte oder Figuren). Felder wie im Systemprompt beschrieben.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      create: { type: 'string', enum: ['map', 'figure'] },
+      name: { type: 'string' },
+      summary: { type: 'string' },
+      view: { type: 'string' },
+      genre: { type: 'string' },
+      perspective: { type: 'string' },
+      width: { type: 'integer' },
+      height: { type: 'integer' },
+      generator: { type: 'object' },
+      tips: { type: 'array', items: { type: 'string' } },
+      figures: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { kind: { type: 'string', enum: ['character', 'creature', 'object'] }, name: { type: 'string' }, brief: { type: 'string' }, size: { type: 'integer' }, use: { type: 'string' } },
+        },
+      },
+    },
+    required: ['create', 'summary'],
+  },
+};
+
+/** plan from the reply: the submit_plan call, else JSON somewhere in the text (older habit) */
+function planOf(out) {
+  const call = (out?.content ?? []).find((c) => c.type === 'tool_use' && c.name === 'submit_plan');
+  if (call?.input && typeof call.input === 'object') return call.input;
+  const text = (out?.content ?? []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
-  if (start < 0 || end <= start) throw new Error('Die KI hat keinen Bauplan geliefert');
-  return JSON.parse(text.slice(start, end + 1));
+  if (start < 0 || end <= start) return null;
+  try {
+    return JSON.parse(text.slice(start, end + 1));
+  } catch {
+    return null;
+  }
 }
 
 function imageBlock(dataUrl) {
@@ -105,18 +142,31 @@ export default async function handler(req, res) {
   content.push({ type: 'text', text: `Beschreibung des Nutzers:\n${text || '(keine – richte dich nach dem Bild)'}` });
 
   try {
-    const r = await fetch(GATEWAY, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODELS[body.mode === 'sparsam' ? 'sparsam' : 'standard'], max_tokens: 2500, system: system(body.context), messages: [{ role: 'user', content }] }),
-    });
-    const out = await r.json().catch(() => null);
-    if (!r.ok) {
-      console.error('[mapforge-describe]', r.status, JSON.stringify(out)?.slice(0, 500));
-      return res.status(200).json({ ok: false, error: `KI nicht erreichbar (${r.status})` });
+    const ask = async (messages) => {
+      const r = await fetch(GATEWAY, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: MODELS[body.mode === 'sparsam' ? 'sparsam' : 'standard'], max_tokens: 8000, system: system(body.context), tools: [PLAN_TOOL], messages }),
+      });
+      const out = await r.json().catch(() => null);
+      if (!r.ok) {
+        console.error('[mapforge-describe]', r.status, JSON.stringify(out)?.slice(0, 500));
+        throw new Error(`KI nicht erreichbar (${r.status})`);
+      }
+      return out;
+    };
+    const messages = [{ role: 'user', content }];
+    let out = await ask(messages);
+    let plan = planOf(out);
+    // no plan (only words or a question, or cut off): once more, asking for the tool call only
+    if (!plan) {
+      console.warn('[mapforge-describe] kein Plan, stop_reason', out?.stop_reason, JSON.stringify(out?.content ?? []).slice(0, 400));
+      const said = (out?.content ?? []).filter((c) => c.type === 'text' && c.text.trim());
+      if (said.length && out?.stop_reason !== 'tool_use') messages.push({ role: 'assistant', content: said }, { role: 'user', content: [{ type: 'text', text: 'Bitte gib den Plan jetzt nur über submit_plan ab – ohne Rückfragen, triff sinnvolle Annahmen.' }] });
+      out = await ask(messages);
+      plan = planOf(out);
     }
-    const reply = (out?.content ?? []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
-    const plan = extractJson(reply);
+    if (!plan) throw new Error('Die KI hat keinen Bauplan geliefert – bitte noch einmal versuchen');
     return res.status(200).json({ ok: true, plan });
   } catch (e) {
     console.error('[mapforge-describe]', e);
