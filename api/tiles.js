@@ -90,7 +90,20 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: false, error: `KI nicht erreichbar (${r.status})` });
     }
     const call = (out?.content ?? []).find((c) => c.type === 'tool_use');
-    const tiles = (call?.input?.tiles ?? []).filter((t) => KINDS.includes(t.kind) && Number.isInteger(t.c) && Number.isInteger(t.r));
+    let raw = call?.input?.tiles;
+    // answered in text instead of the tool: take the JSON from the text
+    if (!Array.isArray(raw)) {
+      const text = (out?.content ?? []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
+      const a = text.indexOf('[');
+      const b = text.lastIndexOf(']');
+      try {
+        raw = a >= 0 && b > a ? JSON.parse(text.slice(a, b + 1)) : [];
+      } catch {
+        raw = [];
+      }
+      if (!raw.length) console.warn('[mapforge-tiles] keine Zuordnung', out?.stop_reason, text.slice(0, 300));
+    }
+    const tiles = (raw ?? []).filter((t) => t && KINDS.includes(t.kind) && Number.isInteger(t.c) && Number.isInteger(t.r));
     const u = out?.usage ?? {};
     const cost = ((u.input_tokens ?? 0) * model.input + (u.output_tokens ?? 0) * model.output) / 1e6;
     return res.status(200).json({ ok: true, tiles, cost });
