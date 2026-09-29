@@ -5997,7 +5997,7 @@ details.more[open] {
 }
 .start-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 .start-tile {
@@ -6050,6 +6050,9 @@ details.more[open] {
 }
 .start-tile.tone-gold {
   --tone: #f0c46b;
+}
+.start-tile.tone-teal {
+  --tone: #6fd6c8;
 }
 .start-recent li {
   border-radius: 12px;
@@ -6501,4 +6504,54 @@ details.more[open] {
 .room-status.is-complete {
   background: rgba(111, 200, 140, 0.1);
   border: 1px solid rgba(111, 200, 140, 0.35);
+}
+
+/* Kleines Motiv */
+.motif-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.motif-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.motif-card:hover,
+.motif-card:focus-visible {
+  border-color: var(--accent);
+}
+.motif-card small {
+  color: var(--text-3);
+  line-height: 1.35;
+}
+.motif-icon {
+  font-size: 26px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.motif-size {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.motif-dialog {
+  width: min(720px, 100%);
+}
+.motif-more {
+  margin-bottom: 12px;
+}
+.motif-more .motif-grid {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
 }

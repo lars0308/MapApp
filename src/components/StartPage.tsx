@@ -1,3 +1,4 @@
+import { MotifDialog } from './MotifPicker';
 import { useEffect, useRef, useState } from 'react';
 import { withBusy } from '../store/busy';
 import { useProject } from '../store/projectStore';
@@ -84,9 +85,11 @@ export function StartPage() {
 
   const recent = (list ?? []).filter((p) => !(placeholder && p.id === id)).slice(0, 8);
   const startFigure = useApp((s) => s.startFigure);
+  const [motifs, setMotifs] = useState(false);
 
   const cards: { key: string; title: string; text: string; icon: React.ReactNode; tone: string; onClick: () => void }[] = [
     { key: 'map', title: 'Neue Karte', text: 'Dungeon, Höhle, Dorf, Level oder Weltkarte', icon: <Icon.Map size={30} />, tone: 'pink', onClick: () => useEditor.getState().openWizard() },
+    { key: 'motif', title: 'Kleines Motiv', text: 'Nur ein Haus, eine Lichtung, ein Strand …', icon: <Icon.Grid size={30} />, tone: 'teal', onClick: () => setMotifs(true) },
     { key: 'character', title: 'Charakter erstellen', text: 'Held, NPC, Spielfigur', icon: <Icon.Person size={30} />, tone: 'blue', onClick: () => startFigure('character') },
     { key: 'creature', title: 'Gegner erstellen', text: 'Monster, Kreaturen, Tiere', icon: <Icon.Ghost size={30} />, tone: 'green', onClick: () => startFigure('creature') },
     { key: 'object', title: 'Objekt erstellen', text: 'Truhe, Fackel, Tür …', icon: <Icon.Box size={30} />, tone: 'gold', onClick: () => startFigure('object') },
@@ -119,6 +122,7 @@ export function StartPage() {
           </button>
         )}
 
+        {motifs && <MotifDialog onClose={() => setMotifs(false)} />}
         <section aria-label="Neu erstellen">
           <h2 className="start-h2">Neu erstellen</h2>
           <div className="start-grid">

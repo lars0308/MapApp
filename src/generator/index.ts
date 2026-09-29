@@ -1033,7 +1033,8 @@ function placeHouses(c: ObjectContext, forest: Uint8Array, rooms: { id: number; 
     const type = specials.get(r.id) ?? 'normal';
     if (type === 'start') {
       for (const [dx, dy] of [[2, 0], [-2, 0], [0, 2], [2, 2]]) if (add('well', r.cx + dx, r.cy + dy)) break;
-      continue;
+      // the only clearing (motif "Haus mit Garten"): houses here too
+      if (rooms.length > 1) continue;
     }
     const want = Math.max(1, Math.min(4, Math.round(r.area / 70)));
     // every spot in the clearing that fits, the back half first (the square in front stays open)

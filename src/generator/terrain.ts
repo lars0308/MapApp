@@ -163,6 +163,22 @@ function bridgeAcross(ctx: Ctx, blob: number[]): boolean {
   return false;
 }
 
+/**
+ * rounder pools: fill notches (free cells with 3+ neighbours in the blob) and drop thin spurs
+ * (cells with at most 1 neighbour) – a thin, jagged pool looks square once shores are drawn
+ */
+function smoothBlob(W: number, blob: number[], free: (i: number) => boolean): number[] {
+  let set = new Set(blob);
+  const nb = (i: number) => [i - 1, i + 1, i - W, i + W].filter((j) => set.has(j)).length;
+  for (let pass = 0; pass < 2; pass++) {
+    const next = new Set(set);
+    for (const i of set) for (const j of [i - 1, i + 1, i - W, i + W]) if (!set.has(j) && nb(j) >= 3 && free(j)) next.add(j);
+    set = next;
+    for (const i of [...set]) if (nb(i) <= 1 && set.size > 4) set.delete(i);
+  }
+  return [...set];
+}
+
 function placePool(ctx: Ctx, room: PlacedRoom, type: number, size: number, allowBridges: boolean, island: boolean): 'ok' | 'nospace' | 'blocked' {
   const { g, t, rng } = ctx;
   const cands: number[] = [];
@@ -186,7 +202,7 @@ function placePool(ctx: Ctx, room: PlacedRoom, type: number, size: number, allow
         if (d >= R - (R === 3 ? 1 : 0) && d <= R) blob.push((cy + oy) * g.W + cx + ox);
       }
   } else {
-    blob = growBlob(ctx, seed, size, (j) => freeInterior(ctx, j, 1));
+    blob = smoothBlob(g.W, growBlob(ctx, seed, size, (j) => freeInterior(ctx, j, 1)), (j) => freeInterior(ctx, j, 1));
   }
   if (blob.length < 3) return 'nospace';
   const backup = blob.map((i) => [g.cells[i], t.terrain[i]]);
@@ -438,14 +454,18 @@ export function placeTerrain(
   if (s.lava.enabled) pools.push({ type: T_LAVA, amount: s.lava.amount, min: 3, max: 5 + Math.round(s.lava.amount / 8), island: false });
   let failed = 0;
   for (const pool of pools) {
-    const count = Math.round((pool.amount / 100) * rooms.length * 0.6);
-    const cands = rng.shuffle(rooms.filter((r) => r.id !== startRoom));
+    // a one-room map (motif: pond) may have its pool in that room
+    const single = rooms.length === 1;
+    const count = Math.max(single && pool.amount > 0 ? 1 : 0, Math.round((pool.amount / 100) * rooms.length * 0.6));
+    const cands = rng.shuffle(single ? rooms.slice() : rooms.filter((r) => r.id !== startRoom));
     let made = 0;
     for (const r of cands) {
       if (made >= count) break;
       const island = pool.island && rng.chance(0.35);
       const bridges = pool.type === T_ABYSS ? s.abyss.bridges : s.bridges;
-      const res = placePool(ctx, r, pool.type, rng.int(pool.min, Math.max(pool.min, pool.max)), bridges, island);
+      // the only room (motif "Teich"): the pool grows with the room instead of staying a puddle
+      const size = single ? Math.max(pool.min, Math.round((r.w * r.h * pool.amount) / 220)) : rng.int(pool.min, Math.max(pool.min, pool.max));
+      const res = placePool(ctx, r, pool.type, size, bridges, island);
       if (res === 'ok') made++;
       else if (res === 'blocked') failed++;
     }

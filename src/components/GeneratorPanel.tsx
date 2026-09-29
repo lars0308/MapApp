@@ -1,3 +1,4 @@
+import { MotifGrid, applyMotif } from './MotifPicker';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { PRESETS } from '../generator/presets';
@@ -109,6 +110,11 @@ export function MapSection({ manual = false }: { manual?: boolean }) {
   return (
     <Section title="Karte">
       <LevelsField />
+      <details className="more motif-more">
+        <summary>Nur ein kleines Motiv (Haus, Lichtung, Strand …)</summary>
+        <p className="hint">Baut statt einer ganzen Karte nur ein Stück – auf dieser Ebene, mit deinen Tiles. Die jetzige Karte wird ersetzt (Rückgängig möglich).</p>
+        <MotifGrid onPick={(m) => void applyMotif(m)} />
+      </details>
       {!side && (
         <div className="field">
           <label>Größe</label>
