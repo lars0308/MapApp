@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { withBusy } from '../store/busy';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { isPlaceholder, useApp } from '../store/appStore';
@@ -33,7 +34,7 @@ export function MapChooser() {
   const open = async (pid: string) => {
     if (pid !== id) {
       await saveNow();
-      const p = await loadProject(pid);
+      const p = await withBusy('Karte wird geöffnet …', () => loadProject(pid));
       if (!p) return toast('Karte nicht gefunden', 'error');
       useProject.getState().loadProject(p);
     }

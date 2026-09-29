@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { withBusy } from '../store/busy';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { Button, Section, Segmented, SelectField, Toggle } from '../components/ui';
@@ -24,7 +25,7 @@ export function ExportPanel() {
   const run = async (key: string, fn: () => Promise<void> | void, done: string) => {
     setBusy(key);
     try {
-      await fn();
+      await withBusy(key === 'godot' ? 'Godot-Paket wird gepackt …' : key === 'png' ? 'Bild wird gerendert …' : 'Export läuft …', fn);
       toast(done, 'success');
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Export fehlgeschlagen', 'error');

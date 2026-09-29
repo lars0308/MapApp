@@ -74,11 +74,8 @@ STIL – die Figur muss zum Spiel passen:
 - Gibt es ein Referenzbild, hat dessen Stil Vorrang (Farben, Umriss, Proportionen, Detailgrad).
 - Mehrere Figuren eines Projekts wirken wie aus einem Guss: gleiche Umrissfarbe, gleiche Lichtrichtung, ähnliche Proportionen.
 
-ANIMATION – Figuren sollen sich gut bewegen:
-- Eingebaute Animationen (figure_status → animations: idle, walk, attack, hurt … bzw. k_idle, k_hop, k_fly …) entstehen automatisch aus den Teilen. Prüfe die wichtigsten (Charakter: idle, walk, attack; Kreatur: k_idle und ihre Fortbewegung) mit figure_render (animation).
-- Gehen eigene Teile nicht richtig mit (Umhang, Haare, Schwanz, Flügel, große Waffe, Hut), lies das Bild mit figure_anim_frames und korrigiere es mit figure_anim_draw – Bild für Bild.
-- Wünscht der Nutzer eine besondere Bewegung (Zauber, Ausweichen, Tanzen, Sterben, Öffnen …), lege sie mit figure_anim_new an (from: ähnlichste vorhandene Animation, sonst die stehende Figur) und zeichne jedes Bild mit figure_anim_draw.
-- Regeln für Animationen: nur Farben der Figur verwenden (Palette aus figure_grid / figure_anim_frames), Umriss und Proportionen gleich lassen, Bewegungen klein und klar (1–2 px pro Bild), zuerst die Schlüsselposen, dann die Zwischenbilder; Füße bleiben am Boden (außer Sprung / Flug); 4–8 Bilder, fps 6–10; Wiederholungen (loop) nahtlos. Zum Schluss mit figure_render (animation) ansehen.
+ANIMATION – nur, wenn der Nutzer ausdrücklich danach fragt (die eingebauten Animationen entstehen automatisch aus den Teilen):
+- Dann: figure_anim_frames lesen, mit figure_anim_draw Bild für Bild ändern, neue Bewegungen mit figure_anim_new; nur Farben der Figur, kleine Bewegungen (1–2 px), mit figure_render (animation) prüfen.
 - Für Figuren sind 10–40 Werkzeugaufrufe normal. Qualität geht vor Tempo.`;
 
 export default async function handler(req, res) {

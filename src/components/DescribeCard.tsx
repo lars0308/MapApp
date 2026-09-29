@@ -7,6 +7,7 @@ import { saveNow } from '../persistence/autosave';
 import { readFileAsDataUrl } from '../utils/download';
 import { askPlan, buildFigure, buildFromPlan, planFigures, setReference } from '../api/describe';
 import { formatCost, runAgent } from '../api/agent';
+import { busyStep, withBusy } from '../store/busy';
 
 const EXAMPLES = [
   'Kleine Insel mit Dorf und Hafen, viel Wald im Süden, für ein gemütliches RPG',
@@ -48,7 +49,11 @@ export function DescribeCard() {
       setBusy('Die KI plant …');
       await saveNow();
       // 1. quick plan: a map (view, size, generator settings → project + first map) or only figures
-      const plan = await askPlan({ text, image: image ?? undefined, tileset: tileset?.dataUrl });
+      const plan = await withBusy(
+        image || tileset ? 'Die KI liest deine Beschreibung und schaut sich deine Bilder an …' : 'Die KI liest deine Beschreibung …',
+        () => askPlan({ text, image: image ?? undefined, tileset: tileset?.dataUrl }),
+        { ai: true, detail: 'Sie entscheidet, was gebaut wird: Karte oder Figur, Ansicht, Größe, Aufbau' },
+      );
       const figures = planFigures(plan);
       if (plan.create === 'figure' && figures.length) {
         const wish = text;
@@ -68,7 +73,7 @@ export function DescribeCard() {
         toast(`${words || plan.summary || 'Figur fertig'} (KI-Kosten ${formatCost(cost)})`, 'success');
         return;
       }
-      const done = await buildFromPlan(plan, tileset ?? undefined, setBusy);
+      const done = await withBusy('Dein Projekt wird angelegt …', () => buildFromPlan(plan, tileset ?? undefined, (t) => (setBusy(t), busyStep(t))));
       // the project keeps description + picture: later AI requests see them again
       await setReference({ text, image });
       const ownTiles = tileset && done.tilesetId ? { name: tileset.name, id: done.tilesetId } : null;

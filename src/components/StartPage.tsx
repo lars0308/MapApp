@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { withBusy } from '../store/busy';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
 import { isPlaceholder, useApp } from '../store/appStore';
@@ -46,7 +47,7 @@ export function StartPage() {
   const open = async (pid: string) => {
     if (pid !== id) {
       await saveNow();
-      const p = await loadProject(pid);
+      const p = await withBusy('Projekt wird geöffnet …', () => loadProject(pid));
       if (!p) {
         toast('Projekt nicht gefunden', 'error');
         return;
@@ -61,7 +62,7 @@ export function StartPage() {
     if (!file) return;
     try {
       if (!placeholder) await saveNow();
-      const p = deserializeProject(await readFileAsText(file));
+      const p = await withBusy('Datei wird geöffnet …', async () => deserializeProject(await readFileAsText(file)));
       useProject.getState().loadProject(p);
       await saveNow();
       toast(`„${p.name}“ geöffnet`, 'success');

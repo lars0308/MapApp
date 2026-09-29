@@ -1,21 +1,17 @@
 import { useAgent, stopAgent } from '../api/agent';
-import { Icon } from './icons';
+import { Loader } from './BusyOverlay';
 
-/** while the AI builds: what it is doing right now, and a stop button */
+/** what the AI is doing right now – big, so it is clear whether it reads, thinks or builds */
 export function AgentBanner() {
-  const { running, step, steps } = useAgent();
+  const { running, step, steps, phase } = useAgent();
   if (!running) return null;
   return (
-    <div className="agent-banner" role="status" aria-live="polite">
-      <span className="agent-banner-icon" aria-hidden="true">
-        <Icon.Spark size={16} />
-      </span>
+    <div className={`agent-banner is-${phase}`} role="status" aria-live="polite">
+      <Loader ai />
       <span className="agent-banner-text">
-        <strong>KI baut</strong>
-        <small>
-          {step}
-          {steps > 0 ? ` · Schritt ${steps}` : ''}
-        </small>
+        <span className="agent-banner-phase">{phase === 'read' ? 'KI liest & versteht' : phase === 'think' ? 'KI denkt nach' : 'KI baut'}</span>
+        <strong>{step}</strong>
+        {steps > 0 && <small>Schritt {steps}</small>}
       </span>
       <button type="button" className="btn btn-secondary agent-banner-stop" onClick={stopAgent}>
         Stopp

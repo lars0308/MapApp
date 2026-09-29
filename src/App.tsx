@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { BusyOverlay } from './components/BusyOverlay';
 import { DesktopLayout } from './components/DesktopLayout';
 import { MobileLayout } from './mobile/MobileLayout';
 import { AgentBanner } from './components/AgentBanner';
@@ -95,6 +96,7 @@ export function App() {
       </ErrorBoundary>
       <Toasts />
       <AgentBanner />
+      <BusyOverlay />
     </div>
   );
 }

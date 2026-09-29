@@ -101,7 +101,7 @@ export async function buildFromPlan(plan: BuildPlan, tileset?: { name: string; d
   const allowed: string[] = deriveConfig({ view, genre: 'other', effort: 'medium' }).perspectives;
   const genre = GENRES.find((g) => g.id === plan.genre && g.views.includes(view))?.id;
   let tilesetId: string | undefined;
-  onStep?.('Projekt anlegen …');
+  onStep?.('Projekt wird angelegt …');
   const made = await runCommand('new_map', {
     view,
     genre,
@@ -112,14 +112,14 @@ export async function buildFromPlan(plan: BuildPlan, tileset?: { name: string; d
   });
   if (!made.ok) throw new Error(made.error);
   if (tileset) {
-    onStep?.('Tileset einlesen …');
+    onStep?.('Dein Tileset wird eingelesen …');
     const added = await runCommand('tileset_add', { name: tileset.name, image_base64: tileset.dataUrl });
     if (!added.ok) throw new Error(added.error);
     tilesetId = (added.data as { id?: string } | undefined)?.id;
     // own tiles first: the demo sets only fill in roles the new tileset lacks
     for (const t of useProject.getState().project.tilesets) if (t.source === 'demo' && t.active) await runCommand('tileset_update', { tileset: t.id, active: false });
   }
-  onStep?.('Karte bauen …');
+  onStep?.('Die Karte wird gebaut …');
   const patch = { ...(plan.generator ?? {}) };
   delete patch.seed;
   const built = await runCommand('set_generator', { patch, regenerate: true });
@@ -163,9 +163,6 @@ export async function buildFigure(fig: FigurePlan & { kind: SpriteKind }, wish: 
       ? 'Die Figur gehört zu dieser Karte: lies zuerst style_colors und halte dich an Farben, Umriss und Pixelgröße der Tiles.'
       : '',
     `Beginne mit figure_new (kind "${kind}", name, size ${size}). Nutze Teile, eigene Farben und figure_draw für alle Details; prüfe mit figure_render und verbessere, bis sie wirklich gut aussieht.`,
-    kind === 'object'
-      ? 'Braucht das Objekt eine Bewegung (Truhe öffnen, Fackel flackern …), prüfe die passende Animation und verbessere sie bei Bedarf.'
-      : 'Prüfe danach die Animationen (Charakter: idle, walk, attack; Kreatur: k_idle und ihre Fortbewegung) und korrigiere Bilder, in denen eigene Teile nicht mitgehen. Beschreibt der Nutzer eine besondere Bewegung, lege sie als eigene Animation an.',
     'Zum Schluss figure_save.',
     onMap && fig.use === 'player' && kind !== 'object' ? 'Mach sie danach mit figure_use_as_player zur Spielfigur.' : '',
     onMap && fig.use !== 'player' ? 'Stelle sie danach mit figure_to_map und place_object passend auf die Karte (1–3 Mal, an sinnvolle Stellen).' : '',

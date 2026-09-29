@@ -25,7 +25,7 @@ const STEP: Record<string, string> = {
   set_generator: 'Ändert die Einstellungen',
   list_tiles: 'Sucht passende Tiles',
   tileset_list: 'Schaut sich die Tilesets an',
-  tileset_render: 'Schaut sich dein Tileset an',
+  tileset_render: 'Schaut sich dein Tileset genau an',
   tileset_assign: 'Ordnet Tiles zu',
   tileset_auto_assign: 'Ordnet Tiles automatisch zu',
   tileset_update: 'Stellt ein Tileset ein',
@@ -70,8 +70,13 @@ interface AgentState {
   step: string;
   steps: number;
   stop: boolean;
+  /** read = the AI looks at / understands something, think = waits for the model, build = changes things */
+  phase: 'read' | 'think' | 'build';
 }
-export const useAgent = create<AgentState>(() => ({ running: false, step: '', steps: 0, stop: false }));
+export const useAgent = create<AgentState>(() => ({ running: false, step: '', steps: 0, stop: false, phase: 'think' }));
+
+/** commands that only look (the banner says "KI liest & versteht") */
+const READS = new Set(['status', 'get_generator', 'list_tiles', 'tileset_list', 'tileset_render', 'list_layers', 'get_map', 'list_objects', 'render', 'figure_status', 'figure_parts', 'figure_render', 'figure_grid', 'figure_anim_frames', 'style_colors', 'level_list']);
 export const stopAgent = () => useAgent.setState({ stop: true, step: 'Wird gestoppt …' });
 
 const MAX_TURNS = 20;
@@ -134,7 +139,7 @@ async function step(messages: Message[], focus?: 'figures'): Promise<{ content: 
  */
 export async function runAgent(task: string, images: { label: string; dataUrl: string }[] = [], opts: { focus?: 'figures' } = {}): Promise<{ text: string; cost: number; stopped: boolean }> {
   if (useAgent.getState().running) throw new Error('Die KI baut gerade schon');
-  useAgent.setState({ running: true, step: 'Die KI überlegt …', steps: 0, stop: false });
+  useAgent.setState({ running: true, step: 'Die KI liest deine Aufgabe …', steps: 0, stop: false, phase: 'think' });
   const first: Block[] = [];
   for (const im of images) first.push({ type: 'text', text: `${im.label}:` }, await imageBlock(im.dataUrl, 768));
   first.push({ type: 'text', text: task });
@@ -144,6 +149,7 @@ export async function runAgent(task: string, images: { label: string; dataUrl: s
   try {
     for (let turn = 0; turn < (opts.focus === 'figures' ? MAX_TURNS_FIGURES : MAX_TURNS); turn++) {
       if (useAgent.getState().stop) break;
+      useAgent.setState({ phase: 'think', step: turn === 0 ? 'Die KI liest deine Aufgabe …' : 'Die KI denkt über den nächsten Schritt nach …' });
       const { content, stop_reason, cost: c } = await step(messages, opts.focus);
       cost += c;
       messages.push({ role: 'assistant', content });
@@ -156,7 +162,7 @@ export async function runAgent(task: string, images: { label: string; dataUrl: s
           results.push({ type: 'tool_result', tool_use_id: call.id, content: 'Vom Nutzer gestoppt', is_error: true });
           continue;
         }
-        useAgent.setState((s) => ({ step: stepLabel(call.name), steps: s.steps + 1 }));
+        useAgent.setState((s) => ({ step: stepLabel(call.name), steps: s.steps + 1, phase: READS.has(call.name) ? 'read' : 'build' }));
         const res = await runCommand(call.name, call.input ?? {});
         const parts: Block[] = [];
         if (!res.ok) parts.push({ type: 'text', text: res.error });
@@ -175,6 +181,6 @@ export async function runAgent(task: string, images: { label: string; dataUrl: s
     await saveNow();
     return { text: summary, cost, stopped: useAgent.getState().stop };
   } finally {
-    useAgent.setState({ running: false, step: '', stop: false });
+    useAgent.setState({ running: false, step: '', stop: false, phase: 'think' });
   }
 }

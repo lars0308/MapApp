@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { withBusy } from './busy';
 import { profileFromPerspective, type GameProfile } from '../profiles';
 import { CELL_VOID } from '../types';
 import type { GeneratorSettings, Layer, LayerRole, MapObject, MapSettings, Project, ProjectMode, TerrainSet, TileMeta, Tileset, CustomObject, GridCut } from '../types';
@@ -364,7 +365,8 @@ export const useProject = create<ProjectState>((set, get) => {
       set({ generating: true });
       try {
         const p = get().project;
-        const out = await generateAsync({ settings: p.generator, map: p.map, tilesets: p.tilesets, layers: p.layers, terrains: p.terrains });
+        const side = p.map.perspective === 'side_view';
+        const out = await withBusy(p.map.perspective === 'hex' ? 'Welt wird erschaffen …' : side ? 'Level wird gebaut …' : 'Karte wird generiert …', () => generateAsync({ settings: p.generator, map: p.map, tilesets: p.tilesets, layers: p.layers, terrains: p.terrains }), { detail: `${p.map.width} × ${p.map.height} Kacheln` });
         docChange('Generieren', (p) => ({
           ...p,
           layers: p.layers.map((l) => (out.layerData[l.id] ? { ...l, data: out.layerData[l.id] } : l)),
@@ -426,7 +428,7 @@ export const useProject = create<ProjectState>((set, get) => {
         const img = await loadImage(source);
         size = { imageWidth: img.naturalWidth, imageHeight: img.naturalHeight };
       }
-      const { columns, rows, empty } = await findEmptyTiles(dataUrl, tileSize);
+      const { columns, rows, empty } = await withBusy('Tileset wird neu zugeschnitten …', () => findEmptyTiles(dataUrl, tileSize), { detail: `${tileSize} px pro Kachel` });
       const lo = ts.firstGid;
       const hi = ts.firstGid + ts.columns * ts.rows;
       const plain = !needsRepack(cut);

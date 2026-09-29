@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { withBusy } from '../store/busy';
 import { Button } from '../components/ui';
 import { Icon } from '../components/icons';
 import { useEditor } from '../store/editorStore';
@@ -28,7 +29,7 @@ export function BackupSection() {
     if (!f) return;
     setBusy(true);
     try {
-      const i = await restoreBackup(await readFileAsText(f));
+      const i = await withBusy('Sicherung wird wiederhergestellt …', async () => restoreBackup(await readFileAsText(f)));
       toast(`Wiederhergestellt: ${i.projects} Karten, ${i.tilesets} Tilesets, ${i.figures} Figuren – lädt neu …`, 'success');
       setTimeout(() => location.reload(), 1200);
     } catch (e) {

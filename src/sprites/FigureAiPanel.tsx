@@ -7,9 +7,9 @@ import { useProject } from '../store/projectStore';
 import { formatCost, runAgent, useAgent } from '../api/agent';
 
 const EXAMPLES: Record<SpriteKind, string[]> = {
-  character: ['Umhang und Haare beim Laufen mitschwingen lassen', 'Neue Animation: Feuerzauber wirken', 'An den Stil meiner Karte anpassen', 'Details und Schattierung verbessern'],
-  creature: ['Hüpf-Animation lebendiger machen', 'Neue Animation: Angriff mit Biss', 'An den Stil meiner Karte anpassen', 'Details und Schattierung verbessern'],
-  object: ['Neue Animation: Truhe öffnet sich', 'Flackerndes Leuchten dazu', 'An den Stil meiner Karte anpassen', 'Details und Schattierung verbessern'],
+  character: ['An den Stil meiner Karte anpassen', 'Details und Schattierung verbessern', 'Roten Umhang und Krone dazu', 'Als Ork-Krieger umgestalten'],
+  creature: ['An den Stil meiner Karte anpassen', 'Details und Schattierung verbessern', 'Gefährlicher aussehen lassen', 'Als Eis-Variante umfärben'],
+  object: ['An den Stil meiner Karte anpassen', 'Details und Schattierung verbessern', 'Goldbeschläge dazu', 'Älter und verwittert aussehen lassen'],
 };
 
 /** Figure builder → "KI": the AI works on the open figure (draw, animate, restyle) – live, stoppable */
@@ -24,7 +24,7 @@ export function FigureAiPanel({ kind }: { kind: SpriteKind }) {
       `Arbeite an der Figur, die gerade im Baukasten offen ist (kind "${kind}"). Wunsch des Nutzers: ${wish.trim()}`,
       'Ändere diese Figur (kein figure_new, außer der Nutzer will eine neue). Lies zuerst figure_status und figure_render.',
       /stil|karte|passend/i.test(wish) ? 'Für den Stil: style_colors lesen und Farben, Umriss und Pixelgröße übernehmen.' : '',
-      'Prüfe das Ergebnis mit figure_render (bei Animationen mit animation). Zum Schluss figure_save.',
+      'Prüfe das Ergebnis mit figure_render. Zum Schluss figure_save.',
     ].filter(Boolean).join('\n');
     try {
       const r = await runAgent(task, ref?.image ? [{ label: 'Referenzbild des Projekts', dataUrl: ref.image }] : [], { focus: 'figures' });
@@ -36,7 +36,7 @@ export function FigureAiPanel({ kind }: { kind: SpriteKind }) {
   };
   return (
     <div className="figure-ai">
-      <p className="hint">Die KI arbeitet an der offenen Figur: zeichnen, Animationen verbessern oder neue anlegen, an den Stil deiner Karte anpassen. Du siehst jeden Schritt live und kannst im Banner stoppen.</p>
+      <p className="hint">Die KI arbeitet an der offenen Figur: Details zeichnen, umgestalten, an den Stil deiner Karte anpassen. Du siehst jeden Schritt live und kannst im Banner stoppen.</p>
       <textarea className="input" rows={3} maxLength={1500} value={wish} disabled={running} placeholder={EXAMPLES[kind][0]} onChange={(e) => setWish(e.target.value)} aria-label="Was soll die KI an der Figur machen?" />
       {!wish && (
         <div className="chips">
