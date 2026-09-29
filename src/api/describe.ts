@@ -1,3 +1,4 @@
+import { SIDE_WORDS, setGameView, sideGame } from './gameView';
 import { runCommand } from './commands';
 import { aiMode, runAgent } from './agent';
 import { defaultGenerator, defaultHex, defaultSide } from '../generator/presets';
@@ -157,6 +158,9 @@ export async function buildFigure(fig: FigurePlan & { kind: SpriteKind }, wish: 
   if (!isUntouched(useSprites.getState()[kind].doc)) useSprites.getState().saveToGallery(kind);
   useApp.getState().goTo(kind);
   const size = [16, 32, 48, 64].includes(Number(fig.size)) ? Number(fig.size) : 32;
+  // side-scroller: the map is one, the user said so (then remembered for later figures) or chose it in the builder
+  if (SIDE_WORDS.test(`${wish} ${fig.brief ?? ''}`)) setGameView('side');
+  const side = sideGame() && kind !== 'object';
   const task = [
     `Baue diese Figur (${KIND_LABEL[kind]}, kind "${kind}") in bestmöglicher Pixel-Art-Qualität: „${fig.name ?? KIND_LABEL[kind]}“.`,
     fig.brief ? `Beschreibung: ${fig.brief}` : '',
@@ -166,6 +170,13 @@ export async function buildFigure(fig: FigurePlan & { kind: SpriteKind }, wish: 
       ? 'Die Figur gehört zu dieser Karte: lies zuerst style_colors und halte dich an Farben, Umriss und Pixelgröße der Tiles.'
       : '',
     styleHint(),
+    side
+      ? 'Das Spiel ist ein 2D-Side-Scroller: die Seitenansicht (side) ist die wichtigste – zeichne sie besonders sorgfältig. Prüfe danach die Plattformer-Animationen in view side (idle, run, jump, fall, attack; Kreatur: k_idle, Fortbewegung, k_attack) und verbessere schwache Bilder mit figure_anim_draw.'
+      : kind !== 'object'
+        ? 'Prüfe danach die wichtigsten Animationen (Charakter: idle, walk, attack; Kreatur: k_idle, Fortbewegung, k_attack) und verbessere schwache Bilder mit figure_anim_draw.'
+        : sideGame()
+          ? 'Das Spiel ist ein 2D-Side-Scroller: zeichne das Objekt in reiner Seitenansicht (keine sichtbare Oberseite), Standfläche unten.'
+          : '',
     `Beginne mit figure_new (kind "${kind}", name, size ${size}). Nutze Teile, eigene Farben und figure_draw für alle Details; prüfe mit figure_render und verbessere, bis sie wirklich gut aussieht.`,
     'Zum Schluss figure_save.',
     onMap && fig.use === 'player' && kind !== 'object' ? 'Mach sie danach mit figure_use_as_player zur Spielfigur.' : '',

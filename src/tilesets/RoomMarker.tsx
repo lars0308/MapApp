@@ -9,6 +9,7 @@ import { Icon } from '../components/icons';
 import { imageUrl, tileStyle } from './TileThumb';
 import { applyCanvasTransform, mirrorH, rotateCW } from './gid';
 import { turnStyle } from '../editor/Toolbar';
+import { groundRole } from '../generator/side';
 
 // "Raum markieren" – two ways to tell MapForge which tiles build a room:
 // - frame: the tileset contains a drawn sample room; frame it once and every tile gets its role from
@@ -50,7 +51,73 @@ const FLOOR_RING: TileRole[] = [
   'floor_corner_bottom_right',
 ];
 /** roles the room builder manages */
-const managed = (role: TileRole | undefined) => !!role && (!!CATEGORY_OF[role] || FLOOR_RING.includes(role));
+/** side view (side-scroller): terrain block, platforms, ladders … (categories like the demo side set) */
+const SIDE_CATEGORY: Partial<Record<TileRole, TileCategory>> = {
+  ground_top: 'wallTop',
+  ground_top_left: 'wallTop',
+  ground_top_right: 'wallTop',
+  ground_left: 'wallTop',
+  ground_right: 'wallTop',
+  ground_bottom: 'wallTop',
+  ground_inner_left: 'wallTop',
+  ground_inner_right: 'wallTop',
+  ground_fill: 'wallTop',
+  platform: 'bridge',
+  platform_left: 'bridge',
+  platform_right: 'bridge',
+  ladder: 'stairs',
+  spikes: 'obstacle',
+  back_wall: 'floor',
+};
+const catOf = (role: TileRole): TileCategory | undefined => CATEGORY_OF[role] ?? SIDE_CATEGORY[role];
+const isSideRole = (role: TileRole) => role in SIDE_CATEGORY;
+const managed = (role: TileRole | undefined) => !!role && (!!CATEGORY_OF[role] || FLOOR_RING.includes(role) || isSideRole(role));
+
+/** side view: the extra slots besides the terrain block */
+const EXTRA_SLOTS_SIDE: { role: TileRole; label: string }[] = [
+  { role: 'ground_inner_left', label: 'Innenecke ◣' },
+  { role: 'ground_inner_right', label: 'Innenecke ◢' },
+  { role: 'platform_left', label: 'Plattform links' },
+  { role: 'platform', label: 'Plattform Mitte' },
+  { role: 'platform_right', label: 'Plattform rechts' },
+  { role: 'ladder', label: 'Leiter' },
+  { role: 'spikes', label: 'Stacheln' },
+  { role: 'back_wall', label: 'Hintergrund' },
+  { role: 'water', label: 'Wasser' },
+  { role: 'lava', label: 'Lava' },
+];
+
+/** role of a cell in a terrain block (side view): grass edge on top, earth inside */
+export function sideRole(r: Rect, x: number, y: number): TileRole {
+  const top = y === r.y0;
+  const left = x === r.x0;
+  const right = x === r.x1;
+  if (top) return left ? 'ground_top_left' : right ? 'ground_top_right' : 'ground_top';
+  if (left) return 'ground_left';
+  if (right) return 'ground_right';
+  if (y === r.y1) return 'ground_bottom';
+  return 'ground_fill';
+}
+
+/** left / right pairs of the side view – one side can be mirrored into the other */
+const SIDE_MIRRORS: [TileRole, TileRole][] = [
+  ['ground_top_left', 'ground_top_right'],
+  ['ground_left', 'ground_right'],
+  ['ground_inner_left', 'ground_inner_right'],
+  ['platform_left', 'platform_right'],
+];
+
+/** empty left / right slots filled with a mirrored copy of the other side */
+export function completeByMirroring(pieces: Pieces): Pieces {
+  const out: Pieces = { ...pieces };
+  for (const [a, b] of SIDE_MIRRORS) {
+    const pa = (out[a] ?? [])[0];
+    const pb = (out[b] ?? [])[0];
+    if (pa && !pb) out[b] = [{ i: pa.i, t: mirrorH(pa.t) }];
+    if (pb && !pa) out[a] = [{ i: pb.i, t: mirrorH(pb.t) }];
+  }
+  return out;
+}
 /** empty floor edge / corner: the generator uses the plain floor there */
 const ringFallback = (role: TileRole): TileRole | null => (FLOOR_RING.includes(role) ? 'floor_center' : null);
 
@@ -83,6 +150,25 @@ const SLOT_LABEL: Partial<Record<TileRole, string>> = {
   floor_corner_top_right: 'Boden ┐',
   floor_corner_bottom_left: 'Boden └',
   floor_corner_bottom_right: 'Boden ┘',
+  ground_top_left: 'Oben links',
+  ground_top: 'Oben (Gras)',
+  ground_top_right: 'Oben rechts',
+  ground_left: 'Links',
+  ground_right: 'Rechts',
+  ground_bottom: 'Unten',
+  ground_fill: 'Erde Mitte',
+};
+/** side view: missing piece → what the generator draws there instead */
+const SIDE_FALLBACK: Partial<Record<TileRole, TileRole>> = {
+  ground_top_left: 'ground_top',
+  ground_top_right: 'ground_top',
+  ground_left: 'ground_fill',
+  ground_right: 'ground_fill',
+  ground_bottom: 'ground_fill',
+  ground_inner_left: 'ground_fill',
+  ground_inner_right: 'ground_fill',
+  platform_left: 'platform',
+  platform_right: 'platform',
 };
 
 /**
@@ -122,12 +208,12 @@ export function roomRole(r: Rect, x: number, y: number, front: number, edges = f
 }
 
 /** metas for every tile in the frame */
-export function roomMetas(ts: Pick<Tileset, 'columns'>, r: Rect, front: number): Record<number, TileMeta> {
+export function roomMetas(ts: Pick<Tileset, 'columns'>, r: Rect, front: number, side = false): Record<number, TileMeta> {
   const out: Record<number, TileMeta> = {};
   for (let y = r.y0; y <= r.y1; y++)
     for (let x = r.x0; x <= r.x1; x++) {
-      const role = roomRole(r, x, y, front);
-      out[y * ts.columns + x] = { category: CATEGORY_OF[role], role, tags: [], weight: role === 'floor_center' ? 50 : 60 };
+      const role = side ? sideRole(r, x, y) : roomRole(r, x, y, front);
+      out[y * ts.columns + x] = { category: catOf(role), role, tags: isSideRole(role) ? ['side'] : [], weight: role === 'floor_center' ? 50 : 60 };
     }
   return out;
 }
@@ -206,21 +292,78 @@ function SampleRoom({ ts, pieces, front }: { ts: Tileset; pieces: Pieces; front:
   return <canvas ref={ref} className="room-sample" aria-label="Probe-Raum mit den gewählten Tiles" />;
 }
 
+/** side view: a small level strip – hills, a gap with water, a platform and a ladder */
+function SampleSide({ ts, pieces }: { ts: Tileset; pieces: Pieces }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const W = 12;
+    const H = 8;
+    const T = 22;
+    // ground height per column (row where the ground starts); H = gap
+    const tops = [5, 5, 5, 4, 4, 4, H, H, 5, 5, 3, 3];
+    const solid = (x: number, y: number) => y >= H || y >= tops[Math.max(0, Math.min(W - 1, x))];
+    c.width = W * T;
+    c.height = H * T;
+    const g = c.getContext('2d')!;
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = '#10141f';
+    g.fillRect(0, 0, c.width, c.height);
+    const img = new Image();
+    const draw = (role: TileRole, x: number, y: number, mark = true) => {
+      const own = pieces[role];
+      const fb = SIDE_FALLBACK[role];
+      const list = own?.length ? own : fb ? pieces[fb] : undefined;
+      if (!list?.length) {
+        if (mark) {
+          g.fillStyle = 'rgba(232,111,111,0.35)';
+          g.fillRect(x * T + 1, y * T + 1, T - 2, T - 2);
+        }
+        return;
+      }
+      const p = list[(x * 7 + y * 3) % list.length];
+      g.save();
+      applyCanvasTransform(g, p.t, x * T, y * T, T, T);
+      g.drawImage(img, (p.i % ts.columns) * ts.tileSize, Math.floor(p.i / ts.columns) * ts.tileSize, ts.tileSize, ts.tileSize, -T / 2, -T / 2, T, T);
+      g.restore();
+    };
+    img.onload = () => {
+      for (let y = 0; y < H; y++)
+        for (let x = 0; x < W; x++) {
+          if (solid(x, y)) draw(groundRole(solid, x, y), x, y);
+          else draw('back_wall', x, y, false);
+        }
+      // water in the gap, a platform over it, a ladder up the high step
+      if (pieces.water?.length) for (let x = 6; x <= 7; x++) draw('water', x, H - 1, false);
+      if (pieces.platform?.length) {
+        draw('platform_left', 5, 2, false);
+        draw('platform', 6, 2, false);
+        draw('platform_right', 7, 2, false);
+      }
+      if (pieces.ladder?.length) for (let y = 3; y < 5; y++) draw('ladder', 9, y, false);
+      if (pieces.spikes?.length) draw('spikes', 1, 4, false);
+    };
+    img.src = ts.dataUrl;
+  }, [ts, pieces]);
+  return <canvas ref={ref} className="room-sample" aria-label="Probe-Level mit den gewählten Tiles" />;
+}
+
 /** pieces → metas (unturned uses) and variants (turned uses) */
-function piecesResult(pieces: Pieces): { tiles: Record<number, TileMeta>; variants: TileVariant[] } {
+function piecesResult(pieces: Pieces, side = false): { tiles: Record<number, TileMeta>; variants: TileVariant[] } {
   const tiles: Record<number, TileMeta> = {};
   const variants: TileVariant[] = [];
   for (const [role, list] of Object.entries(pieces) as [TileRole, Piece[]][])
     for (const p of list ?? []) {
-      if (!p.t && !tiles[p.i]) tiles[p.i] = { category: CATEGORY_OF[role], role, tags: [], weight: role === 'floor_center' ? 50 : 60 };
-      else variants.push({ index: p.i, transform: p.t, role, category: CATEGORY_OF[role] });
+      if (!p.t && !tiles[p.i]) tiles[p.i] = { category: catOf(role), role, tags: isSideRole(role) || (side && (role === 'water' || role === 'lava')) ? ['side'] : [], weight: role === 'floor_center' ? 50 : 60 };
+      else variants.push({ index: p.i, transform: p.t, role, category: catOf(role) });
     }
   return { tiles, variants };
 }
 
-function framePieces(ts: Tileset, r: Rect, front: number): Pieces {
+function framePieces(ts: Tileset, r: Rect, front: number, side = false): Pieces {
   const out: Pieces = {};
-  for (const [k, m] of Object.entries(roomMetas(ts, r, front))) (out[m.role!] ??= []).push({ i: Number(k), t: 0 });
+  for (const [k, m] of Object.entries(roomMetas(ts, r, front, side))) (out[m.role!] ??= []).push({ i: Number(k), t: 0 });
   return out;
 }
 
@@ -281,12 +424,25 @@ function TileSizeField({ ts, onTileSize }: { ts: Tileset; onTileSize: (size: num
   );
 }
 
-export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; onApply: (r: RoomResult, clearOthers: boolean) => void; onClose: () => void; onTileSize?: (size: number) => Promise<void> | void }) {
+export function RoomMarker({
+  ts,
+  onApply,
+  onClose,
+  onTileSize,
+  side = false,
+}: {
+  ts: Tileset;
+  onApply: (r: RoomResult, clearOthers: boolean) => void;
+  onClose: () => void;
+  onTileSize?: (size: number) => Promise<void> | void;
+  /** side-scroller: a terrain block (grass edge, earth, platforms, ladders) instead of a room */
+  side?: boolean;
+}) {
   const [mode, setMode] = useState<'frame' | 'pieces'>('pieces');
   const [start, setStart] = useState<{ x: number; y: number } | null>(null);
   const [rect, setRect] = useState<Rect | null>(null);
   // starts with what the map uses (a Low Top-Down map has 1 row of wall face, a room with more keeps it)
-  const [front, setFront] = useState(() => initialFront(ts));
+  const [front, setFront] = useState(() => (side ? 0 : initialFront(ts)));
   const [clearOthers, setClearOthers] = useState(true);
   // builder: role → pieces (starts with the tileset's confirmed roles and its turned tiles)
   // confirmed tiles, then the AI's suggestions, then (for roles still empty) the rule-based guesses
@@ -311,7 +467,7 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
   const [pieces, setPieces] = useState<Pieces>(initial.pieces);
   /** tiles the AI / the recognition put in – shown dashed until the user places them himself */
   const [suggested, setSuggested] = useState<Set<number>>(initial.suggested);
-  const [slot, setSlot] = useState<TileRole>('corner_top_left');
+  const [slot, setSlot] = useState<TileRole>(side ? 'ground_top' : 'corner_top_left');
   const [drag, setDrag] = useState<{ i: number; x: number; y: number; moved: boolean } | null>(null);
   /** builder: tile picked up with a tap – the next tap on a field of the room puts it there */
   const [hand, setHand] = useState<number | null>(null);
@@ -321,11 +477,12 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
   const cell = Math.max(14, Math.min(40, Math.floor(sheetWidth / ts.columns)));
   const w = rect ? rect.x1 - rect.x0 + 1 : 0;
   const h = rect ? rect.y1 - rect.y0 + 1 : 0;
-  const tooSmall = !!rect && (w < 3 || h < 3 + front);
-  const shown: Pieces = useMemo(() => (mode === 'frame' ? (rect && !tooSmall ? framePieces(ts, rect, front) : {}) : pieces), [mode, rect, tooSmall, ts, front, pieces]);
+  const tooSmall = !!rect && (side ? w < 3 || h < 2 : w < 3 || h < 3 + front);
+  const shown: Pieces = useMemo(() => (mode === 'frame' ? (rect && !tooSmall ? framePieces(ts, rect, front, side) : {}) : pieces), [mode, rect, tooSmall, ts, front, pieces, side]);
   const count = Object.values(shown).reduce((n, l) => n + (l?.length ?? 0), 0);
   const ready = count > 0;
-  const board: Rect = { x0: 0, y0: 0, x1: 4, y1: 4 + front };
+  const board: Rect = side ? { x0: 0, y0: 0, x1: 4, y1: 3 } : { x0: 0, y0: 0, x1: 4, y1: 4 + front };
+  const extras = side ? EXTRA_SLOTS_SIDE : EXTRA_SLOTS;
   const slotPx = wide ? 56 : Math.min(52, Math.floor((window.innerWidth - 80) / 5));
 
   const cellAt = (e: { clientX: number; clientY: number }, el: HTMLElement) => {
@@ -359,7 +516,7 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
     setPieces({ ...pieces, [slot]: [{ i: p.i, t: fn === 'turn' ? rotateCW(p.t) : mirrorH(p.t) }, ...rest] });
   };
 
-  const slotLabel = SLOT_LABEL[slot] ?? EXTRA_SLOTS.find((e) => e.role === slot)?.label;
+  const slotLabel = SLOT_LABEL[slot] ?? extras.find((e) => e.role === slot)?.label;
   const cur = (pieces[slot] ?? [])[0];
 
   const sheet = (
@@ -422,7 +579,10 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
           <div className={`room-frame${tooSmall ? ' is-bad' : ''}`} style={{ left: rect.x0 * cell, top: rect.y0 * cell, width: w * cell, height: h * cell }}>
             {!tooSmall &&
               Array.from({ length: w * h }, (_, k) => {
-                const role = roomRole(rect, rect.x0 + (k % w), rect.y0 + Math.floor(k / w), front);
+                const cx = rect.x0 + (k % w);
+                const cy = rect.y0 + Math.floor(k / w);
+                if (side) return <span key={k} className={`room-cell r-${cy === rect.y0 ? 'front' : 'wall'}`} />;
+                const role = roomRole(rect, cx, cy, front);
                 return <span key={k} className={`room-cell r-${role.startsWith('floor') ? 'floor' : role.startsWith('wall_front') ? 'front' : 'wall'}`} />;
               })}
           </div>
@@ -434,10 +594,10 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
   const builder = (
     <div className="room-board-wrap">
       <div className="room-board" style={{ gridTemplateColumns: `repeat(5, ${slotPx}px)` }}>
-        {Array.from({ length: 5 * (5 + front) }, (_, k) => {
+        {Array.from({ length: 5 * (board.y1 + 1) }, (_, k) => {
           const x = k % 5;
           const y = Math.floor(k / 5);
-          const role = roomRole(board, x, y, front, true);
+          const role = side ? sideRole(board, x, y) : roomRole(board, x, y, front, true);
           const list = pieces[role] ?? [];
           const p = list[(x + y) % Math.max(1, list.length)];
           // empty floor edge: shows the plain floor faintly (that is what the generator will use)
@@ -471,7 +631,7 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
         })}
       </div>
       <div className="room-extra">
-        {EXTRA_SLOTS.map((e) => {
+        {extras.map((e) => {
           const p = (pieces[e.role] ?? [])[0];
           return (
             <button key={e.role} type="button" data-role={e.role} className={`room-slot room-slot-wide${e.role === slot ? ' is-active' : ''}`} onClick={() => drop(e.role)}>
@@ -496,20 +656,26 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
           Entfernen
         </button>
       </div>
-      <button type="button" className="btn btn-secondary room-complete" onClick={() => setPieces(completeByTurning(pieces))}>
-        Fehlende Ecken, Wände und Ränder durch Drehen ergänzen
-      </button>
+      {side ? (
+        <button type="button" className="btn btn-secondary room-complete" onClick={() => setPieces(completeByMirroring(pieces))}>
+          Fehlende linke / rechte Seite durch Spiegeln ergänzen
+        </button>
+      ) : (
+        <button type="button" className="btn btn-secondary room-complete" onClick={() => setPieces(completeByTurning(pieces))}>
+          Fehlende Ecken, Wände und Ränder durch Drehen ergänzen
+        </button>
+      )}
     </div>
   );
 
   return (
     <div className="quick-pick-backdrop" role="presentation" onClick={onClose}>
-      <div className={`quick-pick room-marker${mode === 'pieces' ? ' is-builder' : ''}`} role="dialog" aria-label="Raum im Tileset markieren" onClick={(e) => e.stopPropagation()}>
+      <div className={`quick-pick room-marker${mode === 'pieces' ? ' is-builder' : ''}`} role="dialog" aria-label={side ? 'Gelände im Tileset markieren' : 'Raum im Tileset markieren'} onClick={(e) => e.stopPropagation()}>
         <header className="quick-pick-head">
           <div className="quick-pick-tile">
             <div>
-              <strong>Raum aus dem Tileset bauen</strong>
-              <span className="quick-pick-current">{mode === 'frame' ? 'Rahmen über einen gezeichneten Raum ziehen.' : hand !== null ? 'Jetzt ins passende Feld des Raums tippen.' : 'Tile im Tileset antippen, dann ins passende Feld des Raums tippen.'}</span>
+              <strong>{side ? 'Gelände aus dem Tileset bauen' : 'Raum aus dem Tileset bauen'}</strong>
+              <span className="quick-pick-current">{mode === 'frame' ? `Rahmen über ${side ? 'einen gezeichneten Erdblock' : 'einen gezeichneten Raum'} ziehen.` : hand !== null ? `Jetzt ins passende Feld ${side ? 'des Geländes' : 'des Raums'} tippen.` : `Tile im Tileset antippen, dann ins passende Feld ${side ? 'des Geländes' : 'des Raums'} tippen.`}</span>
             </div>
           </div>
           <IconButton label="Schließen" onClick={onClose}>
@@ -523,20 +689,26 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
             value={mode}
             onChange={(v) => setMode(v)}
             options={[
-              { value: 'pieces', label: 'Raum füllen' },
-              { value: 'frame', label: 'Raum einrahmen' },
+              { value: 'pieces', label: side ? 'Gelände füllen' : 'Raum füllen' },
+              { value: 'frame', label: side ? 'Block einrahmen' : 'Raum einrahmen' },
             ]}
           />
           <p className="hint">
-            {mode === 'frame'
+            {side
+              ? mode === 'frame'
+                ? 'Ist im Tileset ein Erdblock gezeichnet (Gras oben, Erde darunter)? Rahmen darüberziehen: die oberste Reihe wird die Gras-Kante, die Seiten die Ränder, das Innere Erde. Am Handy: erst eine Ecke antippen, dann die gegenüberliegende.'
+                : 'Seitenansicht (Side-Scroller): 1. Tile im Tileset antippen. 2. Ins passende Feld des Erdblocks tippen – oben die Gras-Kante (links, Mitte, rechts), darunter die Seiten und die Erde. Plattformen, Leiter, Stacheln, Hintergrund, Wasser und Lava haben eigene Felder. Eine Seite reicht – „durch Spiegeln ergänzen“ setzt die andere. Mehrere Tiles pro Feld = Varianten.'
+              : mode === 'frame'
               ? 'Ist im Tileset ein Raum gezeichnet? Rahmen darüberziehen: die äußeren Ecken werden Ecken, die Ränder Wände, das Innere Boden. Am Handy: erst eine Ecke antippen, dann die gegenüberliegende.'
               : '1. Tile im Tileset antippen. 2. Ins Feld des Raums tippen, wo es hingehört (Ecke, Wand, Tür, Wasser …). Der Boden hat eigene Felder für Mitte, Rand oben, unten, links, rechts und die vier Boden-Ecken – leer bleibende Ränder nehmen den Boden der Mitte. Ziehen geht auch. Mit Drehen / Spiegeln passt du das gewählte Feld an – eine Ecke oder ein Rand reicht, „durch Drehen ergänzen“ setzt die anderen drei. Mehrere Tiles pro Feld = Varianten.'}
           </p>
-          {mode === 'pieces' && <RoomStatus pieces={pieces} front={front} suggested={suggested.size} />}
+          {mode === 'pieces' && <RoomStatus pieces={pieces} front={front} suggested={suggested.size} side={side} />}
           <div className={mode === 'pieces' && wide ? 'room-split' : undefined}>
             {sheet}
             {mode === 'pieces' && builder}
           </div>
+          {!side && (
+            <>
           <Segmented
             label="Wand-Vorderseite"
             value={String(front)}
@@ -548,11 +720,13 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
             ]}
           />
           <p className="hint">Wand-Vorderseite: Hat das Tileset Mauer von vorne (3/4-Ansicht, Low Top-Down), die unter der oberen Wand steht? Dann 1 oder 2 Reihen wählen.</p>
-          {mode === 'frame' && rect && tooSmall && <p className="hint is-warn">Der Rahmen muss mindestens 3 × {3 + front} Tiles groß sein.</p>}
+            </>
+          )}
+          {mode === 'frame' && rect && tooSmall && <p className="hint is-warn">Der Rahmen muss mindestens 3 × {side ? 2 : 3 + front} Tiles groß sein.</p>}
           {ready && (
             <>
-              <h4>So baut der Generator damit einen Raum</h4>
-              <SampleRoom ts={ts} pieces={shown} front={front} />
+              <h4>{side ? 'So baut der Generator damit ein Level' : 'So baut der Generator damit einen Raum'}</h4>
+              {side ? <SampleSide ts={ts} pieces={shown} /> : <SampleRoom ts={ts} pieces={shown} front={front} />}
               <label className="quick-pick-next">
                 <input type="checkbox" checked={clearOthers} onChange={(e) => setClearOthers(e.target.checked)} />
                 Automatische Vorschläge der übrigen Tiles verwerfen (nur deine Tiles bauen Räume; Deko, Türen usw. kannst du danach einzeln zuordnen)
@@ -564,8 +738,8 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Abbrechen
           </button>
-          <Button variant="primary" disabled={!ready} onClick={() => onApply({ ...piecesResult(shown), replaceVariants: mode === 'pieces', front }, clearOthers)}>
-            {ready ? `${count} Tiles übernehmen` : mode === 'frame' ? 'Rahmen ziehen' : 'Raum füllen'}
+          <Button variant="primary" disabled={!ready} onClick={() => onApply({ ...piecesResult(shown, side), replaceVariants: mode === 'pieces', front: side ? 0 : front }, clearOthers)}>
+            {ready ? `${count} Tiles übernehmen` : mode === 'frame' ? 'Rahmen ziehen' : side ? 'Gelände füllen' : 'Raum füllen'}
           </Button>
         </footer>
         {drag?.moved && <span className="room-drag" style={{ ...tileStyle(ts, drag.i, 44), left: drag.x - 22, top: drag.y - 22 }} />}
@@ -601,19 +775,21 @@ export function applyRoom(ts: Pick<Tileset, 'tiles' | 'variants'>, r: RoomResult
 }
 
 /** what is filled, what the AI suggested, what is still missing */
-function RoomStatus({ pieces, front, suggested }: { pieces: Pieces; front: number; suggested: number }) {
-  const need: TileRole[] = ['corner_top_left', 'corner_top_right', 'corner_bottom_left', 'corner_bottom_right', 'wall_top', 'wall_bottom', 'wall_left', 'wall_right', 'floor_center', ...(front ? (['wall_front'] as TileRole[]) : [])];
+function RoomStatus({ pieces, front, suggested, side }: { pieces: Pieces; front: number; suggested: number; side: boolean }) {
+  const need: TileRole[] = side
+    ? ['ground_top', 'ground_fill', 'ground_top_left', 'ground_top_right', 'ground_left', 'ground_right']
+    : ['corner_top_left', 'corner_top_right', 'corner_bottom_left', 'corner_bottom_right', 'wall_top', 'wall_bottom', 'wall_left', 'wall_right', 'floor_center', ...(front ? (['wall_front'] as TileRole[]) : [])];
   const missing = need.filter((r) => !(pieces[r] ?? []).length);
   return (
     <div className={`room-status${missing.length ? ' has-missing' : ' is-complete'}`} role="status">
-      {suggested > 0 && <p>Die KI hat den Raum vorsortiert – gestrichelte Felder sind Vorschläge. Stimmt ein Feld nicht: Feld antippen → „Entfernen“, dann das richtige Tile setzen.</p>}
+      {suggested > 0 && <p>Die KI hat {side ? 'das Gelände' : 'den Raum'} vorsortiert – gestrichelte Felder sind Vorschläge. Stimmt ein Feld nicht: Feld antippen → „Entfernen“, dann das richtige Tile setzen.</p>}
       {missing.length ? (
         <p>
-          <b>Fehlt noch:</b> {missing.map((r) => SLOT_LABEL[r] ?? r).join(', ')}. Tipp: eine Ecke oder Wand reicht – „durch Drehen ergänzen“ füllt den Rest.
+          <b>Fehlt noch:</b> {missing.map((r) => SLOT_LABEL[r] ?? r).join(', ')}. {side ? 'Tipp: eine Seite reicht – „durch Spiegeln ergänzen“ setzt die andere.' : 'Tipp: eine Ecke oder Wand reicht – „durch Drehen ergänzen“ füllt den Rest.'}
         </p>
       ) : (
         <p>
-          <b>Alles Wichtige ist da.</b> Unten siehst du, wie der Generator damit einen Raum baut.
+          <b>Alles Wichtige ist da.</b> Unten siehst du, wie der Generator damit {side ? 'ein Level' : 'einen Raum'} baut.
         </p>
       )}
     </div>

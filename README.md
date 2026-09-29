@@ -335,6 +335,21 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.43 – Side-Scroller: Gelände-Baukasten, KI-Vorsortierung und Figuren-Animation**
+
+- **Gelände aus dem eigenen Tileset bauen (Seitenansicht):** Bei einer Side-Scroller-Karte wird aus „Raum bauen“ **„Gelände bauen“**. Du füllst einen Erdblock:
+  - oben die Gras-Kante (links, Mitte, rechts),
+  - darunter die Seiten, die Erde und die Unterseite,
+  - dazu eigene Felder für Innenecken, Plattform (links, Mitte, rechts), Leiter, Stacheln, Hintergrund, Wasser und Lava.
+  „Durch Spiegeln ergänzen“ setzt die fehlende linke oder rechte Seite. Die Vorschau zeigt ein kleines Level mit Hügeln, Lücke, Wasser, Plattform und Leiter. „Block einrahmen“ macht aus einem gezeichneten Erdblock im Tileset gleich alle Rollen.
+- **Die KI sortiert Side-Scroller-Tilesets vor:** Sie erkennt Gras-Kanten, Seiten, Erde, Innenecken, Plattformen, Leitern, Stacheln, Hintergrund, Wasser und Lava. Danach öffnet sich der Gelände-Baukasten schon ausgefüllt.
+- **Die KI animiert Figuren wieder – mit Blick auf Plattformer:**
+  - Beim Erstellen prüft sie die wichtigsten Animationen Bild für Bild und verbessert schwache Bilder: idle, run, jump, fall, attack; bei Kreaturen Stand, Fortbewegung, Angriff.
+  - Im Side-Scroller ist die Seitenansicht die Hauptansicht. Die KI achtet auf sauberen Bodenkontakt, Ausholen vor dem Schlag, Schlagspur, Treffer-Aufblitzen und Sturz.
+  - Neue Bewegungen wie Wandsprung oder Dash legt sie auf Wunsch an.
+- **„Mein Spiel: Side-Scroller / Top-Down“** im KI-Reiter des Figuren-Baukastens. Die Beispiele passen zur Wahl, z. B. „Lauf-, Sprung- und Fall-Animation verbessern“, „Neue Animation: Wandsprung“ oder „Fackel flackern lassen“. Steht in der Beschreibung „Side-Scroller“ oder „Plattformer“, merkt sich die App das.
+- Im Side-Scroller exportiert der Figuren-Export standardmäßig nur die Seitenansicht (links wird gespiegelt).
+
 **Version 3.42 – Ladeanzeigen, KI sortiert Tilesets vor, kleine Motive, Pixel-Look**
 
 - **Ladeanzeige überall, wo etwas dauert:** Generieren, Projekt öffnen, Tileset einlesen oder zuschneiden, Godot- und PNG-Export, Sicherung wiederherstellen. Eine große Karte in der Mitte sagt, was gerade passiert, mit hüpfenden Pixel-Blöcken als Animation.

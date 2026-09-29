@@ -64,8 +64,8 @@ function AiSortButton({ ts, onDone }: { ts: Tileset; onDone: () => void }) {
     try {
       const ai = await withBusy(
         'Die KI schaut sich dein Tileset an …',
-        () => aiSortTileset(ts, perspective, (done, total) => busyStep('Die KI schaut sich dein Tileset an …', `Sie sortiert Boden, Wände, Ecken und Deko vor – Abschnitt ${Math.min(done + 1, total)} von ${total}`)),
-        { ai: true, detail: 'Sie sortiert Boden, Wände, Ecken und Deko vor' },
+        () => aiSortTileset(ts, perspective, (done, total) => busyStep('Die KI schaut sich dein Tileset an …', `${perspective === 'side_view' ? 'Sie sortiert Boden, Kanten, Plattformen und Deko vor' : 'Sie sortiert Boden, Wände, Ecken und Deko vor'} – Abschnitt ${Math.min(done + 1, total)} von ${total}`)),
+        { ai: true, detail: perspective === 'side_view' ? 'Sie sortiert Boden, Kanten, Plattformen und Deko vor' : 'Sie sortiert Boden, Wände, Ecken und Deko vor' },
       );
       // confirmed tiles stay as they are, the rest gets the AI's suggestion
       const keep = Object.fromEntries(Object.entries(ai.tiles).filter(([k]) => !ts.tiles[Number(k)] || ts.tiles[Number(k)].auto));
@@ -568,18 +568,19 @@ function TilesetCard({ ts }: { ts: Tileset }) {
       <Toggle label="Aktiv" description="Im Generator und in der Palette verwenden" checked={ts.active} onChange={(v) => updateTileset(ts.id, { active: v })} />
       <div className="tileset-actions-top">
         <Button variant="primary" icon={<Icon.Grid size={16} />} onClick={() => setMarking(true)}>
-          Raum bauen
+          {perspective === 'side_view' ? 'Gelände bauen' : 'Raum bauen'}
         </Button>
         <Button variant="secondary" icon={<Icon.Pencil size={16} />} onClick={() => setEditing(true)}>
           Alles bearbeiten
         </Button>
       </div>
       {editing && <TilesetDialog existing={ts} onClose={() => setEditing(false)} />}
-      <p className="hint">Schnellster Weg zu richtigen Wänden: Ecken, Wände und Boden auf einen Raum-Bauplan ziehen (auch gedreht) – oder einen gezeichneten Raum im Tileset einrahmen.</p>
+      <p className="hint">{perspective === 'side_view' ? 'Schnellster Weg zu richtigem Gelände: Gras-Kante, Seiten und Erde auf einen Erdblock ziehen, dazu Plattformen, Leiter und Stacheln – oder einen gezeichneten Block im Tileset einrahmen.' : 'Schnellster Weg zu richtigen Wänden: Ecken, Wände und Boden auf einen Raum-Bauplan ziehen (auch gedreht) – oder einen gezeichneten Raum im Tileset einrahmen.'}</p>
       {marking && (
         <RoomMarker
           key={ts.tileSize}
           ts={ts}
+          side={perspective === 'side_view'}
           onTileSize={(n) =>
             useProject
               .getState()

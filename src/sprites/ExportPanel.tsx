@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { sideGame } from '../api/gameView';
 import { useSprites } from './store';
 import { animsFor, framesOf, frameSize } from './animation';
 import { exportSheetPng, exportSpriteGodot, type ExportChoice } from './exportSprite';
@@ -23,7 +24,8 @@ const readDirs = (): Dirs => {
   } catch {
     // ignore
   }
-  return '4';
+  // side-scroller: only the side view (left = mirrored)
+  return sideGame() ? '2' : '4';
 };
 
 /** small looping preview of one animation */

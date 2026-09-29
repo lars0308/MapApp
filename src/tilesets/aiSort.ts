@@ -11,7 +11,11 @@ type Kind =
   | 'floor_corner_tl' | 'floor_corner_tr' | 'floor_corner_bl' | 'floor_corner_br'
   | 'wall_top' | 'wall_bottom' | 'wall_left' | 'wall_right' | 'corner_tl' | 'corner_tr' | 'corner_bl' | 'corner_br'
   | 'inner_tl' | 'inner_tr' | 'inner_bl' | 'inner_br' | 'wall_front' | 'wall_front_upper' | 'door'
-  | 'water' | 'lava' | 'abyss' | 'path' | 'bridge' | 'stairs' | 'deco' | 'obstacle' | 'pillar' | 'shadow';
+  | 'water' | 'lava' | 'abyss' | 'path' | 'bridge' | 'stairs' | 'deco' | 'obstacle' | 'pillar' | 'shadow'
+  // side view (side-scroller)
+  | 'ground_top' | 'ground_top_left' | 'ground_top_right' | 'ground_left' | 'ground_right' | 'ground_bottom'
+  | 'ground_inner_left' | 'ground_inner_right' | 'ground_fill' | 'platform' | 'platform_left' | 'platform_right'
+  | 'ladder' | 'spikes' | 'back_wall';
 
 const KIND_META: Record<Kind, { category?: TileCategory; role?: TileRole }> = {
   floor: { category: 'floor', role: 'floor_center' },
@@ -49,6 +53,22 @@ const KIND_META: Record<Kind, { category?: TileCategory; role?: TileRole }> = {
   obstacle: { category: 'obstacle' },
   pillar: { category: 'pillar' },
   shadow: { category: 'shadow', role: 'shadow' },
+  // side view: categories like the demo side set
+  ground_top: { category: 'wallTop', role: 'ground_top' },
+  ground_top_left: { category: 'wallTop', role: 'ground_top_left' },
+  ground_top_right: { category: 'wallTop', role: 'ground_top_right' },
+  ground_left: { category: 'wallTop', role: 'ground_left' },
+  ground_right: { category: 'wallTop', role: 'ground_right' },
+  ground_bottom: { category: 'wallTop', role: 'ground_bottom' },
+  ground_inner_left: { category: 'wallTop', role: 'ground_inner_left' },
+  ground_inner_right: { category: 'wallTop', role: 'ground_inner_right' },
+  ground_fill: { category: 'wallTop', role: 'ground_fill' },
+  platform: { category: 'bridge', role: 'platform' },
+  platform_left: { category: 'bridge', role: 'platform_left' },
+  platform_right: { category: 'bridge', role: 'platform_right' },
+  ladder: { category: 'stairs', role: 'ladder' },
+  spikes: { category: 'obstacle', role: 'spikes' },
+  back_wall: { category: 'floor', role: 'back_wall' },
 };
 
 /** tiles per section edge: small enough that every tile is clearly visible */
@@ -138,7 +158,8 @@ export async function aiSortTileset(ts: Tileset, view: Perspective, onProgress?:
           if (empty.has(i)) continue;
           const m = KIND_META[t.kind];
           if (!m) continue;
-          tiles[i] = { ...m, tags: ['ai'], weight: m.role === 'floor_center' ? 50 : 60, auto: true };
+          // side view: tagged "side" so the side-scroller generator prefers them
+          tiles[i] = { ...m, tags: view === 'side_view' ? ['ai', 'side'] : ['ai'], weight: m.role === 'floor_center' ? 50 : 60, auto: true };
         }
       } catch (e) {
         failed++;

@@ -18,8 +18,15 @@ const KINDS = [
   'wall_front', 'wall_front_upper', 'door',
   'water', 'lava', 'abyss', 'path', 'bridge', 'stairs', 'deco', 'obstacle', 'pillar', 'shadow',
 ];
+// side view (side-scroller): terrain block seen from the side, platforms, ladders …
+const SIDE_KINDS = [
+  'ground_top', 'ground_top_left', 'ground_top_right', 'ground_left', 'ground_right', 'ground_bottom',
+  'ground_inner_left', 'ground_inner_right', 'ground_fill',
+  'platform', 'platform_left', 'platform_right', 'ladder', 'spikes', 'back_wall',
+  'water', 'lava', 'deco', 'obstacle',
+];
 
-const TOOL = {
+const tool = (kinds) => ({
   name: 'submit_tiles',
   description: 'Was jede nicht-leere Kachel dieses Ausschnitts ist.',
   input_schema: {
@@ -32,7 +39,7 @@ const TOOL = {
           properties: {
             c: { type: 'integer', description: 'Spaltennummer (Zahl oben)' },
             r: { type: 'integer', description: 'Zeilennummer (Zahl links)' },
-            kind: { type: 'string', enum: KINDS },
+            kind: { type: 'string', enum: kinds },
           },
           required: ['c', 'r', 'kind'],
         },
@@ -40,7 +47,21 @@ const TOOL = {
     },
     required: ['tiles'],
   },
-};
+});
+
+function sideSystem() {
+  return `Du ordnest Kacheln (Tiles) eines Pixel-Art-Tilesets für MapForge zu, einen Level-Generator für 2D-Side-Scroller / Plattformer (Seitenansicht, Schwerkraft nach unten).
+Du siehst einen Ausschnitt des Tilesets mit Raster: Zahlen oben = Spalte (c), Zahlen links = Zeile (r). Gib für JEDE nicht-leere Kachel genau eine Art (kind) ab – immer mit genau einem Aufruf von submit_tiles, ohne Text dazu. Leere / einfarbig-transparente Kacheln und Dinge, die in keine Art passen, weglassen.
+
+So denkt MapForge über Gelände von der Seite (ein Erdblock: oben Gras/Oberfläche, darunter Erde/Stein):
+- ground_top: Oberkante des Bodens, auf der die Figur läuft (Gras, Schnee, Steinkante oben, darunter Erde); ground_top_left / ground_top_right: dieselbe Oberkante am linken / rechten Ende (Kante oben UND an der Seite).
+- ground_left / ground_right: seitliche Wand eines Erdblocks (Rand links / rechts, keine Oberkante); ground_bottom: Unterseite eines Blocks (Decke, Rand unten).
+- ground_fill: Innere Erde / Stein ohne Kanten; ground_inner_left / ground_inner_right: Innenecke, wo eine Stufe ansetzt (Oberkante knickt in eine höhere Wand; die Wand-Masse liegt links / rechts oben).
+- platform / platform_left / platform_right: dünne, schwebende Plattform (Holzsteg, Steinbalken) – Mitte / linkes Ende / rechtes Ende.
+- ladder: Leiter, Ranke, Kette zum Klettern; spikes: Stacheln / Dornen; back_wall: Hintergrundwand hinter der Figur (Höhlenwand, Mauer ohne Kollision, dunkler).
+- water / lava: Flüssigkeit; deco: Dinge ohne Kollision (Gras-Büschel, Blumen, Pilze, Fackeln, Ketten); obstacle: blockierende Dinge (Kisten, Fässer, Steine).
+Achte auf Richtung von Kanten und Gras: Gras oben = ground_top*; Kante links = …_left, Kante rechts = …_right. Sei gründlich – lieber eine plausible Art als gar keine.`;
+}
 
 function system(view) {
   return `Du ordnest Kacheln (Tiles) eines Pixel-Art-Tilesets für MapForge zu, einen Kartengenerator (Ansicht: ${view}).
@@ -74,6 +95,8 @@ export default async function handler(req, res) {
   const token = process.env.AI_GATEWAY_API_KEY || req.headers['x-vercel-oidc-token'] || process.env.VERCEL_OIDC_TOKEN;
   if (!token) return res.status(500).json({ ok: false, error: 'KI ist auf dem Server nicht eingerichtet (AI Gateway)' });
   const model = MODELS[body.mode === 'sparsam' ? 'sparsam' : 'standard'];
+  const side = body.view === 'side_view';
+  const kinds = side ? SIDE_KINDS : KINDS;
   const content = [
     { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } },
     { type: 'text', text: `Ausschnitt: Spalten ${body.col0}–${body.col0 + body.cols - 1}, Zeilen ${body.row0}–${body.row0 + body.rows - 1}, Kacheln à ${body.tileSize} px. Ordne jede nicht-leere Kachel zu.` },
@@ -82,7 +105,7 @@ export default async function handler(req, res) {
     const r = await fetch(GATEWAY, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: model.id, max_tokens: 8000, system: system(body.view ?? 'top_down'), tools: [TOOL], messages: [{ role: 'user', content }] }),
+      body: JSON.stringify({ model: model.id, max_tokens: 8000, system: side ? sideSystem() : system(body.view ?? 'top_down'), tools: [tool(kinds)], messages: [{ role: 'user', content }] }),
     });
     const out = await r.json().catch(() => null);
     if (!r.ok) {
@@ -103,7 +126,7 @@ export default async function handler(req, res) {
       }
       if (!raw.length) console.warn('[mapforge-tiles] keine Zuordnung', out?.stop_reason, text.slice(0, 300));
     }
-    const tiles = (raw ?? []).filter((t) => t && KINDS.includes(t.kind) && Number.isInteger(t.c) && Number.isInteger(t.r));
+    const tiles = (raw ?? []).filter((t) => t && kinds.includes(t.kind) && Number.isInteger(t.c) && Number.isInteger(t.r));
     const u = out?.usage ?? {};
     const cost = ((u.input_tokens ?? 0) * model.input + (u.output_tokens ?? 0) * model.output) / 1e6;
     return res.status(200).json({ ok: true, tiles, cost });

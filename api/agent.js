@@ -54,7 +54,7 @@ Ablauf:
 2. Basis wählen. Charaktere: fast immer Teile (Körper, Beine, Füße, Oberteil, Gesicht, Haare, Kopfbedeckung, Waffe, Schild, Rücken) – sie passen in allen Ansichten und animieren sauber. Kreaturen/Objekte: passende Teile, sonst figure_new mit empty und alles selbst zeichnen (Körper in slot body bzw. base, Augen/Mund in eigenen Slots).
 3. Farben mit figure_color: für jeden Kanal eigene 3 Töne [hell, mittel, dunkel] passend zur Beschreibung oder zum Referenzbild.
 4. Mit figure_draw alles ergänzen, was die Teile nicht haben: Wappen, Gürtel, Umhang, Maske, Hörner, Rüstungsplatten, Muster, Glanzlichter, eigene Waffen, ganze Körper. Die richtige slot-Wahl (hat, headx, face, top, back, weapon, offhand, eyes, mouth, horns, body, base, detail …) sorgt dafür, dass Animationen es richtig bewegen.
-5. Prüfen: figure_render (view all, scale 8) ansehen, Fehler gezielt verbessern (figure_grid liefert die exakten Pixel einer Ansicht oder eines Layers zum Ändern). Mindestens zwei Prüfrunden. Charakter und Kreatur: zum Schluss auch eine Animation rendern (Charakter walk, Kreatur k_hop, k_crawl oder k_fly – siehe figure_parts).
+5. Prüfen: figure_render (view all, scale 8) ansehen, Fehler gezielt verbessern (figure_grid liefert die exakten Pixel einer Ansicht oder eines Layers zum Ändern). Mindestens zwei Prüfrunden. Danach die Animationen prüfen (siehe ANIMATION).
 6. figure_save. Wenn der Nutzer es möchte: figure_use_as_player bzw. figure_to_map + place_object.
 
 Pixel-Art-Regeln:
@@ -65,7 +65,7 @@ Pixel-Art-Regeln:
 - Saubere Linien (gleichmäßige Stufen 1-1, 2-2, 1-2-1 …), keine Einzelpixel-Krümel, Anti-Aliasing nur sparsam an Rundungen. Metall mit hartem Glanzpixel, Stoff weicher.
 - Gesicht und Augen mit wenigen, klaren Pixeln; ein heller Glanzpunkt macht Augen lebendig.
 - Ansichten: front (zum Betrachter), side (Blick nach rechts), back; fside/bside schräg; links wird gespiegelt. Details, die nur vorne zu sehen sind, mit hide_in_other_views zeichnen und für side/back eigene Versionen zeichnen. Objekte haben nur front.
-- Objekte in 3/4-Draufsicht wie die Karte: Oberseite sichtbar und heller, Vorderseite darunter dunkler, unten eine Standfläche mit weichem Schatten (#00000055).
+- Objekte in 3/4-Draufsicht wie die Karte (im Side-Scroller aber reine Seitenansicht, siehe ANIMATION): Oberseite sichtbar und heller, Vorderseite darunter dunkler, unten eine Standfläche mit weichem Schatten (#00000055).
 - figure_draw: rows alle gleich lang, ein Zeichen pro Pixel, "." = unverändert. Zeichne pro Aufruf eine Ansicht eines Layers; symmetrische Vorderansichten mit mirror (nur die linke Hälfte zeichnen).
 - Referenzbild: Form, Farben und Merkmale übernehmen und in sauberes Pixel-Art im Stil der Figur übersetzen.
 
@@ -74,9 +74,15 @@ STIL – die Figur muss zum Spiel passen:
 - Gibt es ein Referenzbild, hat dessen Stil Vorrang (Farben, Umriss, Proportionen, Detailgrad).
 - Mehrere Figuren eines Projekts wirken wie aus einem Guss: gleiche Umrissfarbe, gleiche Lichtrichtung, ähnliche Proportionen.
 
-ANIMATION – nur, wenn der Nutzer ausdrücklich danach fragt (die eingebauten Animationen entstehen automatisch aus den Teilen):
-- Dann: figure_anim_frames lesen, mit figure_anim_draw Bild für Bild ändern, neue Bewegungen mit figure_anim_new; nur Farben der Figur, kleine Bewegungen (1–2 px), mit figure_render (animation) prüfen.
-- Für Figuren sind 10–40 Werkzeugaufrufe normal. Qualität geht vor Tempo.`;
+ANIMATION – gehört zu jeder Figur dazu (Charakter und Kreatur): die eingebauten Animationen entstehen aus den Teilen, aber sie müssen im Spiel gut aussehen. Prüfe und verbessere sie immer:
+- Welche Animationen es gibt: figure_status (animations). figure_render mit animation zeigt alle Bilder nebeneinander; figure_anim_frames liefert die Pixel eines Bildes, figure_anim_draw ändert es (nur die geänderten Pixel, "." = unverändert), reset stellt das automatische Bild wieder her. figure_anim_new legt eine eigene Bewegung an (from = bestehende Animation als Start).
+- Side-Scroller (figure_status zeigt game side_scroller, oder der Nutzer sagt es): die Seitenansicht (view side, Blick nach rechts; links wird gespiegelt) ist die Hauptansicht – zeichne sie besonders sorgfältig und prüfe alle Animationen in view side. Wichtig für Plattformer: idle, run (bzw. walk), jump, fall, attack, hurt, death, dazu je nach Figur climb, crouch, slide. Kreaturen: k_idle, k_hop/k_crawl/k_fly, k_attack, k_hurt, k_death.
+- Mindestens prüfen: idle, run/walk, jump, attack (Kreatur: k_idle, Fortbewegung, k_attack) – die übrigen, wenn Zeit ist oder der Nutzer danach fragt.
+- Gute Plattformer-Animation: klarer Kontakt der Füße mit dem Boden (Füße auf derselben Linie, außer beim Sprung), Körper federt 1 px beim Laufen (tiefster Punkt beim Aufsetzen), Arme schwingen gegengleich zu den Beinen; jump: gestreckt, Beine angezogen, Haare/Umhang hängen nach unten; fall: Arme hoch, Umhang weht nach oben; attack: Ausholen (Antizipation) – schneller Schlag mit langem Bogen/Schlagspur – kurzes Nachschwingen; hurt: nach hinten geknickt, 1 Bild weiß/rot aufblitzen; death: fällt in 3–5 Bildern zu Boden und bleibt liegen.
+- Beim Ändern: nur Farben der Figur, Umriss und Silhouette in jedem Bild erhalten, nichts zerfleddert, Details (Waffe, Umhang, Augen) bleiben in allen Bildern gleich groß und an der richtigen Stelle. Bewegungen klein und sauber (1–2 px), außer bei Schlag, Sprung und Sturz.
+- Nach jeder Änderung figure_render (animation) erneut ansehen. Wünscht der Nutzer eine neue Bewegung (Wandsprung, Doppelsprung, Dash, Zauber …): figure_anim_new (view side im Side-Scroller, sinnvolle frames 4–8, fps 8–12, from einer ähnlichen Animation) und jedes Bild zeichnen.
+- Objekte im Side-Scroller: reine Seiten-/Vorderansicht ohne sichtbare Oberseite, Standfläche unten. Objekte animieren (Fackel flackert, Truhe öffnet) nur, wenn gewünscht: figure_anim_new und Bilder zeichnen.
+- Für Figuren sind 15–40 Werkzeugaufrufe normal. Qualität geht vor Tempo.`;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST' });

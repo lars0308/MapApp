@@ -1,5 +1,6 @@
 import spec from './spec.json';
 import { useProject, createProject } from '../store/projectStore';
+import { sideGame } from './gameView';
 import { useEditor } from '../store/editorStore';
 import { useApp, type Page } from '../store/appStore';
 import { applyProfile, deriveConfig, genreInfo, type GameProfile, type ViewKind, type Genre, type Effort } from '../profiles';
@@ -317,8 +318,9 @@ function animOf(doc: SpriteDoc, kind: SpriteKind, want: unknown): { anim: AnimDe
   return { anim: built!, custom: false };
 }
 
+
 function viewOf(v: unknown, kind: SpriteKind): View {
-  const view = (v ?? 'front') as View;
+  const view = (v ?? (sideGame() && kind !== 'object' ? 'side' : 'front')) as View;
   if (!VIEWS.some((x) => x.id === view)) fail(`view: ${VIEWS.map((x) => x.id).join(', ')}`);
   if (kind === 'object' && view !== 'front') fail('Objekte haben nur die Vorderansicht');
   return view;
@@ -911,6 +913,7 @@ const H: Record<string, Handler> = {
       data: {
         name: doc.name,
         size: doc.size,
+        ...(sideGame() && kind !== 'object' ? { game: 'side_scroller', main_view: 'side', hint: 'Side-Scroller: die Seitenansicht (side, Blick nach rechts) ist die wichtigste – im Spiel sieht man fast nur sie; Animationen in view side prüfen und verbessern.' } : {}),
         layers: doc.layers.map((l) => ({ id: l.id, slot: l.slot, part: l.partId, name: l.name, drawn: l.edited, own_views: Object.keys(l.views ?? {}), visible: l.visible })),
         colors: doc.ramps,
         anatomy: anatomy(doc, (a.view as View) ?? 'front'),
@@ -1110,7 +1113,7 @@ const H: Record<string, Handler> = {
     const kind = kindOf(a.kind);
     const doc = await figureReady(kind);
     const scale = int(a.scale, 'scale', 6);
-    const view = (a.view as View | 'all') ?? (a.animation ? 'front' : 'all');
+    const view = (a.view as View | 'all') ?? (a.animation ? (sideGame() && kind !== 'object' ? 'side' : 'front') : 'all');
     if (a.animation) {
       const { anim, custom } = animOf(doc, kind, a.animation);
       const v = custom ? (anim as CustomAnim).view : view === 'all' ? 'front' : view;

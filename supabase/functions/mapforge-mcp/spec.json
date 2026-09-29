@@ -1060,6 +1060,7 @@
             "type": "string"
           },
           "view": {
+            "description": "default: side in a side-scroller project (map view side_view), else front",
             "type": "string",
             "enum": [
               "front",
@@ -1098,6 +1099,7 @@
             "type": "string"
           },
           "view": {
+            "description": "default: side in a side-scroller project (map view side_view), else front",
             "type": "string",
             "enum": [
               "front",
@@ -1177,6 +1179,7 @@
             "type": "boolean"
           },
           "view": {
+            "description": "default: side in a side-scroller project (map view side_view), else front",
             "type": "string",
             "enum": [
               "front",

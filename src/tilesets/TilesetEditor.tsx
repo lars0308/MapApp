@@ -74,8 +74,8 @@ export function TilesetEditor({
       try {
         const ai = await withBusy(
           'Die KI schaut sich dein Tileset an …',
-          () => aiSortTileset({ ...ts, tiles }, perspective, (done, total) => busyStep('Die KI schaut sich dein Tileset an …', `Sie sortiert Boden, Wände, Ecken und Deko vor – Abschnitt ${Math.min(done + 1, total)} von ${total}`)),
-          { ai: true, detail: 'Sie sortiert Boden, Wände, Ecken und Deko vor' },
+          () => aiSortTileset({ ...ts, tiles }, perspective, (done, total) => busyStep('Die KI schaut sich dein Tileset an …', `${perspective === 'side_view' ? 'Sie sortiert Boden, Kanten, Plattformen und Deko vor' : 'Sie sortiert Boden, Wände, Ecken und Deko vor'} – Abschnitt ${Math.min(done + 1, total)} von ${total}`)),
+          { ai: true, detail: perspective === 'side_view' ? 'Sie sortiert Boden, Kanten, Plattformen und Deko vor' : 'Sie sortiert Boden, Wände, Ecken und Deko vor' },
         );
         tiles = { ...tiles, ...ai.tiles };
         setUpload({ ...ts, perspectives: [perspective], tiles });
@@ -213,6 +213,7 @@ export function TilesetEditor({
           <RoomMarker
             key={upload.tileSize}
             ts={upload}
+            side={perspective === 'side_view'}
             onTileSize={fixedSize ? undefined : (n) => reslice(n)}
             onClose={() => setMarking(false)}
             onApply={(room, clearOthers) => {
