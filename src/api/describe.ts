@@ -34,6 +34,8 @@ export interface BuildPlan {
   height?: number;
   generator?: Record<string, unknown>;
   tips?: string[];
+  /** "pixel" (crisp) or "smooth" (less pixelated) */
+  pixelLook?: string;
 }
 
 /** shrink a picture for the model (long side ≤ max px); pixel art stays sharp */
@@ -119,6 +121,7 @@ export async function buildFromPlan(plan: BuildPlan, tileset?: { name: string; d
     // own tiles first: the demo sets only fill in roles the new tileset lacks
     for (const t of useProject.getState().project.tilesets) if (t.source === 'demo' && t.active) await runCommand('tileset_update', { tileset: t.id, active: false });
   }
+  if (plan.pixelLook === 'smooth' || plan.pixelLook === 'pixel') useProject.getState().setMapOptions({ pixelLook: plan.pixelLook });
   onStep?.('Die Karte wird gebaut …');
   const patch = { ...(plan.generator ?? {}) };
   delete patch.seed;
@@ -162,10 +165,18 @@ export async function buildFigure(fig: FigurePlan & { kind: SpriteKind }, wish: 
     onMap || useProject.getState().project.tilesets.some((t) => t.active && t.source !== 'demo')
       ? 'Die Figur gehört zu dieser Karte: lies zuerst style_colors und halte dich an Farben, Umriss und Pixelgröße der Tiles.'
       : '',
+    styleHint(),
     `Beginne mit figure_new (kind "${kind}", name, size ${size}). Nutze Teile, eigene Farben und figure_draw für alle Details; prüfe mit figure_render und verbessere, bis sie wirklich gut aussieht.`,
     'Zum Schluss figure_save.',
     onMap && fig.use === 'player' && kind !== 'object' ? 'Mach sie danach mit figure_use_as_player zur Spielfigur.' : '',
     onMap && fig.use !== 'player' ? 'Stelle sie danach mit figure_to_map und place_object passend auf die Karte (1–3 Mal, an sinnvolle Stellen).' : '',
   ].filter(Boolean).join('\n');
   return runAgent(task, image ? [{ label: 'Referenzbild des Nutzers', dataUrl: image }] : [], { focus: 'figures' });
+}
+
+/** the project's pixel look, as a hint for the drawing AI */
+export function styleHint(): string {
+  return useProject.getState().project.map.pixelLook === 'smooth'
+    ? 'Stil „Weich“: eher size 48 oder 64, mehr Farbstufen, sanfte Übergänge mit leichtem Anti-Aliasing, Umriss in einem dunklen Farbton statt hartem Schwarz.'
+    : 'Stil „Pixelig“: klare, gut sichtbare Pixel, kleine Palette, sauberer 1-px-Umriss, kein Anti-Aliasing.';
 }

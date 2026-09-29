@@ -90,8 +90,18 @@ export function drawGid(
   const img = table.imgs[k];
   if (!img) return;
   const s = table.size[gid];
+  // "Weich": smoothing would pull in the neighbouring tile of the sheet (seams) – draw from a copy
+  // of the tile with a 1 px border of its own edge pixels instead
+  let src: CanvasImageSource = img;
+  let sx = table.sx[gid];
+  let sy = table.sy[gid];
+  if (ctx.imageSmoothingEnabled) {
+    src = padded(img, sx, sy, s);
+    sx = 1;
+    sy = 1;
+  }
   if (!t) {
-    ctx.drawImage(img, table.sx[gid], table.sy[gid], s, s, dx, dy, dw, dh);
+    ctx.drawImage(src, sx, sy, s, s, dx, dy, dw, dh);
     return;
   }
   // turned / mirrored tile
@@ -99,6 +109,30 @@ export function drawGid(
   applyCanvasTransform(ctx, t, dx, dy, dw, dh);
   const w = t & TRANSPOSE ? dh : dw;
   const h = t & TRANSPOSE ? dw : dh;
-  ctx.drawImage(img, table.sx[gid], table.sy[gid], s, s, -w / 2, -h / 2, w, h);
+  ctx.drawImage(src, sx, sy, s, s, -w / 2, -h / 2, w, h);
   ctx.restore();
+}
+
+const paddedCache = new WeakMap<object, Map<number, HTMLCanvasElement>>();
+
+/** the tile at (sx, sy) with its edge pixels repeated one pixel outwards */
+function padded(img: CanvasImageSource, sx: number, sy: number, s: number): HTMLCanvasElement {
+  let m = paddedCache.get(img as object);
+  if (!m) paddedCache.set(img as object, (m = new Map()));
+  const key = sy * 65536 + sx;
+  let c = m.get(key);
+  if (c) return c;
+  c = document.createElement('canvas');
+  c.width = s + 2;
+  c.height = s + 2;
+  const g = c.getContext('2d')!;
+  g.imageSmoothingEnabled = false;
+  g.drawImage(img, sx, sy, s, s, 1, 1, s, s);
+  // edges: rows / columns stretched outwards, then the corners
+  g.drawImage(c, 1, 1, s, 1, 1, 0, s, 1);
+  g.drawImage(c, 1, s, s, 1, 1, s + 1, s, 1);
+  g.drawImage(c, 1, 0, 1, s + 2, 0, 0, 1, s + 2);
+  g.drawImage(c, s, 0, 1, s + 2, s + 1, 0, 1, s + 2);
+  m.set(key, c);
+  return c;
 }

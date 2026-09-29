@@ -120,7 +120,7 @@ interface ProjectState {
 
   setMapSize: (w: number, h: number) => void;
   setTileSize: (size: number) => void;
-  setMapOptions: (patch: Partial<Pick<MapSettings, 'perspective' | 'shadows' | 'wallRows'>>) => void;
+  setMapOptions: (patch: Partial<Pick<MapSettings, 'perspective' | 'shadows' | 'wallRows' | 'pixelLook'>>) => void;
   setMode: (mode: ProjectMode) => void;
   updateGenerator: (patch: Partial<GeneratorSettings>) => void;
   applyPreset: (id: string) => void;

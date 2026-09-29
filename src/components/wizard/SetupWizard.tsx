@@ -260,7 +260,7 @@ function WizardDialog() {
         </ol>
 
         <div className="wizard-body" ref={bodyRef}>
-          {id === 'game' && <GameStep draft={draft} onChange={setProfile} onMode={(mode) => setDraft((d) => ({ ...d, mode }))} />}
+          {id === 'game' && <GameStep draft={draft} onChange={setProfile} onMode={(mode) => setDraft((d) => ({ ...d, mode }))} onLook={(pixelLook) => setMap({ pixelLook })} />}
 
           {id === 'perspective' && (
             <StepSection title="Wie soll deine Map dargestellt werden?">
@@ -675,7 +675,7 @@ export function prepareBuildKit() {
 }
 
 /** Step 1: what kind of game – view, genre, effort. Changes the start values of all later steps. */
-function GameStep({ draft, onChange, onMode }: { draft: Draft; onChange: (p: Partial<GameProfile>) => void; onMode: (m: ProjectMode) => void }) {
+function GameStep({ draft, onChange, onMode, onLook }: { draft: Draft; onChange: (p: Partial<GameProfile>) => void; onMode: (m: ProjectMode) => void; onLook: (l: 'pixel' | 'smooth') => void }) {
   const { profile, gen, map } = draft;
   const genres = GENRES.filter((g) => g.views.includes(profile.view));
   const specials = SPECIALS.filter((s) => gen.specials[s.id]).map((s) => s.label);
@@ -756,10 +756,35 @@ function GameStep({ draft, onChange, onMode }: { draft: Draft; onChange: (p: Par
           ))}
         </div>
       </div>
+      <PixelLookField value={map.pixelLook ?? 'pixel'} onChange={onLook} />
       <p className="note game-summary">
         Voreingestellt: <strong>{map.width} × {map.height} Tiles</strong> · <strong>{gen.roomCount} Räume</strong> ({gen.roomMinW}–{gen.roomMaxW} Tiles breit) · Deko {gen.decoDensity} % ·
         Spezialräume: {specials.join(', ') || 'keine'}. Alles lässt sich im nächsten Schritt oder später links unter „Aufbau“ ändern.
       </p>
     </StepSection>
+  );
+}
+
+/** Pixel-Look: crisp pixels (retro) or smoothed when tiles are scaled up */
+export function PixelLookField({ value, onChange }: { value: 'pixel' | 'smooth'; onChange: (v: 'pixel' | 'smooth') => void }) {
+  return (
+    <div className="field">
+      <label>Pixel-Look</label>
+      <div className="choice-grid game-effort" role="radiogroup" aria-label="Pixel-Look">
+        {(
+          [
+            ['pixel', 'Pixelig', 'Scharfe, sichtbare Pixel – der klassische Retro-Look.'],
+            ['smooth', 'Weich', 'Vergrößerte Kacheln und Figuren werden geglättet – weniger pixelig, etwas weicher.'],
+          ] as const
+        ).map(([v, title, text]) => (
+          <button key={v} type="button" role="radio" aria-checked={value === v} className={`choice-card${value === v ? ' is-selected' : ''}`} onClick={() => onChange(v)}>
+            <span className="choice-text">
+              <strong>{title}</strong>
+              <small>{text}</small>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -160,6 +160,19 @@ export function MapSection({ manual = false }: { manual?: boolean }) {
           {faceRowsOf(map) > 0 && ownWithoutFront && <p className="hint is-warn">Dein Tileset hat noch keine Front-Tiles – die Mauer darunter kommt deshalb aus den Demo-Tiles. Lege sie unter Tiles → Tilesets → Raum bauen mit „Wand-Vorderseite: 1 Reihe“ fest.</p>}
         </div>
       )}
+      <div className="field">
+        <label>Pixel-Look</label>
+        <Segmented
+          label="Pixel-Look"
+          value={map.pixelLook ?? 'pixel'}
+          options={[
+            { value: 'pixel', label: 'Pixelig' },
+            { value: 'smooth', label: 'Weich' },
+          ]}
+          onChange={(pixelLook) => setMapOptions({ pixelLook })}
+        />
+        <p className="hint">{(map.pixelLook ?? 'pixel') === 'pixel' ? 'Scharfe, sichtbare Pixel – klassischer Retro-Look.' : 'Vergrößerte Kacheln werden geglättet – weniger pixelig. Gilt auch für PNG- und Godot-Export.'} Für mehr Details ein Tileset mit größeren Kacheln verwenden.</p>
+      </div>
       {!side && map.perspective !== 'hex' && map.perspective !== 'isometric' && <Toggle label="Schatten" description="Wände werfen Schatten" checked={map.shadows} onChange={(shadows) => setMapOptions({ shadows })} />}
       <details className="more" open={side}>
         <summary>{manual ? 'Genaue Größe und Tilegröße' : 'Genaue Größe, Tilegröße, Seed'}</summary>

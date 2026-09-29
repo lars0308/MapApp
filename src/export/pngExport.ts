@@ -37,7 +37,7 @@ export async function renderMapPng(p: Project, o: PngOptions): Promise<Blob> {
   canvas.width = W * s;
   canvas.height = H * s;
   const ctx = canvas.getContext('2d')!;
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = p.map.pixelLook === 'smooth';
   if (o.background) {
     ctx.fillStyle = '#101014';
     ctx.fillRect(0, 0, canvas.width, canvas.height);

@@ -83,6 +83,7 @@ export function MapCanvas() {
     r.objects = p.objects;
     r.backdrop = backdropOf(p);
     r.hex = p.map.perspective === 'hex';
+    r.smooth = p.map.pixelLook === 'smooth';
     applyIso(r, p);
     fitTileToPerspective(p);
 
@@ -120,6 +121,12 @@ export function MapCanvas() {
         r.fit();
       } else if (r.iso && (p.result !== prev.result || tilesetsChanged)) applyIso(r, p);
       if (p.map.perspective !== prev.map.perspective || projectSwitched) fitTileToPerspective(p);
+      if ((p.map.pixelLook === 'smooth') !== r.smooth) {
+        // cached chunks were drawn with the old look
+        r.smooth = p.map.pixelLook === 'smooth';
+        r.setDocument(p.map.width, p.map.height, p.layers, p.tilesets);
+        r.requestRender();
+      }
       if (backdropOf(p) !== r.backdrop) {
         r.backdrop = backdropOf(p);
         r.requestRender();

@@ -40,26 +40,28 @@ export function tilesetImageName(ts: Tileset): string {
 }
 
 /** Scale a tileset PNG so each tile has `tileSize` pixels. */
-export async function scaledTilesetPng(ts: Tileset, tileSize: number): Promise<Blob> {
+export async function scaledTilesetPng(ts: Tileset, tileSize: number, smooth = false): Promise<Blob> {
   const img = await loadImage(ts.dataUrl);
   const canvas = document.createElement('canvas');
   canvas.width = ts.columns * tileSize;
   canvas.height = ts.rows * tileSize;
   const ctx = canvas.getContext('2d')!;
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = smooth;
+  ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, 0, 0, ts.columns * ts.tileSize, ts.rows * ts.tileSize, 0, 0, canvas.width, canvas.height);
   return canvasToBlob(canvas);
 }
 
 /** Object sprite atlas scaled to the map tile size. */
-export async function scaledObjectsPng(tileSize: number): Promise<Blob> {
+export async function scaledObjectsPng(tileSize: number, smooth = false): Promise<Blob> {
   const atlas = objectAtlas().canvas;
   const s = tileSize / OBJECT_ATLAS_TILE;
   const canvas = document.createElement('canvas');
   canvas.width = atlas.width * s;
   canvas.height = atlas.height * s;
   const ctx = canvas.getContext('2d')!;
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = smooth;
+  ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(atlas, 0, 0, canvas.width, canvas.height);
   return canvasToBlob(canvas);
 }
@@ -221,9 +223,9 @@ export async function buildGodotData(p: Project, opts: { embedImages: boolean; i
     format: GODOT_FORMAT,
     generator: 'MapForge',
     exportedAt: new Date().toISOString(),
-    map: { name: p.name, width: W, height: H, tileSize, seed: r?.seed ?? p.generator.seed, perspective: p.map.perspective, shadows: p.map.shadows },
+    map: { name: p.name, width: W, height: H, tileSize, seed: r?.seed ?? p.generator.seed, perspective: p.map.perspective, shadows: p.map.shadows, smooth: p.map.pixelLook === 'smooth' },
     tilesets,
-    ...(opts.embedImages ? { objectsImageBase64: await blobToBase64(await scaledObjectsPng(tileSize)) } : {}),
+    ...(opts.embedImages ? { objectsImageBase64: await blobToBase64(await scaledObjectsPng(tileSize, p.map.pixelLook === 'smooth')) } : {}),
     objectsImage: OBJECTS_IMAGE,
     terrains: p.terrains,
     layers,

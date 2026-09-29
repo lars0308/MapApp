@@ -32,6 +32,7 @@ Gib den Plan IMMER über das Werkzeug submit_plan ab (genau ein Aufruf, kein Tex
   "width": Zahl 24–160, "height": Zahl 24–160,
   "generator": { nur die Einstellungen, die du ändern willst – gleiche Schlüssel und Form wie die Standardwerte unten },
   "tips": ["höchstens 3 kurze deutsche Tipps für danach, optional"],
+  "pixelLook": "pixel" | "smooth" – nur setzen, wenn der Nutzer den Look nennt ("pixelig", "retro" → pixel; "nicht so pixelig", "weich", "glatt" → smooth),
   "figures": [ optional, siehe oben ]
 }
 
@@ -81,6 +82,7 @@ const PLAN_TOOL = {
       height: { type: 'integer' },
       generator: { type: 'object' },
       tips: { type: 'array', items: { type: 'string' } },
+      pixelLook: { type: 'string', enum: ['pixel', 'smooth'] },
       figures: {
         type: 'array',
         items: {

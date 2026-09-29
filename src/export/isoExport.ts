@@ -217,7 +217,7 @@ export function buildIsoScene(plan: IsoPlan, data: GodotData, opts: { player: bo
     return n === 1 ? clean : `${clean}_${n}`;
   };
   const node = (n: string, type: string, parent: string | null, props: string[] = []) => nodes.push([`[node name=${str(n)} type="${type}"${parent === null ? '' : ` parent=${str(parent)}`}]`, ...props].join('\n'));
-  node('Map', 'Node2D', null, ['texture_filter = 1', 'script = ExtResource("1_loader")', 'baked = true', ...(opts.player ? ['player_scene = ExtResource("4_player")'] : [])]);
+  node('Map', 'Node2D', null, [data.map.smooth ? 'texture_filter = 2' : 'texture_filter = 1', 'script = ExtResource("1_loader")', 'baked = true', ...(data.map.smooth ? ['smooth = true'] : []), ...(opts.player ? ['player_scene = ExtResource("4_player")'] : [])]);
   // ground first (flat, not sorted), then the World: blocks, upright tiles, objects and characters by depth
   const flat = data.layers.filter((l) => isoKindOf(l.role) === 'flat');
   const deep = data.layers.filter((l) => {

@@ -242,6 +242,8 @@ export interface MapSettings {
    * undefined = what the view has by default (Top-Down 0, Low Top-Down 1, 45° 2)
    */
   wallRows?: number;
+  /** "pixel": crisp pixels when tiles are scaled up (default); "smooth": scaled tiles are smoothed */
+  pixelLook?: 'pixel' | 'smooth';
 }
 
 export type RoomShape = 'rect' | 'l' | 't' | 'cross' | 'irregular' | 'hall';

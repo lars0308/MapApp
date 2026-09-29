@@ -5,6 +5,7 @@ import { Icon } from '../components/icons';
 import { useEditor } from '../store/editorStore';
 import { useProject } from '../store/projectStore';
 import { formatCost, runAgent, useAgent } from '../api/agent';
+import { styleHint } from '../api/describe';
 
 const EXAMPLES: Record<SpriteKind, string[]> = {
   character: ['An den Stil meiner Karte anpassen', 'Details und Schattierung verbessern', 'Roten Umhang und Krone dazu', 'Als Ork-Krieger umgestalten'],
@@ -24,6 +25,7 @@ export function FigureAiPanel({ kind }: { kind: SpriteKind }) {
       `Arbeite an der Figur, die gerade im Baukasten offen ist (kind "${kind}"). Wunsch des Nutzers: ${wish.trim()}`,
       'Ändere diese Figur (kein figure_new, außer der Nutzer will eine neue). Lies zuerst figure_status und figure_render.',
       /stil|karte|passend/i.test(wish) ? 'Für den Stil: style_colors lesen und Farben, Umriss und Pixelgröße übernehmen.' : '',
+      styleHint(),
       'Prüfe das Ergebnis mit figure_render. Zum Schluss figure_save.',
     ].filter(Boolean).join('\n');
     try {

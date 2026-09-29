@@ -174,6 +174,8 @@ export class MapRenderer {
 
   /** hex map (odd rows shifted, rows 3/4 apart) – see generator/hex.ts */
   hex = false;
+  /** Aussehen "Weich": scaled tiles are smoothed instead of crisp pixels */
+  smooth = false;
   /**
    * isometric diamond map: cell (x, y) is a diamond 2 world units wide and 1 high, its top corner at
    * world (x − y + H, (x + y) / 2 + ISO_TOP); walls stand as blocks, raised floor (heights) as
@@ -306,7 +308,7 @@ export class MapRenderer {
       chunk.canvas.height = CHUNK * ppt;
     }
     const c = chunk.canvas.getContext('2d')!;
-    c.imageSmoothingEnabled = false;
+    c.imageSmoothingEnabled = this.smooth;
     c.clearRect(0, 0, chunk.canvas.width, chunk.canvas.height);
     const cx0 = (ci % this.chunkCols) * CHUNK;
     const cy0 = Math.floor(ci / this.chunkCols) * CHUNK;
@@ -468,7 +470,7 @@ export class MapRenderer {
     const { ctx, cam } = this;
     const z = cam.zoom;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = this.smooth;
     ctx.fillStyle = COLORS.outside;
     ctx.fillRect(0, 0, this.viewW, this.viewH);
 
@@ -528,6 +530,7 @@ export class MapRenderer {
         if (!atlas || r1 <= r0) return;
         const dx = sx(o.x);
         const dy = sy(top + r0);
+        ctx.imageSmoothingEnabled = this.smooth;
         ctx.drawImage(atlas, def.sx * A, (def.sy + r0) * A, def.w * A, (r1 - r0) * A, dx, dy, sx(o.x + def.w) - dx, sy(top + r1) - dy);
       };
       items.push({ key: o.y + 1, draw: () => drawRows(def.overheadRows, def.h) });
@@ -558,7 +561,7 @@ export class MapRenderer {
       const cy0 = Math.floor(y0 / CHUNK);
       const cx1 = Math.ceil(x1 / CHUNK);
       const cy1 = Math.ceil(y1 / CHUNK);
-      ctx.imageSmoothingEnabled = z < this.cachePpt * 0.5;
+      ctx.imageSmoothingEnabled = this.smooth || z < this.cachePpt * 0.5;
       ctx.imageSmoothingQuality = 'medium';
       for (let cy = cy0; cy < cy1; cy++)
         for (let cx = cx0; cx < cx1; cx++) {
@@ -570,7 +573,7 @@ export class MapRenderer {
           const dy = sy(cy * CHUNK);
           ctx.drawImage(canvas, dx, dy, sx(cx * CHUNK + CHUNK) - dx, sy(cy * CHUNK + CHUNK) - dy);
         }
-      ctx.imageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = this.smooth;
       // zoomed out: the cache already holds all y-sorted tiles; objects go on top
       items.sort((a, b) => a.key - b.key);
       for (const it of items) it.draw();
@@ -679,7 +682,7 @@ export class MapRenderer {
     const { ctx, cam } = this;
     const z = cam.zoom;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = this.smooth;
     // zoomed out: smooth down-scaling, otherwise single outline pixels of the hexes form stripes
     const smooth = z * this.dpr < 24;
     ctx.fillStyle = COLORS.outside;
@@ -714,7 +717,7 @@ export class MapRenderer {
         }
     }
     ctx.globalAlpha = 1;
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = this.smooth;
     const hexPath = (x: number, y: number, inset = 0) => {
       const [ox, oy] = hexOrigin(x, y);
       HEX_CORNERS.forEach(([cx, cy], k) => {
@@ -820,7 +823,7 @@ export class MapRenderer {
     const W = this.W;
     const H = this.H;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = this.smooth;
     ctx.fillStyle = COLORS.outside;
     ctx.fillRect(0, 0, this.viewW, this.viewH);
     const sx = (wx: number) => (wx - cam.x) * z;
@@ -876,9 +879,9 @@ export class MapRenderer {
     if (z < 10) {
       const cache = this.isoFlatCache(flat, heights);
       const [ox, oy] = [sx(0), sy(0)];
-      ctx.imageSmoothingEnabled = z < cache.ppt * 0.6;
+      ctx.imageSmoothingEnabled = this.smooth || z < cache.ppt * 0.6;
       ctx.drawImage(cache.canvas, ox, oy, this.worldW * z, this.worldH * z);
-      ctx.imageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = this.smooth;
     } else {
       for (const i of cells) {
         if (lifted(i)) continue;
@@ -1031,7 +1034,7 @@ export class MapRenderer {
       const g = c.canvas.getContext('2d')!;
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.clearRect(0, 0, c.canvas.width, c.canvas.height);
-      g.imageSmoothingEnabled = false;
+      g.imageSmoothingEnabled = this.smooth;
       for (let i = 0; i < this.W * this.H; i++) {
         if (heights && heights[i] > 0) continue;
         const [wx, wy] = this.toWorld(i % this.W, (i / this.W) | 0);

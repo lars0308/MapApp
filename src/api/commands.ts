@@ -142,6 +142,7 @@ async function renderArea(p: Project, x: number, y: number, w: number, h: number
   const canvas = document.createElement('canvas');
   const r = new MapRenderer(canvas);
   r.hex = p.map.perspective === 'hex';
+  r.smooth = p.map.pixelLook === 'smooth';
   applyIso(r, p);
   r.backdrop = p.map.perspective === 'side_view' ? (SIDE_THEMES[p.generator.side?.style ?? 'outdoor'] ?? SIDE_THEMES.outdoor).backdrop : 'plain';
   r.setDocument(p.map.width, p.map.height, p.layers, p.tilesets);

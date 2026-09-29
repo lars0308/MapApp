@@ -66,11 +66,12 @@ async function godotEntries(p: Project, folder: string, includeShadows: boolean,
     { path: `${folder}/${GODOT_LOADER_FILENAME}`, data: GODOT_LOADER_SCRIPT },
     { path: `${folder}/README.md`, data: GODOT_README },
   ];
-  const objectsPng = await scaledObjectsPng(p.map.tileSize);
+  const smooth = p.map.pixelLook === 'smooth';
+  const objectsPng = await scaledObjectsPng(p.map.tileSize, smooth);
   entries.push({ path: `${folder}/${OBJECTS_IMAGE}`, data: new Uint8Array(await objectsPng.arrayBuffer()) });
   const exportedIds = new Set(data.tilesets.map((t) => t.id));
   for (const ts of p.tilesets.filter((t) => exportedIds.has(t.id))) {
-    const png = await scaledTilesetPng(ts, p.map.tileSize);
+    const png = await scaledTilesetPng(ts, p.map.tileSize, smooth);
     entries.push({ path: `${folder}/tilesets/${tilesetImageName(ts)}`, data: new Uint8Array(await png.arrayBuffer()) });
   }
   // diamond view: own iso sheets (diamonds, blocks, upright tiles) for the ready TileSet and scene

@@ -30,6 +30,8 @@ class_name MapForgeLoader
 @export var player_scene: PackedScene
 @export var player_camera_zoom: float = 2.0
 @export var build_on_ready: bool = true
+## MapForge "Aussehen: Weich": linear texture filter instead of crisp pixels
+@export var smooth: bool = false
 ## the scene already contains tiles and objects (Map.tscn from MapForge): only runtime parts are added
 @export var baked: bool = false
 ## Collision layer keeps its physics but is not drawn
@@ -63,7 +65,8 @@ var _hex_roads := PackedByteArray()
 
 
 func _ready() -> void:
-	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # crisp pixel art
+	# crisp pixel art, or smoothed (MapForge "Aussehen: Weich")
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR if smooth else CanvasItem.TEXTURE_FILTER_NEAREST
 	if build_on_ready:
 		build_now()
 
@@ -77,6 +80,9 @@ func build_now() -> void:
 	if map_data.is_empty():
 		return
 	var info: Dictionary = map_data.get("map", {})
+	if info.get("smooth", false):
+		smooth = true
+		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	tile_size = int(info.get("tileSize", 16))
 	perspective = str(info.get("perspective", "top_down"))
 	print("MapForge: '%s' %dx%d tiles, %d px, perspective %s, seed %s" % [

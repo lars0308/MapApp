@@ -335,6 +335,25 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.42 – Ladeanzeigen, KI sortiert Tilesets vor, kleine Motive, Pixel-Look**
+
+- **Ladeanzeige überall, wo etwas dauert:** Generieren, Projekt öffnen, Tileset einlesen oder zuschneiden, Godot- und PNG-Export, Sicherung wiederherstellen. Eine große Karte in der Mitte sagt, was gerade passiert, mit hüpfenden Pixel-Blöcken als Animation.
+- **Die KI sagt groß, was sie tut:** Das KI-Banner ist jetzt eine große Karte. Sie zeigt „KI liest & versteht“ (Tileset ansehen, Karte prüfen), „KI denkt nach“ oder „KI baut“, dazu den aktuellen Schritt und einen Stopp-Knopf. Beim Planen auf der Startseite steht dort „Die KI liest deine Beschreibung …“.
+- **Die KI sortiert Tilesets vor:** Beim Hochladen schaut sich die KI das Tileset abschnittsweise an. Jeder Abschnitt hat ein nummeriertes Raster. Sie ordnet Boden, Boden-Ränder, Wände, Außen- und Innenecken, Wand-Fronten, Türen, Wasser, Wege, Deko und Hindernisse zu. Danach öffnet sich der Raum-Baukasten **schon ausgefüllt**:
+  - Vorschläge der KI sind gestrichelt.
+  - Fehlende Felder sind rot mit „fehlt“.
+  - Eine Zeile oben sagt, was noch fehlt.
+  - Für vorhandene Tilesets gibt es „Mit KI vorsortieren“.
+- **Kachelgröße aus dem Tileset:** Das erste eigene Tileset gibt die Kachelgröße der Karte vor, damit die Pixel 1:1 dargestellt werden. Das gilt auch im Assistenten.
+- **Kleines Motiv:** Statt einer ganzen Karte nur ein Stück, mit einem Tipp erstellt:
+  - Haus mit Garten, Haus von innen, Waldlichtung, Strand, Teich, Fluss mit Brücke, Dorfplatz, Dungeon-Raum, Bossraum, Höhlenkammer
+  - auf der Startseite als eigene Karte „Kleines Motiv“
+  - unter Aufbau → Karte für die aktuelle Ebene
+  - Karten mit nur einer Lichtung bekommen jetzt auch Häuser bzw. einen Teich.
+  - Wasserflächen sind runder, ohne eckige, dünne Ausläufer.
+- **Pixel-Look: Pixelig oder Weich** (Assistent, erster Schritt, und Aufbau → Karte). „Weich“ glättet vergrößerte Kacheln, ohne Fugen zwischen den Tiles. Das gilt auch für den PNG-Export und in Godot (linearer statt Nearest-Filter). Die KI zeichnet Figuren passend dazu: pixelig mit klaren Pixeln, weich mit mehr Farbstufen und sanften Übergängen. Auf der Startseite erkennt sie Wünsche wie „nicht so pixelig“.
+- Die KI-Animationen laufen nicht mehr automatisch mit, sondern nur noch, wenn du ausdrücklich danach fragst.
+
 **Version 3.41 – KI animiert Figuren im Stil deiner Karte**
 
 - **Neuer Reiter „KI“ im Figuren-Baukasten:** Schreib, was die KI an der offenen Figur machen soll, zum Beispiel „Umhang beim Laufen mitschwingen lassen“, „Neue Animation: Feuerzauber“, „An den Stil meiner Karte anpassen“ oder „Details verbessern“. Du siehst live, was sie tut, und kannst im Banner stoppen.

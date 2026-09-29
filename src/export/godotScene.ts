@@ -183,7 +183,7 @@ export function buildMapScene(data: GodotData, opts: { player: boolean }): strin
   const nodes: string[] = [];
   const node = (n: string, type: string, parent: string | null, props: string[] = []) => nodes.push([`[node name=${str(n)} type="${type}"${parent === null ? '' : ` parent=${str(parent)}`}]`, ...props].join('\n'));
 
-  node('Map', 'Node2D', null, ['texture_filter = 1', 'script = ExtResource("1_loader")', 'baked = true', ...(opts.player ? ['player_scene = ExtResource("4_player")'] : [])]);
+  node('Map', 'Node2D', null, [data.map.smooth ? 'texture_filter = 2' : 'texture_filter = 1', 'script = ExtResource("1_loader")', 'baked = true', ...(data.map.smooth ? ['smooth = true'] : []), ...(opts.player ? ['player_scene = ExtResource("4_player")'] : [])]);
 
   // layers: the first y-sorted layer opens the World (y-sorted with objects and characters),
   // non-sorted layers after it are drawn above it
