@@ -183,7 +183,8 @@ function WizardDialog() {
       const store = useProject.getState();
       store.loadProject(
         createProject(draft.name.trim() || 'Neues Projekt', {
-          map: draft.map,
+          // own tilesets: the map uses their tile size (pixels 1:1)
+          map: lib.length ? { ...draft.map, tileSize: lib[0].tileSize } : draft.map,
           generator: gen,
           terrains: draft.terrains,
           mode: draft.mode,

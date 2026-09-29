@@ -1,3 +1,5 @@
+import { aiSortTileset } from './aiSort';
+import { busyStep, withBusy } from '../store/busy';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useProject } from '../store/projectStore';
 import { useEditor } from '../store/editorStore';
@@ -8,7 +10,7 @@ import { ObjectThumb } from '../objects/ObjectThumb';
 import { tileBlocks } from '../editor/collision';
 import { PERSPECTIVE_INFO } from '../generator/perspective';
 import { tilesetSupports } from './tilePools';
-import { formatCost, runAgent, useAgent } from '../api/agent';
+import { formatCost } from '../api/agent';
 import { CATEGORIES, CATEGORY_LABEL, SUGGESTED_TAGS } from './categories';
 import { TileThumb } from './TileThumb';
 import { AssignSummary, TileLabel, confirmedMetas, suggestMetas } from './TileLabel';
@@ -52,18 +54,33 @@ interface PaletteItem {
 }
 
 /** the AI looks at the tileset in sections and assigns floor, walls, water, doors, deco … */
-function AiAssignButton({ ts }: { ts: Tileset }) {
+/** "Mit KI vorsortieren": the AI looks at the sheet section by section, then the room builder opens filled */
+function AiSortButton({ ts, onDone }: { ts: Tileset; onDone: () => void }) {
   const toast = useEditor((s) => s.toast);
-  const running = useAgent((s) => s.running);
-  const run = () =>
-    void runAgent(
-      `Ordne das Tileset „${ts.name}“ (id ${ts.id}, ${ts.columns}×${ts.rows} Tiles à ${ts.tileSize} px) zu: schau es dir mit tileset_render abschnittsweise an und setze mit tileset_assign Kategorie, Rolle und Tags – Boden, Wände mit ihren Rollen (Kanten, Ecken, Innenecken, Fronten), Wasser, Wege, Türen, Deko, Hindernisse. Leere oder unklare Tiles auslassen. Danach generate, damit die Karte mit dem Tileset gebaut wird.`,
-    )
-      .then((done) => toast(`${done.text || 'Tiles zugeordnet'} (KI-Kosten ${formatCost(done.cost)})`, 'success'))
-      .catch((e: unknown) => toast(e instanceof Error ? e.message : 'KI-Zuordnung fehlgeschlagen', 'error'));
+  const perspective = useProject((s) => s.project.map.perspective);
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      const ai = await withBusy(
+        'Die KI schaut sich dein Tileset an …',
+        () => aiSortTileset(ts, perspective, (done, total) => busyStep('Die KI schaut sich dein Tileset an …', `Sie sortiert Boden, Wände, Ecken und Deko vor – Abschnitt ${Math.min(done + 1, total)} von ${total}`)),
+        { ai: true, detail: 'Sie sortiert Boden, Wände, Ecken und Deko vor' },
+      );
+      // confirmed tiles stay as they are, the rest gets the AI's suggestion
+      const keep = Object.fromEntries(Object.entries(ai.tiles).filter(([k]) => !ts.tiles[Number(k)] || ts.tiles[Number(k)].auto));
+      useProject.getState().mergeTileMetas(ts.id, keep);
+      toast(`Die KI hat ${ai.recognised} Tiles vorsortiert – prüfe den Raum (KI-Kosten ${formatCost(ai.cost)})`, 'success');
+      onDone();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'KI-Vorsortierung fehlgeschlagen', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
-    <Button variant="secondary" block icon={<Icon.Spark size={16} />} disabled={running} onClick={run}>
-      {running ? 'Die KI arbeitet …' : 'Mit KI zuordnen'}
+    <Button variant="secondary" block icon={<Icon.Spark size={16} />} disabled={busy} onClick={() => void run()}>
+      {busy ? 'Die KI sortiert …' : 'Mit KI vorsortieren'}
     </Button>
   );
 }
@@ -600,7 +617,7 @@ function TilesetCard({ ts }: { ts: Tileset }) {
           void learnFrom({ ...ts, tiles: { ...ts.tiles, ...confirmed } });
         }}
       />
-      {ts.source === 'upload' && <AiAssignButton ts={ts} />}
+      {ts.source === 'upload' && <AiSortButton ts={ts} onDone={() => setMarking(true)} />}
       <div className="field">
         <label>Geeignet für</label>
         <div className="chips">

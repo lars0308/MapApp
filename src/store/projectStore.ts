@@ -386,7 +386,14 @@ export const useProject = create<ProjectState>((set, get) => {
     addTileset: (ts) => {
       const p = get().project;
       const full: Tileset = { ...ts, firstGid: p.nextGid };
-      touch({ ...p, tilesets: [...p.tilesets, full], nextGid: p.nextGid + ts.columns * ts.rows });
+      // the first own tileset sets the map's tile size: its pixels are shown 1:1, not stretched
+      const firstOwn = ts.source !== 'demo' && !p.tilesets.some((t) => t.source !== 'demo');
+      const map = firstOwn && ts.tileSize !== p.map.tileSize ? { ...p.map, tileSize: ts.tileSize } : p.map;
+      touch({ ...p, map, tilesets: [...p.tilesets, full], nextGid: p.nextGid + ts.columns * ts.rows });
+      if (map !== p.map) {
+        mapEvents.emit({ type: 'all' });
+        useEditor.getState().toast(`Kachelgröße der Karte an dein Tileset angepasst: ${ts.tileSize} px`, 'success');
+      }
     },
     removeTileset: (id) => {
       const ts = get().project.tilesets.find((t) => t.id === id);

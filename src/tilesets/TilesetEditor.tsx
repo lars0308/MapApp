@@ -8,6 +8,9 @@ import { AssignSummary, TileLabel, confirmedMetas, suggestMetas } from './TileLa
 import { autoAssign } from './autoAssign';
 import { QuickPick } from './QuickPick';
 import { RoomMarker, applyRoom, matchWallRows } from './RoomMarker';
+import { aiSortTileset } from './aiSort';
+import { busyStep, withBusy } from '../store/busy';
+import { formatCost } from '../api/agent';
 import { learnFrom, similarTiles } from './learning';
 import { TileInspector } from './TilesPanel';
 import { useEditor } from '../store/editorStore';
@@ -62,11 +65,25 @@ export function TilesetEditor({
     try {
       const dataUrl = await readFileAsDataUrl(f);
       // draft gids start at 1 (own id space, only used inside the wizard)
-      const { ts, note } = await createTilesetFromFile(f.name.replace(/\.[^.]+$/, ''), dataUrl, 16, 1);
+      const { ts, note } = await withBusy('Dein Tileset wird eingelesen …', () => createTilesetFromFile(f.name.replace(/\.[^.]+$/, ''), dataUrl, 16, 1), { detail: 'Kachelgröße erkennen, leere Felder finden' });
       if (note.includes('Einzelteile') || note.includes('kein klares')) toast(`${f.name}: ${note}`, 'success');
       setDetected(ts.tileSize);
-      // first guess for every tile – the user only corrects
-      setUpload({ ...ts, perspectives: [perspective], tiles: await autoAssign(ts) });
+      // first guess for every tile (rules), then the AI sorts it properly – the user only checks
+      let tiles = await autoAssign(ts);
+      setUpload({ ...ts, perspectives: [perspective], tiles });
+      try {
+        const ai = await withBusy(
+          'Die KI schaut sich dein Tileset an …',
+          () => aiSortTileset({ ...ts, tiles }, perspective, (done, total) => busyStep('Die KI schaut sich dein Tileset an …', `Sie sortiert Boden, Wände, Ecken und Deko vor – Abschnitt ${Math.min(done + 1, total)} von ${total}`)),
+          { ai: true, detail: 'Sie sortiert Boden, Wände, Ecken und Deko vor' },
+        );
+        tiles = { ...tiles, ...ai.tiles };
+        setUpload({ ...ts, perspectives: [perspective], tiles });
+        toast(`Die KI hat ${ai.recognised} Tiles vorsortiert – prüfe den Raum und ergänze, was fehlt (KI-Kosten ${formatCost(ai.cost)})`, 'success');
+      } catch (e) {
+        // offline / local build: the rule-based guess stays
+        toast(`KI-Vorsortierung nicht möglich: ${e instanceof Error ? e.message : e} – die automatische Erkennung ist eingetragen`, 'error');
+      }
       setMarked([]);
       // straight into "Raum füllen": tap a tile, tap where it goes in the room
       setMarking(true);

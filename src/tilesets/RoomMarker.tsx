@@ -289,12 +289,28 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
   const [front, setFront] = useState(() => initialFront(ts));
   const [clearOthers, setClearOthers] = useState(true);
   // builder: role → pieces (starts with the tileset's confirmed roles and its turned tiles)
-  const [pieces, setPieces] = useState<Pieces>(() => {
+  // confirmed tiles, then the AI's suggestions, then (for roles still empty) the rule-based guesses
+  const [initial] = useState(() => {
     const out: Pieces = {};
-    for (const [k, m] of Object.entries(ts.tiles)) if (!m.auto && managed(m.role)) (out[m.role!] ??= []).push({ i: Number(k), t: 0 });
+    const suggested = new Set<number>();
+    const entries = Object.entries(ts.tiles).map(([k, m]) => [Number(k), m] as const);
+    for (const [i, m] of entries) if (!m.auto && managed(m.role)) (out[m.role!] ??= []).push({ i, t: 0 });
     for (const v of ts.variants ?? []) (out[v.role] ??= []).push({ i: v.index, t: v.transform });
-    return out;
+    for (const [i, m] of entries)
+      if (m.auto && m.tags.includes('ai') && managed(m.role)) {
+        (out[m.role!] ??= []).push({ i, t: 0 });
+        suggested.add(i);
+      }
+    for (const [i, m] of entries)
+      if (m.auto && !m.tags.includes('ai') && managed(m.role) && (out[m.role!]?.length ?? 0) < 2 && !(out[m.role!] ?? []).some((p) => suggested.has(p.i) || !ts.tiles[p.i]?.auto)) {
+        (out[m.role!] ??= []).push({ i, t: 0 });
+        suggested.add(i);
+      }
+    return { pieces: out, suggested };
   });
+  const [pieces, setPieces] = useState<Pieces>(initial.pieces);
+  /** tiles the AI / the recognition put in – shown dashed until the user places them himself */
+  const [suggested, setSuggested] = useState<Set<number>>(initial.suggested);
   const [slot, setSlot] = useState<TileRole>('corner_top_left');
   const [drag, setDrag] = useState<{ i: number; x: number; y: number; moved: boolean } | null>(null);
   /** builder: tile picked up with a tap – the next tap on a field of the room puts it there */
@@ -324,6 +340,7 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
     const cur = next[role] ?? [];
     next[role] = cur.some((p) => p.i === i && p.t === 0) ? cur.filter((p) => !(p.i === i && p.t === 0)) : [...cur, { i, t: 0 }];
     setPieces(next);
+    if (suggested.has(i)) setSuggested(new Set([...suggested].filter((x) => x !== i)));
     setSlot(role);
   };
   /** tap on a field: the tile in hand goes there, otherwise the field is chosen (turn / mirror / remove) */
@@ -427,7 +444,15 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
           const fb = ringFallback(role);
           const ghost = !p && fb ? (pieces[fb] ?? [])[0] : undefined;
           return (
-            <button key={k} type="button" data-role={role} className={`room-slot${role === slot ? ' is-active' : ''}${list.length ? ' is-set' : ''}`} title={SLOT_LABEL[role]} onClick={() => drop(role)} style={{ width: slotPx, height: slotPx }}>
+            <button
+              key={k}
+              type="button"
+              data-role={role}
+              className={`room-slot${role === slot ? ' is-active' : ''}${list.length ? ' is-set' : ''}${p && suggested.has(p.i) ? ' is-suggested' : ''}${!p && !ghost ? ' is-missing' : ''}`}
+              title={SLOT_LABEL[role]}
+              onClick={() => drop(role)}
+              style={{ width: slotPx, height: slotPx }}
+            >
               {p ? (
                 <span className="room-slot-tile" data-role={role} style={{ ...tileStyle(ts, p.i, slotPx), ...turnStyle(p.t) }} />
               ) : ghost ? (
@@ -436,7 +461,10 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
                   <span className="room-slot-label" data-role={role}>{SLOT_LABEL[role]}</span>
                 </>
               ) : (
-                <span data-role={role}>{SLOT_LABEL[role]}</span>
+                <span data-role={role}>
+                  {SLOT_LABEL[role]}
+                  <b className="room-missing">fehlt</b>
+                </span>
               )}
             </button>
           );
@@ -504,6 +532,7 @@ export function RoomMarker({ ts, onApply, onClose, onTileSize }: { ts: Tileset; 
               ? 'Ist im Tileset ein Raum gezeichnet? Rahmen darüberziehen: die äußeren Ecken werden Ecken, die Ränder Wände, das Innere Boden. Am Handy: erst eine Ecke antippen, dann die gegenüberliegende.'
               : '1. Tile im Tileset antippen. 2. Ins Feld des Raums tippen, wo es hingehört (Ecke, Wand, Tür, Wasser …). Der Boden hat eigene Felder für Mitte, Rand oben, unten, links, rechts und die vier Boden-Ecken – leer bleibende Ränder nehmen den Boden der Mitte. Ziehen geht auch. Mit Drehen / Spiegeln passt du das gewählte Feld an – eine Ecke oder ein Rand reicht, „durch Drehen ergänzen“ setzt die anderen drei. Mehrere Tiles pro Feld = Varianten.'}
           </p>
+          {mode === 'pieces' && <RoomStatus pieces={pieces} front={front} suggested={suggested.size} />}
           <div className={mode === 'pieces' && wide ? 'room-split' : undefined}>
             {sheet}
             {mode === 'pieces' && builder}
@@ -569,4 +598,24 @@ export function applyRoom(ts: Pick<Tileset, 'tiles' | 'variants'>, r: RoomResult
   }
   const variants = r.replaceVariants ? r.variants : [...(clearOthers ? [] : ts.variants ?? []), ...r.variants];
   return { tiles: { ...tiles, ...r.tiles }, variants };
+}
+
+/** what is filled, what the AI suggested, what is still missing */
+function RoomStatus({ pieces, front, suggested }: { pieces: Pieces; front: number; suggested: number }) {
+  const need: TileRole[] = ['corner_top_left', 'corner_top_right', 'corner_bottom_left', 'corner_bottom_right', 'wall_top', 'wall_bottom', 'wall_left', 'wall_right', 'floor_center', ...(front ? (['wall_front'] as TileRole[]) : [])];
+  const missing = need.filter((r) => !(pieces[r] ?? []).length);
+  return (
+    <div className={`room-status${missing.length ? ' has-missing' : ' is-complete'}`} role="status">
+      {suggested > 0 && <p>Die KI hat den Raum vorsortiert – gestrichelte Felder sind Vorschläge. Stimmt ein Feld nicht: Feld antippen → „Entfernen“, dann das richtige Tile setzen.</p>}
+      {missing.length ? (
+        <p>
+          <b>Fehlt noch:</b> {missing.map((r) => SLOT_LABEL[r] ?? r).join(', ')}. Tipp: eine Ecke oder Wand reicht – „durch Drehen ergänzen“ füllt den Rest.
+        </p>
+      ) : (
+        <p>
+          <b>Alles Wichtige ist da.</b> Unten siehst du, wie der Generator damit einen Raum baut.
+        </p>
+      )}
+    </div>
+  );
 }
