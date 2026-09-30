@@ -1,4 +1,4 @@
-import { animPoses, feetInFrame, framesOf, isPixelAnim, renderFrame, animView, frameSize, type AnimDef } from './animation';
+import { animPoses, feetInFrame, framesOf, type Pose, isPixelAnim, renderFrame, animView, frameSize, type AnimDef } from './animation';
 import type { CustomAnim, SpriteDoc, View } from './types';
 import { viewLayers } from './store';
 
@@ -149,6 +149,30 @@ export function checkAnimation(doc: SpriteDoc, anim: AnimDef | CustomAnim, view:
     if (!lying && bb.y1 - ground > 1) issues.push({ frame: i, level: 'error', text: `Figur sinkt ${bb.y1 - ground} px in den Boden` });
     else if (!air && !ownAnim && !lying && feet0 - bb.y1 > 1) issues.push({ frame: i, level: 'error', text: `Füße schweben ${feet0 - bb.y1} px über dem Boden` });
   });
+
+  // parts that vanish: a layer (sword, arm, head) turned behind another one in some frame
+  if (!pixel && !anim.id.includes('death')) {
+    const parts = doc.layers.filter((l) => l.visible && l.slot !== 'shadow' && l.region !== 'ground').slice(0, 12);
+    const shown = (l: typeof parts[number], full: Uint8ClampedArray, pose: Pose) => {
+      const without = renderFrame({ ...doc, layers: doc.layers.filter((x) => x.id !== l.id) }, pose, v);
+      let c = 0;
+      for (let k = 0; k < full.length; k += 4) if (full[k + 3] > 40 && (full[k] !== without[k] || full[k + 1] !== without[k + 1] || full[k + 2] !== without[k + 2] || without[k + 3] <= 40)) c++;
+      return c;
+    };
+    for (const l of parts) {
+      const base = shown(l, still, {});
+      if (base < 6) continue;
+      let worst = 1;
+      let at = -1;
+      poses.forEach((p, i) => {
+        if (p.lie || p.alpha !== undefined || p.flash) return;
+        const r = shown(l, renderFrame(doc, p, v), p) / base;
+        if (r < worst) (worst = r), (at = i);
+      });
+      if (at >= 0 && worst < 0.35)
+        issues.push({ frame: at, level: worst < 0.2 ? 'error' : 'hint', text: `„${l.name}“ ist hier fast ganz verdeckt (${Math.round(worst * 100)} % sichtbar) – dreht es sich hinter ein anderes Teil? Waffe als eigene Ebene (region weapon) abtrennen oder die Ebenen-Reihenfolge ändern` });
+    }
+  }
 
   // motion between frames: one step much bigger than the others = a jerk
   if (frames.length > 1) {

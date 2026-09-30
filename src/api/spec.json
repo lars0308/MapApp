@@ -1639,7 +1639,7 @@
     },
     {
       "name": "figure_layer_split",
-      "description": "Cut part of a layer off into its own layer that moves as a body region – makes uploaded pictures (one layer, moving as a whole) animatable in parts: head, arms, legs, weapon, lid, effect. Pixels by rectangles and/or a mask (rows with '#' at x/y). The turning point is set automatically (arm: shoulder, leg: hip, head: neck) – check it. into = add to an existing part layer.",
+      "description": "Cut part of a layer off into its own layer that moves as a body region – makes uploaded pictures (one layer, moving as a whole) animatable in parts: head, arms, legs, weapon, lid, effect. Pixels by rectangles and/or a mask (rows with '#' at x/y). The turning point is set automatically (arm: shoulder, leg: hip, head: neck) – check it. into = add to an existing part layer. Always cut a held weapon off on its own (region weapon, pivot on the grip) – cut together with the arm it turns backwards in swings and hides behind the head.",
       "input": {
         "type": "object",
         "properties": {

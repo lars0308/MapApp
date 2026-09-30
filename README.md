@@ -335,6 +335,16 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.46 – Eigene Bilder: bessere Reihenfolge der Teile, verdeckte Teile werden erkannt**
+
+- **Reihenfolge der abgetrennten Teile** wie in der Seitenansicht üblich: hinterer Arm und hinteres Bein hinter dem Körper, Kopf davor, Waffenarm und Waffe ganz vorn.
+- **Drehpunkt des Rests** wird nach dem Abtrennen neu gesetzt (Hüfte statt Füße des ganzen Bildes).
+- **Die Prüfung meldet verdeckte Teile**, z. B. ein Schwert, das sich beim Schlag hinter den Kopf dreht.
+- **KI:** trennt die Waffe immer als eigenes Teil ab, mit dem Drehpunkt am Griff. Nur so bleibt sie beim Schlag nach vorn gerichtet und bekommt eine Schlagspur.
+- **KI live getestet** (Side-Scroller, echte App):
+  - Beim Glätten von Lauf- und Sprung-Animation ging die KI so vor wie vorgesehen: prüfen, glätten, erneut prüfen, speichern. Kosten: 16 Cent.
+  - Ein hochgeladenes Ritterbild hat sie pixelgenau in Kopf, Waffenarm und Beine zerlegt; die Drehpunkte saßen richtig. Dabei ist das Problem mit dem Schwert aufgefallen, das hiermit behoben ist.
+
 **Version 3.45 – Bodenkontakt, sauberere Standard-Animationen, genauere Prüfung**
 
 - **Bodenkontakt:** Die Figur sinkt in keiner Animation mehr in den Boden. Das gilt auch für gedrehte Beine beim Laufen, Rutschen, Umfallen, Ducken und Stauchen. Der Körper liegt dann auf der Bodenlinie auf. Waffe und Effekte dürfen tiefer reichen, z. B. ein Schwert, das auf den Boden schlägt. Fliegende Kreaturen dürfen absinken, solange sie über dem Boden bleiben.

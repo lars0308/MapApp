@@ -505,6 +505,26 @@ export function jointPivot(part: Uint8ClampedArray, rest: Uint8ClampedArray, n: 
   return [Math.round((cx + 0.5) * 2) / 2, Math.round((cy + 0.5) * 2) / 2];
 }
 
+/** drawing order of cut-off parts (side view): far arm and leg behind the body, head, near arm and weapon in front */
+const RIG_ORDER: Record<RigRegion, number> = { ground: 0, armL: 1, legL: 2, torso: 3, legR: 4, head: 5, armR: 6, weapon: 7, effect: 8 };
+function orderRig(layers: SpriteLayer[]): SpriteLayer[] {
+  const out = layers.slice();
+  // only runs of own-picture parts (no Baukasten parts) are sorted, everything else keeps its place
+  let i = 0;
+  while (i < out.length) {
+    if (!out[i].region || out[i].partId) {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < out.length && out[j].region && !out[j].partId) j++;
+    const run = out.slice(i, j).sort((a, b) => RIG_ORDER[a.region!] - RIG_ORDER[b.region!]);
+    out.splice(i, run.length, ...run);
+    i = j;
+  }
+  return out;
+}
+
 /** hand-drawn frames of an animation removed (its frame numbers changed) */
 function dropFrames(frames: SpriteDoc['frames'], animId: string): SpriteDoc['frames'] {
   if (!frames) return frames;
@@ -783,8 +803,10 @@ export const useSprites = create<SpriteState>((set, get) => {
         : { id: uid(), name: opts.name ?? REGION_NAME[region] ?? 'Teil', slot: src.slot === 'shadow' ? 'extra' : src.slot, partId: null, edited: true, visible: true, data: outData, views: views ? outViews : undefined, region };
       // turning point where the part meets the rest (shoulder, hip, neck) – else from its outline
       part.pivot = jointPivot(outData, data, n, region) ?? autoPivot(outData, n, region);
-      const rest: SpriteLayer = { ...src, data, views, edited: true, region: src.region ?? 'torso' };
-      const layers = k.doc.layers.flatMap((l) => (l.id === src.id ? (target ? [rest] : [rest, part]) : l.id === target?.id ? [part] : [l]));
+      const restRegion = src.region ?? 'torso';
+      // the rest got smaller (the part is gone): its turning point is found again
+      const rest: SpriteLayer = { ...src, data, views, edited: true, region: restRegion, pivot: autoPivot(data, n, restRegion) ?? src.pivot };
+      const layers = orderRig(k.doc.layers.flatMap((l) => (l.id === src.id ? (target ? [rest] : [rest, part]) : l.id === target?.id ? [part] : [l])));
       setDoc(kind, { layers }, { ...hist, active: part.id });
       return part.id;
     },

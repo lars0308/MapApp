@@ -1005,8 +1005,10 @@ const H: Record<string, Handler> = {
         size: doc.size,
         ...(sideGame() && kind !== 'object' ? { game: 'side_scroller', main_view: 'side', hint: 'Side-Scroller: die Seitenansicht (side, Blick nach rechts) ist die wichtigste – im Spiel sieht man fast nur sie; Animationen in view side prüfen und verbessern.' } : {}),
         layers: doc.layers.map((l) => ({ id: l.id, slot: l.slot, part: l.partId, name: l.name, drawn: l.edited, own_views: Object.keys(l.views ?? {}), visible: l.visible, moves_as: l.region ?? 'auto', ...(l.pivot ? { pivot: l.pivot } : {}) })),
-        ...(doc.layers.some((l) => l.region === 'torso' && !l.partId) && !doc.layers.some((l) => l.partId)
-          ? { own_picture: 'Hochgeladenes Bild: es bewegt sich als Ganzes. Für Gliedmaßen-Bewegung Teile mit figure_layer_split abtrennen (Kopf, Arme, Beine, Waffe).' }
+        ...(!doc.layers.some((l) => l.partId) && doc.layers.some((l) => l.region)
+          ? doc.layers.filter((l) => l.region && l.region !== 'ground').length === 1
+            ? { own_picture: 'Hochgeladenes Bild: es bewegt sich als Ganzes. Für Gliedmaßen-Bewegung Teile mit figure_layer_split abtrennen (Kopf, Arme, Beine, Waffe).' }
+            : { own_picture: `Hochgeladenes Bild in Teilen: ${doc.layers.filter((l) => l.region).map((l) => `${l.name} → ${l.region}`).join(', ')}. Drehpunkte prüfen, dann Animationen rendern und prüfen.` }
           : {}),
         colors: doc.ramps,
         anatomy: anatomy(doc, (a.view as View) ?? 'front'),
