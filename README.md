@@ -335,6 +335,20 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.45 – Bodenkontakt, sauberere Standard-Animationen, genauere Prüfung**
+
+- **Bodenkontakt:** Die Figur sinkt in keiner Animation mehr in den Boden. Das gilt auch für gedrehte Beine beim Laufen, Rutschen, Umfallen, Ducken und Stauchen. Der Körper liegt dann auf der Bodenlinie auf. Waffe und Effekte dürfen tiefer reichen, z. B. ein Schwert, das auf den Boden schlägt. Fliegende Kreaturen dürfen absinken, solange sie über dem Boden bleiben.
+- **„Zaubern“ flüssiger:** 6 statt 4 Bilder. Die Arme heben sich gleichmäßig, statt in einem Ruck.
+- **„Flackern“** verändert jetzt jedes Bild ein wenig, auch ohne Feuer-Ebene.
+- **Drehpunkt beim Abtrennen:** Er sitzt jetzt dort, wo das Teil am Rest hing: Schulter, Hüfte, Hals. Ein Arm mit Schwert dreht sich also an der Schulter statt an der Schwertspitze.
+- **Genauere Prüfung:**
+  - erkennt auch Sprünge, bei denen sich die ganze Figur plötzlich versetzt,
+  - Farben von verdeckten Ebenen (Umhang hinter dem Körper) gelten nicht mehr als fremd,
+  - Aufhellen und Aufblitzen zählen nicht als Sprung,
+  - Glanzpunkte, die die Figur selbst hat, gelten nicht als lose Pixel.
+  In einem Durchlauf mit zwölf Zufallsfiguren und allen Animationen meldete die Prüfung danach nur noch einen einzelnen losen Pixel.
+- **Nachjustieren „Für alle Bilder dieser Animation“:** z. B. die Waffe in der ganzen Animation etwas tiefer halten. Dazu gibt es „Alle Nachjustierungen zurücksetzen“.
+
 **Version 3.44 – Animieren: flüssiger, nachjustierbar, eigene Bilder, KI prüft jedes Bild**
 
 - **Reiter „Animieren“ im Figuren-Baukasten (wieder da, neu gebaut):**

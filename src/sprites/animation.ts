@@ -252,16 +252,21 @@ export const ANIMATIONS: AnimDef[] = [
     fps: 8,
     loop: false,
     hint: 'Arme hoch, kurzes Aufleuchten',
+    // arms rise in even steps, glow at the top, come down a little slower (no jerk between frames)
     poses: [
       { rot: { armL: 40, armR: -40, weapon: 30 } },
-      { rot: { armL: 120, armR: -120, weapon: 100 }, bright: 0.1 },
+      { rot: { armL: 85, armR: -85, weapon: 65 }, bright: 0.05 },
+      { rot: { armL: 125, armR: -125, weapon: 105 }, off: { head: o(0, -1) }, bright: 0.15 },
       { rot: { armL: 160, armR: -160, weapon: 150 }, off: { head: o(0, -1) }, bright: 0.25 },
-      { rot: { armL: 60, armR: -60, weapon: 50 } },
+      { rot: { armL: 115, armR: -115, weapon: 95 }, bright: 0.1 },
+      { rot: { armL: 65, armR: -65, weapon: 50 } },
     ],
     side: [
       { rot: { armR: -50, weapon: 40 } },
-      { rot: { armR: -120, weapon: 100 }, bright: 0.1 },
+      { rot: { armR: -85, weapon: 70 }, bright: 0.05 },
+      { rot: { armR: -120, weapon: 100 }, bright: 0.15 },
       { rot: { armR: -150, weapon: 130 }, lean: -0.04, bright: 0.25 },
+      { rot: { armR: -110, weapon: 85 }, bright: 0.1 },
       { rot: { armR: -70, weapon: 50 } },
     ],
   },
@@ -438,7 +443,7 @@ export const ANIMATIONS: AnimDef[] = [
     fps: 10,
     loop: true,
     hint: 'Effekte (Feuer, Funkeln) flackern, die Grundform bleibt',
-    poses: [{ off: { effect: o(0, 0) } }, { off: { effect: o(0, -1) }, bright: 0.04 }, { off: { effect: o(1, 0) } }, { off: { effect: o(0, -1) }, hideEffects: false }],
+    poses: [{ off: { effect: o(0, 0) } }, { off: { effect: o(0, -1) }, bright: 0.07 }, { off: { effect: o(1, 0) }, bright: 0.03 }, { off: { effect: o(0, -1) }, bright: 0.1 }],
   },
   {
     id: 'open',
@@ -636,18 +641,24 @@ export function renderFrame(doc: SpriteDoc, pose: Pose, view: View = 'front'): U
   const vis = viewLayers(doc, view).filter((l) => l.visible && !(pose.hideEffects && (l.slot === 'effect' || l.slot === 'aura')));
   const regionAt = (l: SpriteLayer, x: number, y: number) => regionOf(l, x - d, y - d, doc.kind, body, bounds, creature);
 
-  // a figure turned far over rests on the ground instead of sinking into it
+  // ground contact: a turned leg, a crouch or a figure falling over rests on the ground instead
+  // of sinking into it (weapon and effects may reach below – a sword hitting the floor)
   let lift = 0;
-  if (pose.spin && Math.abs(pose.spin) >= 45) {
+  if (doc.kind !== 'object' || pose.spin) {
+    let still = -1;
     let maxY = -1;
     for (const l of vis)
       for (let y = 0; y < n; y++)
         for (let x = 0; x < n; x++) {
           if (!l.data[(y * n + x) * 4 + 3]) continue;
           const r = regionAt(l, x, y);
-          if (r !== 'ground') maxY = Math.max(maxY, place(r, x + p + 0.5, y + p + 0.5)[1]);
+          if (r === 'ground' || r === 'weapon' || r === 'effect') continue;
+          still = Math.max(still, y + p);
+          maxY = Math.max(maxY, place(r, x + p + 0.5, y + p + 0.5)[1]);
         }
-    if (maxY > feet + 1) lift = Math.floor(feet + 1 - maxY);
+    // the lowest point may go as deep as it is standing still (shoes below the feet line), not deeper
+    const floor = Math.max(feet + 1, still + 1);
+    if (maxY > floor + 0.5) lift = Math.floor(floor + 0.5 - maxY);
   }
 
   // swinging the side arm leaves a gap in the torso – fill it with the torso next to it
@@ -769,7 +780,8 @@ function squash(img: Uint8ClampedArray, n: number, feet: number, s: number): Uin
   const wx = 1 / Math.sqrt(s);
   for (let y = 0; y < n; y++)
     for (let x = 0; x < n; x++) {
-      const sy = Math.round(feet - (feet - y) / s);
+      // below the feet line (soles, shadow) nothing is stretched – the figure keeps standing on it
+      const sy = y > feet ? y : Math.round(feet - (feet - y) / s);
       const sx = Math.floor(cx + (x + 0.5 - cx) / wx);
       if (sx < 0 || sy < 0 || sx >= n || sy >= n || sy > feet + 3) continue;
       const i = (sy * n + sx) * 4;

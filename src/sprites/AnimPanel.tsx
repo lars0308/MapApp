@@ -106,6 +106,7 @@ export function AnimPanel({ kind }: { kind: SpriteKind }) {
   const [onion, setOnion] = useState(false);
   const [tick, setTick] = useState(0);
   const [part, setPart] = useState<Part>('all');
+  const [everyFrame, setEveryFrame] = useState(false);
   const [editing, setEditing] = useState(false);
   const [report, setReport] = useState<AnimReport | null>(null);
   const [creating, setCreating] = useState(false);
@@ -134,7 +135,10 @@ export function AnimPanel({ kind }: { kind: SpriteKind }) {
   };
   const nudge = (dx: number, dy: number, turn: number) => {
     if (key < 0) return;
-    st.nudgePose(kind, anim.id, tuneKey(view, key), delta(part, dx, dy, turn));
+    const d = delta(part, dx, dy, turn);
+    // "für alle Bilder": e.g. hold the weapon a little lower in the whole animation
+    const list = everyFrame ? keyPoses(doc, anim, view).map((_, i) => i) : [key];
+    for (const i of list) st.nudgePose(kind, anim.id, tuneKey(view, i), d);
   };
   const saveFrame = (d: Uint8ClampedArray) => {
     if (pixel) {
@@ -268,6 +272,10 @@ export function AnimPanel({ kind }: { kind: SpriteKind }) {
                   </button>
                 ))}
               </div>
+              <label className="slot-lock">
+                <input type="checkbox" checked={everyFrame} onChange={(e) => setEveryFrame(e.target.checked)} />
+                Für alle Bilder dieser Animation
+              </label>
               <div className="anim2-pad">
                 <button type="button" className="btn btn-secondary" aria-label="Nach links" onClick={() => nudge(-1, 0, 0)}>
                   ←
@@ -291,6 +299,11 @@ export function AnimPanel({ kind }: { kind: SpriteKind }) {
               {tuned && (
                 <button type="button" className="btn btn-ghost" onClick={() => st.nudgePose(kind, anim.id, tuneKey(view, key), null)}>
                   Nachjustierung dieses Bildes zurücksetzen
+                </button>
+              )}
+              {Object.keys(tune.poses ?? {}).filter((k) => k.startsWith(`${view}:`)).length > 1 && (
+                <button type="button" className="btn btn-ghost" onClick={() => Object.keys(tune.poses ?? {}).filter((k) => k.startsWith(`${view}:`)).forEach((k) => st.nudgePose(kind, anim.id, k, null))}>
+                  Alle Nachjustierungen dieser Animation zurücksetzen
                 </button>
               )}
             </>

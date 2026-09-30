@@ -481,6 +481,30 @@ export function autoPivot(data: Uint8ClampedArray, n: number, region: RigRegion)
   return [cx, (y0 + y1 + 1) / 2];
 }
 
+/**
+ * where a cut-off part touched the rest of the picture: an arm turns at the top of that seam
+ * (shoulder), a leg too (hip), a head at the bottom (neck), anything else at its middle
+ */
+export function jointPivot(part: Uint8ClampedArray, rest: Uint8ClampedArray, n: number, region: RigRegion): [number, number] | undefined {
+  const seam: [number, number][] = [];
+  const solid = (d: Uint8ClampedArray, x: number, y: number) => x >= 0 && y >= 0 && x < n && y < n && d[(y * n + x) * 4 + 3] > 0;
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++)
+      if (solid(part, x, y) && (solid(rest, x - 1, y) || solid(rest, x + 1, y) || solid(rest, x, y - 1) || solid(rest, x, y + 1))) seam.push([x, y]);
+  if (!seam.length) return undefined;
+  let pick = seam;
+  if (region === 'armL' || region === 'armR' || region === 'legL' || region === 'legR') {
+    const top = Math.min(...seam.map((p) => p[1]));
+    pick = seam.filter((p) => p[1] <= top + 1);
+  } else if (region === 'head') {
+    const bottom = Math.max(...seam.map((p) => p[1]));
+    pick = seam.filter((p) => p[1] >= bottom - 1);
+  }
+  const cx = pick.reduce((a, p) => a + p[0], 0) / pick.length;
+  const cy = pick.reduce((a, p) => a + p[1], 0) / pick.length;
+  return [Math.round((cx + 0.5) * 2) / 2, Math.round((cy + 0.5) * 2) / 2];
+}
+
 /** hand-drawn frames of an animation removed (its frame numbers changed) */
 function dropFrames(frames: SpriteDoc['frames'], animId: string): SpriteDoc['frames'] {
   if (!frames) return frames;
@@ -757,7 +781,8 @@ export const useSprites = create<SpriteState>((set, get) => {
       const part: SpriteLayer = target
         ? { ...target, data: outData, edited: true }
         : { id: uid(), name: opts.name ?? REGION_NAME[region] ?? 'Teil', slot: src.slot === 'shadow' ? 'extra' : src.slot, partId: null, edited: true, visible: true, data: outData, views: views ? outViews : undefined, region };
-      part.pivot = autoPivot(outData, n, region);
+      // turning point where the part meets the rest (shoulder, hip, neck) – else from its outline
+      part.pivot = jointPivot(outData, data, n, region) ?? autoPivot(outData, n, region);
       const rest: SpriteLayer = { ...src, data, views, edited: true, region: src.region ?? 'torso' };
       const layers = k.doc.layers.flatMap((l) => (l.id === src.id ? (target ? [rest] : [rest, part]) : l.id === target?.id ? [part] : [l]));
       setDoc(kind, { layers }, { ...hist, active: part.id });

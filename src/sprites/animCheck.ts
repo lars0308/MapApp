@@ -1,5 +1,6 @@
-import { animPoses, framesOf, isPixelAnim, renderFrame, animView, frameSize, type AnimDef } from './animation';
+import { animPoses, feetInFrame, framesOf, isPixelAnim, renderFrame, animView, frameSize, type AnimDef } from './animation';
 import type { CustomAnim, SpriteDoc, View } from './types';
+import { viewLayers } from './store';
 
 // "Passen alle Bilder zusammen?" – checks the frames of an animation against the figure and
 // against each other: foreign colours, stray pixels, a figure that suddenly shrinks, feet that
@@ -21,7 +22,7 @@ export interface AnimReport {
 }
 
 /** animations that leave the ground on purpose */
-const AIRBORNE = new Set(['run', 'jump', 'fall', 'k_hop', 'k_fly', 'bob', 'death', 'k_death', 'slide', 'cast']);
+const AIRBORNE = new Set(['run', 'jump', 'k_attack', 'fall', 'k_hop', 'k_fly', 'bob', 'death', 'k_death', 'slide', 'cast']);
 const NOT_BODY_SLOTS = new Set(['shadow', 'effect', 'aura', 'weapon']);
 const NOT_BODY_REGIONS = new Set(['ground', 'effect', 'weapon']);
 /** loops that stay on the spot (the figure must not wander) */
@@ -53,10 +54,26 @@ function diff(a: Uint8ClampedArray, b: Uint8ClampedArray, size: number): number 
   for (let i = 0; i < a.length; i += 4) {
     const oa = a[i + 3] > 40;
     const ob = b[i + 3] > 40;
-    if (oa !== ob || (oa && Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 30)) d++;
+    // shape changes and strong colour changes count; brightening / flashing the whole figure does not
+    if (oa !== ob || (oa && Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 150)) d++;
   }
   return d / Math.max(1, size);
 }
+
+/** pixels without any neighbour */
+function strays(f: Uint8ClampedArray, n: number): number {
+  let c = 0;
+  const on = (x: number, y: number) => x >= 0 && y >= 0 && x < n && y < n && f[(y * n + x) * 4 + 3] > 40;
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++)
+      if (on(x, y) && !on(x - 1, y - 1) && !on(x, y - 1) && !on(x + 1, y - 1) && !on(x - 1, y) && !on(x + 1, y) && !on(x - 1, y + 1) && !on(x, y + 1) && !on(x + 1, y + 1)) c++;
+  return c;
+}
+
+const same = (a: Uint8ClampedArray, b: Uint8ClampedArray) => {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+};
 
 const median = (v: number[]) => {
   const s = [...v].sort((a, b) => a - b);
@@ -77,16 +94,20 @@ export function checkAnimation(doc: SpriteDoc, anim: AnimDef | CustomAnim, view:
   const ref = box(still, n);
   const palette: [number, number, number][] = [];
   const seen = new Set<number>();
-  for (let i = 0; i < still.length; i += 4) {
-    if (still[i + 3] < 40) continue;
-    const key = (still[i] << 16) | (still[i + 1] << 8) | still[i + 2];
-    if (seen.has(key)) continue;
-    seen.add(key);
-    palette.push([still[i], still[i + 1], still[i + 2]]);
-  }
+  // colours of every layer (a cape hidden behind the body shows when an arm swings) + the standing picture
+  const sources = [still, ...(pixel ? [] : viewLayers(doc, v).filter((l) => l.visible).map((l) => l.data))];
+  for (const src of sources)
+    for (let i = 0; i < src.length; i += 4) {
+      if (src[i + 3] < 40) continue;
+      const key = (src[i] << 16) | (src[i + 1] << 8) | src[i + 2];
+      if (seen.has(key)) continue;
+      seen.add(key);
+      palette.push([src[i], src[i + 1], src[i + 2]]);
+    }
   const known = (r: number, g: number, b: number) => seen.has((r << 16) | (g << 8) | b) || palette.some((c) => Math.abs(c[0] - r) + Math.abs(c[1] - g) + Math.abs(c[2] - b) < 18);
 
   const boxes = frames.map((f) => box(f, n));
+  const stray0 = strays(still, n);
   // size and ground contact are measured on the body alone: shadow, weapon, effects and trails
   // would hide feet that float or sink
   const bodyDoc = { ...doc, layers: doc.layers.filter((l) => !NOT_BODY_SLOTS.has(l.slot ?? '') && !NOT_BODY_REGIONS.has(l.region ?? '')) };
@@ -97,6 +118,7 @@ export function checkAnimation(doc: SpriteDoc, anim: AnimDef | CustomAnim, view:
   const ownAnim = 'frames' in anim;
   const feet0 = pixel ? median(boxes.map((b) => b.y1)) : bodyRef.y1;
   const size0 = pixel ? median(boxes.map((b) => b.count)) : bodyRef.count;
+  const ground = pixel ? feet0 : Math.max(feet0, feetInFrame(doc, v));
 
   frames.forEach((f, i) => {
     const p = poses[i];
@@ -113,33 +135,18 @@ export function checkAnimation(doc: SpriteDoc, anim: AnimDef | CustomAnim, view:
       for (let k = 0; k < f.length; k += 4) if (f[k + 3] > 200 && !known(f[k], f[k + 1], f[k + 2])) foreign++;
       if (foreign > 2) issues.push({ frame: i, level: foreign > 12 ? 'error' : 'hint', text: `${foreign} Pixel in Farben, die die Figur sonst nicht hat` });
     }
-    // lonely pixels (crumbs) – not part of any shape
-    let stray = 0;
-    for (let y = 0; y < n; y++)
-      for (let x = 0; x < n; x++) {
-        if (f[(y * n + x) * 4 + 3] <= 40) continue;
-        let near = false;
-        for (let dy = -1; dy <= 1 && !near; dy++)
-          for (let dx = -1; dx <= 1; dx++) {
-            if (!dx && !dy) continue;
-            const xx = x + dx;
-            const yy = y + dy;
-            if (xx >= 0 && yy >= 0 && xx < n && yy < n && f[(yy * n + xx) * 4 + 3] > 40) {
-              near = true;
-              break;
-            }
-          }
-        if (!near) stray++;
-      }
+    // lonely pixels (crumbs) – more than the figure itself has (sparkles, eye glints are drawn that way)
+    const stray = Math.max(0, strays(f, n) - stray0);
     if (stray && !effects) issues.push({ frame: i, level: stray > 3 ? 'error' : 'hint', text: `${stray} lose Einzelpixel` });
     // suddenly bigger / smaller (parts missing or doubled)
-    const lying = !!p && (!!p.lie || (p.squash !== undefined && Math.abs(p.squash - 1) > 0.15) || p.alpha !== undefined);
+    const lying = !!p && (!!p.lie || (p.squash !== undefined && Math.abs(p.squash - 1) > 0.1) || p.alpha !== undefined);
     const bb = body?.[i] ?? b;
     const ratio = bb.count / Math.max(1, size0);
     if (!lying && !anim.id.includes('death') && (ratio < 0.78 || ratio > 1.3))
       issues.push({ frame: i, level: 'error', text: `Figur ist hier ${ratio < 1 ? 'kleiner' : 'größer'} (${Math.round(ratio * 100)} %) – fehlt etwas oder ist etwas doppelt?` });
     // feet leave the ground line
-    if (!lying && bb.y1 - feet0 > 1) issues.push({ frame: i, level: 'error', text: `Figur sinkt ${bb.y1 - feet0} px in den Boden` });
+    // sinking = below the ground line (a flying creature may dip as long as it stays above it)
+    if (!lying && bb.y1 - ground > 1) issues.push({ frame: i, level: 'error', text: `Figur sinkt ${bb.y1 - ground} px in den Boden` });
     else if (!air && !ownAnim && !lying && feet0 - bb.y1 > 1) issues.push({ frame: i, level: 'error', text: `Füße schweben ${feet0 - bb.y1} px über dem Boden` });
   });
 
@@ -150,13 +157,20 @@ export function checkAnimation(doc: SpriteDoc, anim: AnimDef | CustomAnim, view:
     if (anim.loop && frames.length > 2) pairs.push([frames.length - 1, 0]);
     const d = pairs.map(([a, b]) => diff(frames[a], frames[b], size0));
     const m = median(d);
+    // how far the body itself moves per step (a figure jumping sideways by 8 px changes few pixels
+    // of a thin sprite, but it is a jerk all the same)
+    const bx = (i: number) => body?.[i] ?? boxes[i];
+    const step = pairs.map(([a, b]) => Math.hypot((bx(a).x0 + bx(a).x1 - bx(b).x0 - bx(b).x1) / 2, bx(a).y1 - bx(b).y1));
+    const ms = median(step);
+    const far = Math.max(4, n * 0.1);
     pairs.forEach(([a, b], k) => {
       const seam = b === 0;
       // a strike frame with a motion trail is fast on purpose (smear frame)
       const smear = !!poses[b]?.trail || !!poses[a]?.trail;
-      if (!smear && d[k] > 0.32 && d[k] > m * 2.2)
+      const jump = !anim.id.includes('death') && !poses[b]?.lie && step[k] > far && step[k] > Math.max(1, ms) * 2.5;
+      if (!smear && ((d[k] > 0.32 && d[k] > m * 2.2) || jump))
         issues.push({ frame: a, level: 'error', text: seam ? `Der Übergang vom letzten zum ersten Bild ruckelt (Schleife schließt nicht sauber)` : `Großer Sprung von Bild ${a + 1} zu ${b + 1} – Bewegung kleiner machen oder Zwischenbild einfügen` });
-      else if (d[k] === 0 && anim.loop && frames.length > 2 && !seam) issues.push({ frame: a, level: 'hint', text: `Bild ${a + 1} und ${b + 1} sind gleich (Standbild)` });
+      else if (anim.loop && frames.length > 2 && !seam && same(frames[a], frames[b])) issues.push({ frame: a, level: 'hint', text: `Bild ${a + 1} und ${b + 1} sind gleich (Standbild)` });
     });
     // a loop on the spot must end where it started
     if (anim.loop && IN_PLACE.has(anim.id)) {
