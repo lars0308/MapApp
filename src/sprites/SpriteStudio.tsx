@@ -1,3 +1,4 @@
+import { AnimPanel } from './AnimPanel';
 import { FigureAiPanel } from './FigureAiPanel';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ExportPanel } from './ExportPanel';
@@ -12,38 +13,9 @@ import { VIEWS, type SpriteKind } from './types';
 import { Icon } from '../components/icons';
 import { Button, IconButton, Segmented } from '../components/ui';
 import { useEditor } from '../store/editorStore';
-import { dataUrlToBytes, downloadBlob, downloadText, readFileAsDataUrl, readFileAsText, safeFileName } from '../utils/download';
+import { imageDataFromFile } from './imageFile';
+import { dataUrlToBytes, downloadBlob, downloadText, readFileAsText, safeFileName } from '../utils/download';
 
-async function imageDataFromFile(file: File): Promise<ImageData> {
-  const url = await readFileAsDataUrl(file);
-  const img = await new Promise<HTMLImageElement>((res, rej) => {
-    const i = new Image();
-    i.onload = () => res(i);
-    i.onerror = () => rej(new Error('Bild konnte nicht gelesen werden'));
-    i.src = url;
-  });
-  const c = document.createElement('canvas');
-  c.width = img.naturalWidth;
-  c.height = img.naturalHeight;
-  const g = c.getContext('2d', { willReadFrequently: true })!;
-  g.drawImage(img, 0, 0);
-  // crop transparent margins so the own sprite sits right
-  const d = g.getImageData(0, 0, c.width, c.height);
-  let x0 = c.width,
-    y0 = c.height,
-    x1 = -1,
-    y1 = -1;
-  for (let y = 0; y < c.height; y++)
-    for (let x = 0; x < c.width; x++)
-      if (d.data[(y * c.width + x) * 4 + 3] > 0) {
-        x0 = Math.min(x0, x);
-        y0 = Math.min(y0, y);
-        x1 = Math.max(x1, x);
-        y1 = Math.max(y1, y);
-      }
-  if (x1 < 0) throw new Error('Das Bild ist leer (nur transparent)');
-  return g.getImageData(x0, y0, x1 - x0 + 1, y1 - y0 + 1);
-}
 
 const TOOLS: { id: SpriteTool; label: string; short: string; key: string; icon: (p: { size?: number }) => React.ReactElement }[] = [
   { id: 'pen', label: 'Stift', key: 'B', short: 'Stift', icon: Icon.Pencil },
@@ -60,10 +32,11 @@ const TOOLS: { id: SpriteTool; label: string; short: string; key: string; icon: 
   { id: 'hand', label: 'Ansicht verschieben (Leertaste)', key: 'H', short: 'Ansicht', icon: Icon.Hand },
 ];
 
-type Tab = 'parts' | 'layers' | 'colors' | 'palette' | 'ai' | 'gallery' | 'export';
+type Tab = 'parts' | 'layers' | 'anim' | 'colors' | 'palette' | 'ai' | 'gallery' | 'export';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'parts', label: 'Teile' },
   { id: 'layers', label: 'Ebenen' },
+  { id: 'anim', label: 'Animieren' },
   { id: 'colors', label: 'Farben' },
   { id: 'palette', label: 'Palette' },
   { id: 'ai', label: 'KI' },
@@ -74,7 +47,12 @@ const TABS: { id: Tab; label: string }[] = [
 /** "Charakter bauen" / "Objekt bauen": plug-and-play parts + free pixel drawing. */
 export function SpriteStudio({ kind, desktop }: { kind: SpriteKind; desktop: boolean }) {
   const loaded = useSprites((s) => s.loaded[kind]);
-  const [tab, setTab] = useState<Tab>('parts');
+  const [tab, setTab] = useState<Tab>(() => {
+    // the chooser / the AI can ask for a tab (own picture → Animieren)
+    const want = useSprites.getState().studioTab as Tab | null;
+    if (want) useSprites.getState().setStudioTab(null);
+    return want && TABS.some((t) => t.id === want) ? want : 'parts';
+  });
   const [savePart, setSavePart] = useState<{ layerId: string | null } | null>(null);
   // phones: scrolling down to the parts makes the canvas smaller, the menu moves up
   const [compact, setCompact] = useState(false);
@@ -140,6 +118,7 @@ export function SpriteStudio({ kind, desktop }: { kind: SpriteKind; desktop: boo
       <div className="sprite-tab-body">
         {tab === 'parts' && <PartsPanel kind={kind} />}
         {tab === 'layers' && <LayersList kind={kind} onSavePart={(layerId) => setSavePart({ layerId })} />}
+        {tab === 'anim' && <AnimPanel kind={kind} />}
         {tab === 'colors' && <ColorsPanel kind={kind} />}
         {tab === 'palette' && <PalettePanel kind={kind} />}
         {tab === 'ai' && <FigureAiPanel kind={kind} />}

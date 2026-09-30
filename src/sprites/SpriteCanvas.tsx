@@ -46,6 +46,13 @@ export function rectCells(a: Pt, b: Pt): Pt[] {
   return out;
 }
 
+/** every cell of the rectangle a–b (cutting off a part) */
+export function boxCells(a: Pt, b: Pt): Pt[] {
+  const out: Pt[] = [];
+  for (let y = Math.min(a.y, b.y); y <= Math.max(a.y, b.y); y++) for (let x = Math.min(a.x, b.x); x <= Math.max(a.x, b.x); x++) out.push({ x, y });
+  return out;
+}
+
 const BRUSH_TOOLS = ['pen', 'eraser', 'dither', 'lighten', 'darken'];
 
 /**
@@ -141,8 +148,24 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     }
     g.strokeStyle = '#3a3945';
     g.strokeRect(ox - 0.5, oy - 0.5, n * zoom + 1, n * zoom + 1);
+    // turning point of the active layer (rigged parts)
+    const al = d.layers.find((l) => l.id === act);
+    if (al?.pivot && (st.tool === 'pivot' || st.tool === 'cut')) {
+      const px = ox + al.pivot[0] * zoom;
+      const py = oy + al.pivot[1] * zoom;
+      g.strokeStyle = '#ff5a8a';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(px, py, Math.max(4, zoom * 0.6), 0, Math.PI * 2);
+      g.moveTo(px - zoom, py);
+      g.lineTo(px + zoom, py);
+      g.moveTo(px, py - zoom);
+      g.lineTo(px, py + zoom);
+      g.stroke();
+      g.lineWidth = 1;
+    }
     if (preview.current?.cells.length) {
-      g.fillStyle = st.color;
+      g.fillStyle = st.tool === 'cut' ? 'rgba(255,90,138,0.35)' : st.color;
       for (const p of preview.current.cells) if (p.x >= 0 && p.y >= 0 && p.x < n && p.y < n) g.fillRect(ox + p.x * zoom, oy + p.y * zoom, zoom, zoom);
     }
     // hover: brush footprint
@@ -277,6 +300,19 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
       if (img[i + 3]) st.setColor('#' + [img[i], img[i + 1], img[i + 2]].map((v) => v.toString(16).padStart(2, '0')).join(''));
       return;
     }
+    if (tool === 'pivot') {
+      const act = st[kind].doc.layers.find((l) => l.id === st[kind].active);
+      if (!act) return;
+      st.setLayerRig(kind, act.id, { region: act.region ? undefined : 'torso', pivot: [Math.max(0, Math.min(n, p.x + 0.5)), Math.max(0, Math.min(n, p.y + 0.5))] });
+      return;
+    }
+    if (tool === 'cut') {
+      if (!st.cut || st.cut.kind !== kind) return;
+      drag.current = { start: p, last: p, layer: st.cut.from, tool, screen: { x: e.clientX, y: e.clientY }, pan: st.pan };
+      preview.current = { cells: boxCells(p, p) };
+      draw();
+      return;
+    }
     const tgt = target();
     if (!tgt) return;
     const { layer, data } = tgt;
@@ -330,6 +366,12 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
       return;
     }
     if (dr.last.x === p.x && dr.last.y === p.y) return;
+    if (dr.tool === 'cut') {
+      preview.current = { cells: boxCells(dr.start, p) };
+      dr.last = p;
+      draw();
+      return;
+    }
     const n = st[kind].doc.size;
     const layer = st[kind].doc.layers.find((l) => l.id === dr.layer);
     const data = layer && st.editPixels(kind, layer.id);
@@ -359,6 +401,22 @@ export function SpriteCanvas({ kind }: { kind: SpriteKind }) {
     if (!dr) return;
     const st = useSprites.getState();
     const n = st[kind].doc.size;
+    if (dr.tool === 'cut') {
+      preview.current = null;
+      const c = st.cut;
+      if (c && c.kind === kind) {
+        const idx = boxCells(dr.start, dr.last)
+          .filter((q) => q.x >= 0 && q.y >= 0 && q.x < n && q.y < n)
+          .map((q) => q.y * n + q.x);
+        const id = st.splitLayer(kind, c.from, idx, { region: c.region, into: c.into ?? undefined });
+        if (id) {
+          useSprites.setState({ cut: { ...c, into: id } });
+          st.setActive(kind, id);
+        } else useEditor.getState().toast('Im Rechteck ist nichts von der Ebene, die du zerteilst');
+      }
+      draw();
+      return;
+    }
     const layer = st[kind].doc.layers.find((l) => l.id === dr.layer);
     const data = layer && st.editPixels(kind, layer.id);
     if (layer && data && (dr.tool === 'line' || dr.tool === 'rect')) {

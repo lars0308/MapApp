@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { imageDataFromFile } from './imageFile';
+import { useEditor } from '../store/editorStore';
 import { compose, toPng, useSprites } from './store';
 import type { SpriteKind } from './types';
 import { useApp } from '../store/appStore';
@@ -52,6 +54,7 @@ function Which({ kind, purpose, onBack, onPick }: { kind: SpriteKind; purpose: '
     void useSprites.getState().load(kind);
   }, [kind]);
   const st = useSprites.getState();
+  const fileRef = useRef<HTMLInputElement>(null);
   return (
     <div className="page-inner chooser anim-picker">
       <button type="button" className="btn btn-ghost chooser-back" onClick={onBack}>
@@ -87,6 +90,31 @@ function Which({ kind, purpose, onBack, onPick }: { kind: SpriteKind; purpose: '
               </span>
               <Icon.ChevronRight size={16} />
             </button>
+            <button type="button" className="start-continue" onClick={() => fileRef.current?.click()}>
+              <Icon.Upload size={18} />
+              <span>
+                Eigenes Bild hochladen und animieren <small>PNG deiner Figur oder deines Objekts – danach in Teile trennen und bewegen</small>
+              </span>
+              <Icon.ChevronRight size={16} />
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                e.target.value = '';
+                if (!f) return;
+                try {
+                  st.newFromImage(kind, await imageDataFromFile(f), f.name.replace(/\.[^.]+$/, ''));
+                  st.setStudioTab('anim');
+                  onPick();
+                } catch (err) {
+                  useEditor.getState().toast(err instanceof Error ? err.message : 'Bild konnte nicht geladen werden', 'error');
+                }
+              }}
+            />
           </>
         ) : (
           <button type="button" className="start-continue" onClick={() => useApp.getState().goTo(kind)}>

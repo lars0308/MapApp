@@ -6555,3 +6555,256 @@ details.more[open] {
 .motif-more .motif-grid {
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
 }
+
+/* Animieren (figure builder tab) */
+.anim2 {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.anim2 .hint {
+  margin: 0;
+}
+.anim2-head {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+}
+.anim2-pick {
+  flex: 1;
+  min-width: 0;
+}
+.anim2-stage-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.anim2-stage {
+  width: 160px;
+  height: 160px;
+  image-rendering: pixelated;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface) 0 50%) 0 0 / 16px 16px;
+  flex: none;
+}
+.anim2-controls {
+  display: grid;
+  gap: 8px;
+  flex: 1;
+  min-width: 150px;
+}
+.anim2-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.anim2-step span {
+  min-width: 52px;
+  text-align: center;
+  font-family: var(--mono);
+  color: var(--text-2);
+}
+.anim2-speed input {
+  width: 100%;
+}
+.anim2-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 2px 6px;
+  scrollbar-width: thin;
+}
+.anim2-thumb {
+  position: relative;
+  flex: none;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-size: 11px;
+  cursor: pointer;
+}
+.anim2-thumb canvas {
+  width: 44px;
+  height: 44px;
+  image-rendering: pixelated;
+}
+.anim2-thumb.is-between {
+  border-style: dashed;
+  opacity: 0.75;
+}
+.anim2-thumb.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  color: var(--text);
+}
+.anim2-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.anim2-tune {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.anim2-tune h4 {
+  margin: 0;
+}
+.anim2-tune .chip.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.anim2-pad {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(40px, 1fr));
+  gap: 6px;
+}
+.anim2-pad .btn {
+  padding: 0;
+  font-size: 18px;
+}
+.anim2-ops .btn {
+  flex: 1 1 auto;
+}
+.anim2-new {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-line);
+  background: var(--bg-2);
+}
+.anim2-report {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+}
+.anim2-report p {
+  margin: 0 0 6px;
+}
+.anim2-report.is-ok {
+  border-color: var(--ok);
+}
+.anim2-report.has-errors {
+  border-color: var(--danger);
+}
+.anim2-report ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+.anim2-report li button {
+  text-align: left;
+  background: none;
+  border: 0;
+  color: var(--text-2);
+  padding: 4px 0;
+  cursor: pointer;
+  font: inherit;
+}
+.anim2-report li button:hover {
+  color: var(--text);
+}
+/* the tab is narrow on desktop: wrap instead of overflowing */
+.anim2 .segmented {
+  flex-wrap: wrap;
+}
+.anim2 .segmented button {
+  padding: 0 6px;
+  min-width: max-content;
+}
+.anim2-head {
+  flex-wrap: wrap;
+}
+.anim2-pick {
+  flex: 1 1 160px;
+}
+.anim2-stage {
+  width: 128px;
+  height: 128px;
+}
+.anim2-controls {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.anim2-controls .btn {
+  width: 100%;
+}
+.anim2-step .btn {
+  width: auto;
+  flex: 1;
+}
+.anim2-rig {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  background: var(--bg-2);
+}
+.anim2-rig[open] {
+  display: grid;
+  gap: 8px;
+}
+.anim2-rig summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.anim2-rig h4 {
+  margin: 4px 0 0;
+}
+.anim2-cut {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+.anim2-cut .field {
+  flex: 1 1 160px;
+}
+.anim2-layers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.anim2-layers li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 6px;
+  align-items: center;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+}
+.anim2-layers li.is-active {
+  background: var(--accent-soft);
+}
+.anim2-layer-name {
+  background: none;
+  border: 0;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  padding: 6px 4px;
+}

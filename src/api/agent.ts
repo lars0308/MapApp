@@ -57,6 +57,13 @@ const STEP: Record<string, string> = {
   figure_anim_frames: 'Schaut sich ein Animationsbild an',
   figure_anim_draw: 'Zeichnet ein Animationsbild',
   figure_anim_new: 'Legt eine neue Animation an',
+  figure_anim_pose: 'Justiert eine Bewegung nach',
+  figure_anim_set_poses: 'Gestaltet die Bewegung',
+  figure_anim_smooth: 'Macht die Animation flüssiger',
+  figure_anim_frame_op: 'Ordnet die Bilder',
+  figure_anim_check: 'Prüft, ob alle Bilder zusammenpassen',
+  figure_layer_split: 'Trennt ein Teil ab',
+  figure_layer_rig: 'Legt fest, wie sich ein Teil bewegt',
   style_colors: 'Liest den Stil der Karte',
   figure_render: 'Prüft die Figur',
   figure_save: 'Speichert die Figur',
@@ -76,12 +83,12 @@ interface AgentState {
 export const useAgent = create<AgentState>(() => ({ running: false, step: '', steps: 0, stop: false, phase: 'think' }));
 
 /** commands that only look (the banner says "KI liest & versteht") */
-const READS = new Set(['status', 'get_generator', 'list_tiles', 'tileset_list', 'tileset_render', 'list_layers', 'get_map', 'list_objects', 'render', 'figure_status', 'figure_parts', 'figure_render', 'figure_grid', 'figure_anim_frames', 'style_colors', 'level_list']);
+const READS = new Set(['status', 'get_generator', 'list_tiles', 'tileset_list', 'tileset_render', 'list_layers', 'get_map', 'list_objects', 'render', 'figure_status', 'figure_parts', 'figure_render', 'figure_grid', 'figure_anim_frames', 'figure_anim_check', 'style_colors', 'level_list']);
 export const stopAgent = () => useAgent.setState({ stop: true, step: 'Wird gestoppt …' });
 
 const MAX_TURNS = 20;
 /** figures take more careful steps (draw, look, improve) */
-const MAX_TURNS_FIGURES = 40;
+const MAX_TURNS_FIGURES = 60;
 
 /** Einstellungen → KI: "standard" (Claude Sonnet, gründlich) or "sparsam" (Claude Haiku, about half the price) */
 export type AiMode = 'standard' | 'sparsam';

@@ -1083,7 +1083,7 @@
     },
     {
       "name": "figure_anim_draw",
-      "description": "Change pixels of one animation frame (same text format as figure_draw; coordinates in the frame). For built-in animations this overrides the computed frame (reset: true goes back to the automatic one); own animations are changed directly. Use it to let capes, tails, hair or wings follow the motion, fix a weapon, add effects (dust, sparks, magic).",
+      "description": "Change pixels of one animation frame (same text format as figure_draw; coordinates in the frame). For pose animations (built-in and own) this overrides the computed frame (reset: true goes back to it); drawn (pixel) animations are changed directly. For details only – capes, hair, tails following the motion, effects. Moving body parts is better done with figure_anim_pose (keeps all frames consistent).",
       "input": {
         "type": "object",
         "properties": {
@@ -1152,7 +1152,7 @@
     },
     {
       "name": "figure_anim_new",
-      "description": "Create an own animation (e.g. cast a spell, dodge, dance, sleep, open): frames start as copies of an existing animation (from) or of the standing figure; then change them frame by frame with figure_anim_draw. It is exported to Godot with the figure.",
+      "description": "Create an own animation (wall jump, dash, double jump, cast, dodge, open, flicker …). Default: a POSE animation – every frame is computed from the figure's layers (same pixels, colours, proportions in every frame – nothing falls apart); give the key frames directly as poses, or start as a copy of an existing animation (from) or of the standing figure (frames), then shape it with figure_anim_pose / figure_anim_set_poses. Exported to Godot with the figure.",
       "input": {
         "type": "object",
         "properties": {
@@ -1192,11 +1192,565 @@
           "from": {
             "type": "string",
             "description": "animation to start from (id), else the standing figure"
+          },
+          "poses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "one key frame: moves the figure's layers (every pixel stays the figure's own)",
+              "properties": {
+                "off": {
+                  "type": "object",
+                  "description": "region → {x, y} pixel offset (armR = the arm holding the weapon)",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "integer"
+                      },
+                      "y": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                },
+                "rot": {
+                  "type": "object",
+                  "description": "region → degrees clockwise (arms turn at the shoulder, legs at the hip, head at the neck, weapon at the grip)",
+                  "additionalProperties": {
+                    "type": "number"
+                  }
+                },
+                "all": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "integer"
+                    },
+                    "y": {
+                      "type": "integer"
+                    }
+                  },
+                  "description": "whole figure offset (jump height, bob)"
+                },
+                "spin": {
+                  "type": "number",
+                  "description": "turn the whole figure around the feet (degrees)"
+                },
+                "lean": {
+                  "type": "number",
+                  "description": "lean: px per px above the feet (-0.5..0.5)"
+                },
+                "squash": {
+                  "type": "number",
+                  "description": "<1 squash / >1 stretch towards the feet (0.5..1.6)"
+                },
+                "trail": {
+                  "type": "number",
+                  "description": "motion trail behind the weapon tip: degrees of the swing"
+                },
+                "flash": {
+                  "type": "string",
+                  "enum": [
+                    "white",
+                    "red"
+                  ]
+                },
+                "dust": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                },
+                "alpha": {
+                  "type": "number"
+                },
+                "bright": {
+                  "type": "number"
+                },
+                "hold": {
+                  "type": "number",
+                  "description": "0..1 share of the arm turn the grip undoes (weapon stays steady)"
+                },
+                "lie": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "description": "key frames (optional; else frames/from)"
           }
         },
         "required": [
           "kind",
           "name"
+        ]
+      }
+    },
+    {
+      "name": "figure_anim_pose",
+      "description": "Nudge one key frame of an animation (built-in or own pose animation): move / turn body parts. Values add up to what is there (reset: true = back to the original pose). The in-betweens follow automatically. Use it to fix contact (feet on the ground line), arcs, anticipation, overlap – instead of repainting pixels.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "animation": {
+            "type": "string"
+          },
+          "view": {
+            "description": "default: side in a side-scroller project (map view side_view), else front",
+            "type": "string",
+            "enum": [
+              "front",
+              "fside",
+              "side",
+              "bside",
+              "back"
+            ]
+          },
+          "frame": {
+            "type": "integer",
+            "description": "key frame index (0-based, without in-betweens)"
+          },
+          "off": {
+            "type": "object",
+            "description": "region → {x, y} pixel offset (armR = the arm holding the weapon)",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "integer"
+                },
+                "y": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "rot": {
+            "type": "object",
+            "description": "region → degrees clockwise (arms turn at the shoulder, legs at the hip, head at the neck, weapon at the grip)",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "all": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "integer"
+              },
+              "y": {
+                "type": "integer"
+              }
+            },
+            "description": "whole figure offset (jump height, bob)"
+          },
+          "spin": {
+            "type": "number",
+            "description": "turn the whole figure around the feet (degrees)"
+          },
+          "lean": {
+            "type": "number",
+            "description": "lean: px per px above the feet (-0.5..0.5)"
+          },
+          "squash": {
+            "type": "number",
+            "description": "<1 squash / >1 stretch towards the feet (0.5..1.6)"
+          },
+          "trail": {
+            "type": "number",
+            "description": "motion trail behind the weapon tip: degrees of the swing"
+          },
+          "flash": {
+            "type": "string",
+            "enum": [
+              "white",
+              "red"
+            ]
+          },
+          "dust": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "alpha": {
+            "type": "number"
+          },
+          "bright": {
+            "type": "number"
+          },
+          "hold": {
+            "type": "number",
+            "description": "0..1 share of the arm turn the grip undoes (weapon stays steady)"
+          },
+          "lie": {
+            "type": "boolean"
+          },
+          "reset": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "animation",
+          "frame"
+        ]
+      }
+    },
+    {
+      "name": "figure_anim_set_poses",
+      "description": "Replace all key frames of an own pose animation (from figure_anim_new) in one go – design the whole motion as poses. Drops earlier nudges and drawn frames of it.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "animation": {
+            "type": "string"
+          },
+          "poses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "one key frame: moves the figure's layers (every pixel stays the figure's own)",
+              "properties": {
+                "off": {
+                  "type": "object",
+                  "description": "region → {x, y} pixel offset (armR = the arm holding the weapon)",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "integer"
+                      },
+                      "y": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                },
+                "rot": {
+                  "type": "object",
+                  "description": "region → degrees clockwise (arms turn at the shoulder, legs at the hip, head at the neck, weapon at the grip)",
+                  "additionalProperties": {
+                    "type": "number"
+                  }
+                },
+                "all": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "integer"
+                    },
+                    "y": {
+                      "type": "integer"
+                    }
+                  },
+                  "description": "whole figure offset (jump height, bob)"
+                },
+                "spin": {
+                  "type": "number",
+                  "description": "turn the whole figure around the feet (degrees)"
+                },
+                "lean": {
+                  "type": "number",
+                  "description": "lean: px per px above the feet (-0.5..0.5)"
+                },
+                "squash": {
+                  "type": "number",
+                  "description": "<1 squash / >1 stretch towards the feet (0.5..1.6)"
+                },
+                "trail": {
+                  "type": "number",
+                  "description": "motion trail behind the weapon tip: degrees of the swing"
+                },
+                "flash": {
+                  "type": "string",
+                  "enum": [
+                    "white",
+                    "red"
+                  ]
+                },
+                "dust": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                },
+                "alpha": {
+                  "type": "number"
+                },
+                "bright": {
+                  "type": "number"
+                },
+                "hold": {
+                  "type": "number",
+                  "description": "0..1 share of the arm turn the grip undoes (weapon stays steady)"
+                },
+                "lie": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "fps": {
+            "type": "integer"
+          },
+          "loop": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "animation",
+          "poses"
+        ]
+      }
+    },
+    {
+      "name": "figure_anim_smooth",
+      "description": "Smoother animation: smooth 2 / 3 computes 1 / 2 in-between frames between all key frames (same duration, the fps rise accordingly); fps sets the speed of the key frames. Pose animations only.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "animation": {
+            "type": "string"
+          },
+          "view": {
+            "description": "default: side in a side-scroller project (map view side_view), else front",
+            "type": "string",
+            "enum": [
+              "front",
+              "fside",
+              "side",
+              "bside",
+              "back"
+            ]
+          },
+          "smooth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "fps": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 24
+          }
+        },
+        "required": [
+          "kind",
+          "animation"
+        ]
+      }
+    },
+    {
+      "name": "figure_anim_frame_op",
+      "description": "Own animations: duplicate, delete, move (left/right) a key frame or insert a computed in-between after it (inbetween, pose animations). Only without smoothing (smooth 1).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "animation": {
+            "type": "string"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "duplicate",
+              "delete",
+              "left",
+              "right",
+              "inbetween"
+            ]
+          },
+          "frame": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "animation",
+          "op",
+          "frame"
+        ]
+      }
+    },
+    {
+      "name": "figure_anim_check",
+      "description": "Do all frames fit together? Checks every frame against the figure and its neighbours: foreign colours, stray pixels, figure suddenly bigger/smaller (parts missing or doubled), feet leaving the ground line, big jumps between two frames, a loop that does not close, a figure wandering off. Returns issues per frame and a score (100 = clean). Run it after every change to an animation.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "animation": {
+            "type": "string"
+          },
+          "view": {
+            "description": "default: side in a side-scroller project (map view side_view), else front",
+            "type": "string",
+            "enum": [
+              "front",
+              "fside",
+              "side",
+              "bside",
+              "back"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "animation"
+        ]
+      }
+    },
+    {
+      "name": "figure_layer_split",
+      "description": "Cut part of a layer off into its own layer that moves as a body region – makes uploaded pictures (one layer, moving as a whole) animatable in parts: head, arms, legs, weapon, lid, effect. Pixels by rectangles and/or a mask (rows with '#' at x/y). The turning point is set automatically (arm: shoulder, leg: hip, head: neck) – check it. into = add to an existing part layer.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "layer": {
+            "type": "string",
+            "description": "layer id or name to cut from"
+          },
+          "region": {
+            "type": "string",
+            "enum": [
+              "head",
+              "torso",
+              "armL",
+              "armR",
+              "legL",
+              "legR",
+              "weapon",
+              "effect",
+              "ground"
+            ]
+          },
+          "rects": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "minItems": 4,
+              "maxItems": 4
+            },
+            "description": "[[x, y, width, height], …] in figure pixels"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "x": {
+            "type": "integer"
+          },
+          "y": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "into": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "layer",
+          "region"
+        ]
+      }
+    },
+    {
+      "name": "figure_layer_rig",
+      "description": "How a layer moves in animations: region ('auto' = from its slot and position) and turning point pivot [x, y] in figure pixels (shoulder of an arm, hip of a leg, neck of a head, grip of a weapon, hinge of a lid).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "layer": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string",
+            "enum": [
+              "head",
+              "torso",
+              "armL",
+              "armR",
+              "legL",
+              "legR",
+              "weapon",
+              "effect",
+              "ground",
+              "auto"
+            ]
+          },
+          "pivot": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "required": [
+          "kind",
+          "layer"
         ]
       }
     },
@@ -1364,7 +1918,7 @@
     },
     {
       "name": "figure_render",
-      "description": "Picture of the figure as PNG – one view or all views side by side; optionally an animation as a strip of frames.",
+      "description": "Picture of the figure as PNG – one view or all views side by side; with animation: all frames side by side with frame numbers, in-betweens (·) and the ground line (mode strip), or all frames on top of each other to judge arcs, spacing and jitter (mode overlay).",
       "input": {
         "type": "object",
         "properties": {
@@ -1395,6 +1949,13 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 16
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "strip",
+              "overlay"
+            ]
           }
         },
         "required": [

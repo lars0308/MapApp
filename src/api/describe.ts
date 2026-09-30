@@ -171,9 +171,9 @@ export async function buildFigure(fig: FigurePlan & { kind: SpriteKind }, wish: 
       : '',
     styleHint(),
     side
-      ? 'Das Spiel ist ein 2D-Side-Scroller: die Seitenansicht (side) ist die wichtigste – zeichne sie besonders sorgfältig. Prüfe danach die Plattformer-Animationen in view side (idle, run, jump, fall, attack; Kreatur: k_idle, Fortbewegung, k_attack) und verbessere schwache Bilder mit figure_anim_draw.'
+      ? 'Das Spiel ist ein 2D-Side-Scroller: die Seitenansicht (side) ist die wichtigste – zeichne sie besonders sorgfältig. Danach die Plattformer-Animationen in view side (idle, run, jump, fall, attack; Kreatur: k_idle, Fortbewegung, k_attack) flüssig machen: figure_anim_check, Bewegungen mit figure_anim_pose nachjustieren, figure_anim_smooth für run/idle, prüfen bis alle Bilder zusammenpassen.'
       : kind !== 'object'
-        ? 'Prüfe danach die wichtigsten Animationen (Charakter: idle, walk, attack; Kreatur: k_idle, Fortbewegung, k_attack) und verbessere schwache Bilder mit figure_anim_draw.'
+        ? 'Danach die wichtigsten Animationen (Charakter: idle, walk, attack; Kreatur: k_idle, Fortbewegung, k_attack) flüssig machen: figure_anim_check, Bewegungen mit figure_anim_pose nachjustieren, figure_anim_smooth für walk/idle, prüfen bis alle Bilder zusammenpassen.'
         : sideGame()
           ? 'Das Spiel ist ein 2D-Side-Scroller: zeichne das Objekt in reiner Seitenansicht (keine sichtbare Oberseite), Standfläche unten.'
           : '',

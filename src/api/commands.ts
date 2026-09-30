@@ -23,7 +23,9 @@ import { loadImage } from '../utils/image';
 import { useSprites, DEMO_PARTS, SLOTS, blank, composeView, fitContext, layerPixels, partById, toPng } from '../sprites/store';
 import { S as DESIGN } from '../sprites/painter';
 import { RAMP_PRESETS, CHANNELS, type Channel, type Ramp } from '../sprites/palette';
-import { animsFor, frameKey, framesOf, frameSize, renderFrame, type AnimDef } from '../sprites/animation';
+import { animFps, animPoses, animsFor, feetInFrame, frameKey, framesOf, frameSize, isPixelAnim, keyPoses, smoothOf, tuneKey, tuneOf, type AnimDef, type Pose, type Region } from '../sprites/animation';
+import { checkAnimation } from '../sprites/animCheck';
+import { REGION_NAME } from '../sprites/store';
 import { buildSpriteGodot } from '../sprites/exportSprite';
 import { setPlayerSprite } from '../playtest/playerSprite';
 import { figureToObject } from '../objects/fromFigure';
@@ -174,6 +176,53 @@ async function renderArea(p: Project, x: number, y: number, w: number, h: number
 }
 
 /** figure frames side by side → PNG data URL */
+/** animation frames side by side for checking: numbers, ground line, frame borders */
+function animStrip(frames: Uint8ClampedArray[], n: number, scale: number, feet: number, keys: number[] | null): string {
+  const top = 14;
+  const c = document.createElement('canvas');
+  c.width = frames.length * (n * scale + 2);
+  c.height = n * scale + top;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#f2f2f5';
+  g.fillRect(0, 0, c.width, c.height);
+  g.imageSmoothingEnabled = false;
+  const t = document.createElement('canvas');
+  t.width = n;
+  t.height = n;
+  frames.forEach((f, i) => {
+    const x = i * (n * scale + 2);
+    g.fillStyle = i % 2 ? '#e6e6ec' : '#ececf1';
+    g.fillRect(x, top, n * scale, n * scale);
+    g.fillStyle = 'rgba(220,40,60,0.55)';
+    g.fillRect(x, top + (feet + 1) * scale, n * scale, 1);
+    t.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(f), n, n), 0, 0);
+    g.drawImage(t, x, top, n * scale, n * scale);
+    g.fillStyle = '#222';
+    g.font = 'bold 11px sans-serif';
+    g.fillText(keys && keys[i] < 0 ? `${i}·` : String(i), x + 3, 11);
+  });
+  return c.toDataURL('image/png');
+}
+
+/** all frames on top of each other (earlier ones fainter): shows arcs and jitter at a glance */
+function overlay(frames: Uint8ClampedArray[], n: number, scale: number): string {
+  const c = document.createElement('canvas');
+  c.width = c.height = n * scale;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#f2f2f5';
+  g.fillRect(0, 0, c.width, c.height);
+  g.imageSmoothingEnabled = false;
+  const t = document.createElement('canvas');
+  t.width = t.height = n;
+  frames.forEach((f, i) => {
+    t.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(f), n, n), 0, 0);
+    g.globalAlpha = 0.2 + (0.8 * (i + 1)) / frames.length;
+    g.drawImage(t, 0, 0, n * scale, n * scale);
+  });
+  g.globalAlpha = 1;
+  return c.toDataURL('image/png');
+}
+
 function strip(frames: Uint8ClampedArray[], n: number, scale: number): string {
   const c = document.createElement('canvas');
   c.width = frames.length * n * scale;
@@ -318,6 +367,47 @@ function animOf(doc: SpriteDoc, kind: SpriteKind, want: unknown): { anim: AnimDe
   return { anim: built!, custom: false };
 }
 
+
+const REGIONS = Object.keys(REGION_NAME) as Region[];
+function regionOf(v: unknown): Region {
+  const r = str(v, 'region') as Region;
+  if (!REGIONS.includes(r)) fail(`region: ${REGIONS.join(', ')}`);
+  return r;
+}
+
+/** a pose from the AI: only known fields, sane numbers (offsets ±12 px, angles ±180°) */
+function cleanPose(v: unknown): Pose {
+  const o = (v ?? {}) as Record<string, unknown>;
+  const num = (x: unknown, lo: number, hi: number) => (typeof x === 'number' && Number.isFinite(x) ? Math.max(lo, Math.min(hi, x)) : undefined);
+  const off = (x: unknown) => {
+    const q = x as { x?: unknown; y?: unknown } | undefined;
+    if (!q || typeof q !== 'object') return undefined;
+    return { x: Math.round(num(q.x, -12, 12) ?? 0), y: Math.round(num(q.y, -12, 12) ?? 0) };
+  };
+  const p: Pose = {};
+  if (o.off && typeof o.off === 'object') {
+    p.off = {};
+    for (const [r, val] of Object.entries(o.off)) if (REGIONS.includes(r as Region)) p.off[r as Region] = off(val);
+  }
+  if (o.rot && typeof o.rot === 'object') {
+    p.rot = {};
+    for (const [r, val] of Object.entries(o.rot)) if (REGIONS.includes(r as Region) && num(val, -180, 180) !== undefined) p.rot[r as Region] = num(val, -180, 180);
+  }
+  if (o.all) p.all = off(o.all);
+  const set = <K extends keyof Pose>(k: K, val: Pose[K] | undefined) => val !== undefined && (p[k] = val);
+  set('spin', num(o.spin, -120, 120));
+  set('lean', num(o.lean, -0.5, 0.5));
+  set('squash', num(o.squash, 0.5, 1.6));
+  set('bright', num(o.bright, -0.5, 0.5));
+  set('alpha', num(o.alpha, 0, 1));
+  set('hold', num(o.hold, 0, 1));
+  set('trail', num(o.trail, -180, 180));
+  set('dust', num(o.dust, 0, 3));
+  if (o.flash === 'white' || o.flash === 'red') p.flash = o.flash;
+  if (o.lie === true) p.lie = true;
+  if (o.hideEffects === true) p.hideEffects = true;
+  return p;
+}
 
 function viewOf(v: unknown, kind: SpriteKind): View {
   const view = (v ?? (sideGame() && kind !== 'object' ? 'side' : 'front')) as View;
@@ -914,12 +1004,15 @@ const H: Record<string, Handler> = {
         name: doc.name,
         size: doc.size,
         ...(sideGame() && kind !== 'object' ? { game: 'side_scroller', main_view: 'side', hint: 'Side-Scroller: die Seitenansicht (side, Blick nach rechts) ist die wichtigste – im Spiel sieht man fast nur sie; Animationen in view side prüfen und verbessern.' } : {}),
-        layers: doc.layers.map((l) => ({ id: l.id, slot: l.slot, part: l.partId, name: l.name, drawn: l.edited, own_views: Object.keys(l.views ?? {}), visible: l.visible })),
+        layers: doc.layers.map((l) => ({ id: l.id, slot: l.slot, part: l.partId, name: l.name, drawn: l.edited, own_views: Object.keys(l.views ?? {}), visible: l.visible, moves_as: l.region ?? 'auto', ...(l.pivot ? { pivot: l.pivot } : {}) })),
+        ...(doc.layers.some((l) => l.region === 'torso' && !l.partId) && !doc.layers.some((l) => l.partId)
+          ? { own_picture: 'Hochgeladenes Bild: es bewegt sich als Ganzes. Für Gliedmaßen-Bewegung Teile mit figure_layer_split abtrennen (Kopf, Arme, Beine, Waffe).' }
+          : {}),
         colors: doc.ramps,
         anatomy: anatomy(doc, (a.view as View) ?? 'front'),
         animations: [
-          ...animsFor(kind).map((x) => ({ id: x.id, label: x.label, frames: x.poses.length, hint: x.hint })),
-          ...(doc.customAnims ?? []).map((x) => ({ id: x.id, label: x.name, frames: x.frames.length, own: true, view: x.view })),
+          ...animsFor(kind).map((x) => ({ id: x.id, label: x.label, frames: animPoses(doc, x, viewOf(undefined, kind)).poses.length, key_frames: keyPoses(doc, x, viewOf(undefined, kind)).length, smooth: smoothOf(doc, x), fps: animFps(doc, x), nudged: Object.keys(tuneOf(doc, x.id).poses ?? {}).length || undefined, hint: x.hint })),
+          ...(doc.customAnims ?? []).map((x) => ({ id: x.id, label: x.name, frames: isPixelAnim(x) ? x.frames.length : animPoses(doc, x, x.view).poses.length, own: true, type: isPixelAnim(x) ? 'pixel' : 'pose', view: x.view, smooth: smoothOf(doc, x), fps: animFps(doc, x) })),
         ],
       },
     };
@@ -983,20 +1076,24 @@ const H: Record<string, Handler> = {
     const k = int(a.frame, 'frame', 0);
     if (k < 0 || k >= frames.length) fail(`frame 0–${frames.length - 1}`);
     const n = frameSize(doc.size);
+    const keys = isPixelAnim(anim) ? null : animPoses(doc, anim, view);
     return {
       data: {
         animation: anim.id,
         own: custom,
+        kind_of_animation: isPixelAnim(anim) ? 'pixel' : 'pose',
         view,
         frames: frames.length,
-        fps: anim.fps,
+        fps: animFps(doc, anim),
         loop: anim.loop,
         frame_size: n,
         figure_offset: Math.floor((n - doc.size) / 2),
+        feet_row: feetInFrame(doc, view),
         frame: k,
+        ...(keys ? { key_frame: keys.keys[k] >= 0 ? keys.keys[k] : null, pose: keys.poses[k] } : {}),
         ...toGrid(frames[k], n),
-        edited: custom || !!doc.frames?.[frameKey(view, anim.id, k)],
-        hint: 'Koordinaten im Bild (frame_size × frame_size); die Figur steht um figure_offset versetzt darin. Mit figure_anim_draw ändern.',
+        edited: !!doc.frames?.[frameKey(view, anim.id, k)],
+        hint: keys && keys.keys[k] < 0 ? 'Berechnetes Zwischenbild – ändere die Schlüsselbilder davor/danach (figure_anim_pose).' : 'Koordinaten im Bild (frame_size × frame_size). Bewegung lieber mit figure_anim_pose (Teile verschieben/drehen), Pixel-Details mit figure_anim_draw.',
       },
     };
   },
@@ -1004,51 +1101,182 @@ const H: Record<string, Handler> = {
   figure_anim_draw: async (a) => {
     const kind = kindOf(a.kind);
     const doc = await figureReady(kind);
-    const { anim, custom } = animOf(doc, kind, a.animation);
-    const view = custom ? (anim as CustomAnim).view : viewOf(a.view, kind);
+    const { anim } = animOf(doc, kind, a.animation);
+    const pixel = isPixelAnim(anim);
+    const view = 'view' in anim ? (anim as CustomAnim).view : viewOf(a.view, kind);
     const frames = framesOf(doc, anim, view);
     const k = int(a.frame, 'frame', 0);
     if (k < 0 || k >= frames.length) fail(`frame 0–${frames.length - 1}`);
     const n = frameSize(doc.size);
     const st = useSprites.getState();
-    // back to the automatic frame (built-in animations only)
-    if (a.reset && !custom) {
+    // back to the computed frame (pose animations)
+    if (a.reset && !pixel) {
       st.setFrame(kind, frameKey(view, anim.id, k), null);
       return { data: { animation: anim.id, frame: k, reset: true } };
     }
     const pic = textPicture(a, n);
     const target = new Uint8ClampedArray(a.clear ? new Uint8ClampedArray(n * n * 4) : frames[k]);
     const { painted, outside } = paintPicture(target, n, pic);
-    if (custom) {
+    if (pixel) {
       const all = (anim as CustomAnim).frames.slice();
       all[k] = target;
       st.updateCustomAnim(kind, anim.id, { frames: all });
     } else st.setFrame(kind, frameKey(view, anim.id, k), target);
-    return { data: { animation: anim.id, view, frame: k, painted, ...(outside ? { outside } : {}) } };
+    return { data: { animation: anim.id, view, frame: k, painted, ...(outside ? { outside } : {}), hint: 'Mit figure_anim_check prüfen, ob das Bild noch zu den anderen passt.' } };
   },
 
   figure_anim_new: async (a) => {
     const kind = kindOf(a.kind);
     const doc = await figureReady(kind);
     const view = viewOf(a.view, kind);
-    const count = Math.max(1, Math.min(16, int(a.frames, 'frames', 4)));
-    const n = frameSize(doc.size);
-    let frames: Uint8ClampedArray[];
-    if (a.from) {
-      // start from an existing animation (its frames for this view, repeated or cut to the count)
-      const src = framesOf(doc, animOf(doc, kind, a.from).anim, view);
-      frames = Array.from({ length: count }, (_, i) => new Uint8ClampedArray(src[i % src.length]));
-    } else {
-      // every frame starts as the figure standing still (the pose without motion)
-      const still = renderFrame(doc, {}, view);
-      frames = Array.from({ length: count }, () => new Uint8ClampedArray(still));
-    }
     const name = String(a.name ?? 'KI-Animation').slice(0, 40);
     const id = uid('anim');
-    useSprites.getState().addCustomAnim(kind, { id, name, fps: Math.max(1, Math.min(30, int(a.fps, 'fps', 8))), loop: a.loop !== false, view, frames });
-    return { data: { animation: id, name, view, frames: count, frame_size: n, figure_offset: Math.floor((n - doc.size) / 2), hint: 'Jetzt Bild für Bild mit figure_anim_draw anpassen, mit figure_render (animation) prüfen.' } };
+    const fps = Math.max(1, Math.min(30, int(a.fps, 'fps', 8)));
+    let poses: Pose[];
+    if (Array.isArray(a.poses) && a.poses.length) poses = (a.poses as unknown[]).slice(0, 16).map(cleanPose);
+    else {
+      const count = Math.max(1, Math.min(16, int(a.frames, 'frames', 4)));
+      const src = a.from ? animOf(doc, kind, a.from).anim : null;
+      if (src && isPixelAnim(src)) {
+        // copy of a drawn animation stays drawn
+        const f = framesOf(doc, src, view);
+        useSprites.getState().addCustomAnim(kind, { id, name, fps, loop: a.loop !== false, view, frames: Array.from({ length: count }, (_, i) => new Uint8ClampedArray(f[i % f.length])) });
+        return { data: { animation: id, name, view, frames: count, kind_of_animation: 'pixel' } };
+      }
+      const k = src ? keyPoses(doc, src, view) : [{}];
+      poses = Array.from({ length: count }, (_, i) => structuredClone(k[i % k.length]));
+    }
+    useSprites.getState().addCustomAnim(kind, { id, name, fps, loop: a.loop !== false, view, frames: [], poses });
+    return {
+      data: {
+        animation: id,
+        name,
+        view,
+        frames: poses.length,
+        kind_of_animation: 'pose',
+        hint: 'Pose-Animation: jedes Bild entsteht aus den Ebenen der Figur (gleiche Pixel, Farben, Größe). Bewegung mit figure_anim_pose oder figure_anim_set_poses formen, mit figure_render (animation) und figure_anim_check prüfen, Details mit figure_anim_draw.',
+      },
+    };
   },
 
+  figure_anim_set_poses: async (a) => {
+    const kind = kindOf(a.kind);
+    const doc = await figureReady(kind);
+    const { anim, custom } = animOf(doc, kind, a.animation);
+    if (!custom || isPixelAnim(anim)) fail('Nur für eigene Pose-Animationen (figure_anim_new) – eingebaute mit figure_anim_pose nachjustieren');
+    if (!Array.isArray(a.poses) || !a.poses.length) fail('poses: Liste von Posen, eine pro Schlüsselbild');
+    const poses = (a.poses as unknown[]).slice(0, 16).map(cleanPose);
+    const st = useSprites.getState();
+    st.updateCustomAnim(kind, anim.id, { poses, ...(a.fps !== undefined ? { fps: Math.max(1, Math.min(30, int(a.fps, 'fps'))) } : {}), ...(a.loop !== undefined ? { loop: !!a.loop } : {}) });
+    // old nudges and drawn frames belong to the old poses
+    const d = useSprites.getState()[kind].doc;
+    for (const key of Object.keys(d.frames ?? {})) if (key.split(':')[1] === anim.id) st.setFrame(kind, key, null);
+    const tune = tuneOf(d, anim.id);
+    if (tune.poses) for (const key of Object.keys(tune.poses)) st.nudgePose(kind, anim.id, key, null);
+    return { data: { animation: anim.id, frames: poses.length } };
+  },
+
+  figure_anim_pose: async (a) => {
+    const kind = kindOf(a.kind);
+    const doc = await figureReady(kind);
+    const { anim } = animOf(doc, kind, a.animation);
+    if (isPixelAnim(anim)) fail('Gemalte Animation – mit figure_anim_draw ändern');
+    const view = 'view' in anim ? (anim as CustomAnim).view : viewOf(a.view, kind);
+    const keys = keyPoses(doc, anim, view);
+    const k = int(a.frame, 'frame', 0);
+    if (k < 0 || k >= keys.length) fail(`frame (Schlüsselbild) 0–${keys.length - 1}`);
+    const st = useSprites.getState();
+    const key = tuneKey(view, k);
+    if (a.reset) st.nudgePose(kind, anim.id, key, null);
+    else st.nudgePose(kind, anim.id, key, cleanPose(a));
+    const now = keyPoses(useSprites.getState()[kind].doc, anim, view)[k];
+    return { data: { animation: anim.id, view, key_frame: k, pose: now, smooth: smoothOf(doc, anim), hint: smoothOf(doc, anim) > 1 ? `Mit Zwischenbildern ist Schlüsselbild ${k} das Bild ${k * smoothOf(doc, anim)} der Animation.` : undefined } };
+  },
+
+  figure_anim_smooth: async (a) => {
+    const kind = kindOf(a.kind);
+    const doc = await figureReady(kind);
+    const { anim } = animOf(doc, kind, a.animation);
+    if (isPixelAnim(anim)) fail('Gemalte Animationen bekommen keine berechneten Zwischenbilder');
+    const smooth = a.smooth === undefined ? undefined : Math.max(1, Math.min(3, int(a.smooth, 'smooth')));
+    const fps = a.fps === undefined ? undefined : Math.max(1, Math.min(24, int(a.fps, 'fps')));
+    useSprites.getState().setAnimTune(kind, anim.id, { ...(smooth !== undefined ? { smooth } : {}), ...(fps !== undefined ? { fps } : {}) });
+    const d = useSprites.getState()[kind].doc;
+    return { data: { animation: anim.id, smooth: smoothOf(d, anim), frames: framesOf(d, anim, 'view' in anim ? (anim as CustomAnim).view : viewOf(a.view, kind)).length, fps: animFps(d, anim) } };
+  },
+
+  figure_anim_frame_op: async (a) => {
+    const kind = kindOf(a.kind);
+    const doc = await figureReady(kind);
+    const { anim, custom } = animOf(doc, kind, a.animation);
+    if (!custom) fail('Nur eigene Animationen – eingebaute haben feste Bilder (nachjustieren mit figure_anim_pose)');
+    if (smoothOf(doc, anim) > 1) fail('Erst figure_anim_smooth smooth 1 – mit Zwischenbildern lassen sich Bilder nicht verschieben');
+    const op = str(a.op, 'op') as 'duplicate' | 'delete' | 'left' | 'right' | 'inbetween';
+    if (!['duplicate', 'delete', 'left', 'right', 'inbetween'].includes(op)) fail('op: duplicate, delete, left, right, inbetween');
+    useSprites.getState().animFrameOp(kind, anim.id, op, int(a.frame, 'frame', 0));
+    const now = (useSprites.getState()[kind].doc.customAnims ?? []).find((x) => x.id === anim.id)!;
+    return { data: { animation: anim.id, frames: now.poses?.length || now.frames.length } };
+  },
+
+  figure_anim_check: async (a) => {
+    const kind = kindOf(a.kind);
+    const doc = await figureReady(kind);
+    const { anim } = animOf(doc, kind, a.animation);
+    const view = 'view' in anim ? (anim as CustomAnim).view : viewOf(a.view, kind);
+    const r = checkAnimation(doc, anim, view);
+    return {
+      data: {
+        animation: anim.id,
+        view,
+        ...r,
+        issues: r.issues.map((x) => ({ ...x, frame: x.frame })),
+        hint: r.issues.length ? 'frame = Bildnummer (0-basiert). Bewegungsfehler mit figure_anim_pose beheben (Schlüsselbilder), Pixelfehler mit figure_anim_draw, zu große Sprünge mit figure_anim_smooth oder kleineren Bewegungen. Danach erneut prüfen.' : 'Alle Bilder passen zusammen.',
+      },
+    };
+  },
+
+  figure_layer_split: async (a) => {
+    const kind = kindOf(a.kind);
+    const doc = await figureReady(kind);
+    const layer = doc.layers.find((l) => l.id === a.layer || l.name === a.layer) ?? fail(`Layer "${a.layer}" gibt es nicht`);
+    const region = regionOf(a.region);
+    const n = doc.size;
+    const idx = new Set<number>();
+    for (const r of (Array.isArray(a.rects) ? a.rects : []) as unknown[]) {
+      const [x, y, w, h] = (Array.isArray(r) ? r : []).map(Number);
+      if (![x, y, w, h].every(Number.isFinite)) fail('rects: [[x, y, breite, höhe], …]');
+      for (let yy = Math.max(0, y); yy < Math.min(n, y + h); yy++) for (let xx = Math.max(0, x); xx < Math.min(n, x + w); xx++) idx.add(yy * n + xx);
+    }
+    if (Array.isArray(a.rows)) {
+      const x0 = int(a.x, 'x', 0);
+      const y0 = int(a.y, 'y', 0);
+      (a.rows as string[]).forEach((row, dy) => [...String(row)].forEach((ch, dx) => ch !== '.' && ch !== ' ' && x0 + dx < n && y0 + dy < n && idx.add((y0 + dy) * n + x0 + dx)));
+    }
+    if (!idx.size) fail('rects oder rows (Maske: "#" = gehört zum Teil) angeben');
+    const id = useSprites.getState().splitLayer(kind, layer!.id, idx, { region, name: a.name ? String(a.name).slice(0, 30) : undefined, into: a.into ? String(a.into) : undefined });
+    if (!id) fail('In diesem Bereich hat die Ebene keine Pixel');
+    const part = useSprites.getState()[kind].doc.layers.find((l) => l.id === id)!;
+    return { data: { layer: id, name: part.name, region: part.region, pivot: part.pivot, hint: 'Drehpunkt prüfen (Schulter/Hüfte/Hals/Griff) und ggf. mit figure_layer_rig pivot setzen. Dann eine Animation rendern.' } };
+  },
+
+  figure_layer_rig: async (a) => {
+    const kind = kindOf(a.kind);
+    const doc = await figureReady(kind);
+    const layer = doc.layers.find((l) => l.id === a.layer || l.name === a.layer) ?? fail(`Layer "${a.layer}" gibt es nicht`);
+    const rig: { region?: Region | null; pivot?: [number, number] | null } = {};
+    if (a.region !== undefined) rig.region = a.region === null || a.region === 'auto' ? null : regionOf(a.region);
+    if (a.pivot !== undefined) {
+      if (a.pivot === null) rig.pivot = null;
+      else {
+        const [x, y] = (Array.isArray(a.pivot) ? a.pivot : []).map(Number);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) fail('pivot: [x, y] in Pixeln der Figur');
+        rig.pivot = [Math.max(0, Math.min(doc.size, x)), Math.max(0, Math.min(doc.size, y))];
+      }
+    }
+    useSprites.getState().setLayerRig(kind, layer!.id, rig);
+    const l = useSprites.getState()[kind].doc.layers.find((x) => x.id === layer!.id)!;
+    return { data: { layer: l.id, region: l.region ?? 'auto', pivot: l.pivot ?? null } };
+  },
 
   figure_parts: (a) => {
     const kind = kindOf(a.kind);
@@ -1116,9 +1344,15 @@ const H: Record<string, Handler> = {
     const view = (a.view as View | 'all') ?? (a.animation ? (sideGame() && kind !== 'object' ? 'side' : 'front') : 'all');
     if (a.animation) {
       const { anim, custom } = animOf(doc, kind, a.animation);
-      const v = custom ? (anim as CustomAnim).view : view === 'all' ? 'front' : view;
+      const v = custom ? (anim as CustomAnim).view : view === 'all' ? viewOf(undefined, kind) : view;
       const frames = framesOf(doc, anim, v);
-      return { text: `${"label" in anim ? anim.label : anim.name} (${v}), ${frames.length} Bilder`, binary: { kind: 'image', mime: 'image/png', name: `${anim.id}.png`, base64: dataUrlBase64(strip(frames, frameSize(doc.size), Math.max(1, Math.round(scale / 2)))) } };
+      const n = frameSize(doc.size);
+      const keys = isPixelAnim(anim) ? null : animPoses(doc, anim, v).keys;
+      const url = a.mode === 'overlay' ? overlay(frames, n, Math.max(2, scale)) : animStrip(frames, n, Math.max(2, Math.round(scale / 2)), feetInFrame(doc, v), keys);
+      return {
+        text: `${'label' in anim ? anim.label : anim.name} (${v}), ${frames.length} Bilder${a.mode === 'overlay' ? ' übereinander (Bewegungsbahn)' : ' – Zahl = Bildnummer (0-basiert), · = Zwischenbild, rote Linie = Boden'}`,
+        binary: { kind: 'image', mime: 'image/png', name: `${anim.id}.png`, base64: dataUrlBase64(url) },
+      };
     }
     const views: View[] = view === 'all' ? (kind === 'object' ? ['front'] : VIEWS.map((v) => v.id)) : [view];
     const url = views.length === 1 ? toPng(composeView(doc, views[0]), doc.size, scale) : strip(views.map((v) => composeView(doc, v)), doc.size, scale);

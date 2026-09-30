@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { sideGame } from '../api/gameView';
 import { useSprites } from './store';
-import { animsFor, framesOf, frameSize } from './animation';
+import { animFps, animsFor, framesOf, frameSize } from './animation';
 import { exportSheetPng, exportSpriteGodot, type ExportChoice } from './exportSprite';
 import { VIEWS, VIEWS4, type SpriteKind, type View } from './types';
 import { Button, Segmented } from '../components/ui';
@@ -45,9 +45,9 @@ function Preview({ kind, animId, view }: { kind: SpriteKind; animId: string; vie
       i++;
     };
     draw();
-    const t = setInterval(draw, 1000 / anim.fps);
+    const t = setInterval(draw, 1000 / animFps(doc, anim));
     return () => clearInterval(t);
-  }, [frames, n, anim.fps]);
+  }, [frames, n, doc, anim]);
   return <canvas ref={ref} width={n} height={n} className="export-preview" aria-label={`Vorschau ${anim.label}`} />;
 }
 

@@ -1,4 +1,4 @@
-import { isBackView, type Body, type Bounds, type Creature, type CustomAnim, type SpriteDoc, type SpriteKind, type SpriteLayer, type View } from './types';
+import { isBackView, type AnimTune, type Body, type Bounds, type Creature, type CustomAnim, type RigRegion, type SpriteDoc, type SpriteKind, type SpriteLayer, type View } from './types';
 import { compose, fitContext, viewLayers } from './store';
 import { shiftColor } from './palette';
 import { S } from './painter';
@@ -9,7 +9,7 @@ import { frontish, weaponHand, weaponRest } from './parts/character';
 // moves the regions a little (breathing, walking, jumping …). Works for drawn layers too,
 // because regions come from the body measurements, not from the parts.
 
-export type Region = 'head' | 'torso' | 'armL' | 'armR' | 'legL' | 'legR' | 'ground' | 'effect' | 'weapon';
+export type Region = RigRegion;
 type Off = { x: number; y: number };
 
 export interface Pose {
@@ -504,6 +504,8 @@ function regionOf(layer: SpriteLayer, x: number, y: number, kind: SpriteKind, b:
 }
 
 function regionRaw(layer: SpriteLayer, x: number, y: number, kind: SpriteKind, b: Body, bounds: Bounds, c: Creature): Region {
+  // "Bewegt sich als" – set by the user or the AI (own pictures cut into parts)
+  if (layer.region) return layer.region;
   const slot = layer.slot;
   if (slot === 'shadow') return 'ground';
   if (kind === 'object') {
@@ -592,7 +594,11 @@ export function renderFrame(doc: SpriteDoc, pose: Pose, view: View = 'front'): U
   const { body, bounds, creature } = fitContext(doc, view);
   const feet = feetInFrame(doc, view);
   const piv = pivots(doc.kind, body, bounds, creature);
+  // own turning points of rigged layers (canvas pixels) win over the body measurements
+  const own: Partial<Record<Region, Pt>> = {};
+  for (const l of doc.layers) if (l.region && l.pivot && !own[l.region]) own[l.region] = [l.pivot[0] + p, l.pivot[1] + p];
   const pv = (r: Region): Pt => {
+    if (own[r]) return own[r]!;
     const q = piv[r] ?? [S / 2, S / 2];
     return [q[0] + k, q[1] + k];
   };
@@ -803,10 +809,106 @@ function lieDown(img: Uint8ClampedArray, n: number, feet: number): Uint8ClampedA
 }
 
 
-/** frames of a built-in animation (hand-edited frames win) or of an own animation */
+// ---------------------------------------------------------------- tuning, in-betweens
+
+export const isCustom = (a: AnimDef | CustomAnim): a is CustomAnim => 'frames' in a;
+/** own animation drawn pixel by pixel (imported sheet) – no poses, no in-betweens */
+export const isPixelAnim = (a: AnimDef | CustomAnim) => isCustom(a) && !a.poses?.length;
+/** the view a (custom) animation is shown in */
+export const animView = (a: AnimDef | CustomAnim, view: View): View => (isCustom(a) ? a.view : view);
+export const tuneOf = (doc: SpriteDoc, id: string): AnimTune => doc.animTune?.[id] ?? {};
+export const smoothOf = (doc: SpriteDoc, a: AnimDef | CustomAnim) => (isPixelAnim(a) ? 1 : Math.max(1, Math.min(3, Math.round(tuneOf(doc, a.id).smooth ?? 1))));
+export const tuneKey = (view: View, i: number) => `${view}:${i}`;
+
+const addOff = (a?: Off, b?: Off): Off | undefined => (a || b ? { x: (a?.x ?? 0) + (b?.x ?? 0), y: (a?.y ?? 0) + (b?.y ?? 0) } : undefined);
+
+/** a pose with a hand nudge on top (offsets and angles add up, squash multiplies) */
+export function addPose(a: Pose, d: Pose | undefined): Pose {
+  if (!d) return a;
+  const off: Pose['off'] = { ...a.off };
+  for (const [r, v] of Object.entries(d.off ?? {})) off[r as Region] = addOff(off[r as Region], v);
+  const rot: Pose['rot'] = { ...a.rot };
+  for (const [r, v] of Object.entries(d.rot ?? {})) rot[r as Region] = (rot[r as Region] ?? 0) + (v ?? 0);
+  return {
+    ...a,
+    off,
+    rot,
+    all: addOff(a.all, d.all),
+    spin: (a.spin ?? 0) + (d.spin ?? 0) || undefined,
+    lean: (a.lean ?? 0) + (d.lean ?? 0) || undefined,
+    squash: d.squash ? (a.squash ?? 1) * d.squash : a.squash,
+    ...(d.flash !== undefined ? { flash: d.flash } : {}),
+    ...(d.trail !== undefined ? { trail: d.trail } : {}),
+  };
+}
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const lerpOff = (a: Off | undefined, b: Off | undefined, t: number): Off | undefined =>
+  a || b ? { x: Math.round(lerp(a?.x ?? 0, b?.x ?? 0, t)), y: Math.round(lerp(a?.y ?? 0, b?.y ?? 0, t)) } : undefined;
+
+/** pose between two key poses (t = 0..1): positions and angles blend, one-off effects stay on the key */
+export function lerpPose(a: Pose, b: Pose, t: number): Pose {
+  const off: Pose['off'] = {};
+  for (const r of new Set([...Object.keys(a.off ?? {}), ...Object.keys(b.off ?? {})]) as Set<Region>) off[r] = lerpOff(a.off?.[r], b.off?.[r], t);
+  const rot: Pose['rot'] = {};
+  for (const r of new Set([...Object.keys(a.rot ?? {}), ...Object.keys(b.rot ?? {})]) as Set<Region>) rot[r] = lerp(a.rot?.[r] ?? 0, b.rot?.[r] ?? 0, t);
+  const near = t < 0.5 ? a : b;
+  const num = (x: number | undefined, y: number | undefined, d: number) => (x === undefined && y === undefined ? undefined : lerp(x ?? d, y ?? d, t));
+  return {
+    off,
+    rot,
+    all: lerpOff(a.all, b.all, t),
+    spin: num(a.spin, b.spin, 0),
+    lean: num(a.lean, b.lean, 0),
+    squash: num(a.squash, b.squash, 1),
+    bright: num(a.bright, b.bright, 0),
+    alpha: num(a.alpha, b.alpha, 1),
+    hold: num(a.hold, b.hold, 0),
+    lie: near.lie,
+    hideEffects: near.hideEffects,
+    // hit flash, trail and dust belong to their key frame only
+  };
+}
+
+/** the key poses of an animation for a view, with the hand nudges */
+export function keyPoses(doc: SpriteDoc, anim: AnimDef | CustomAnim, view: View): Pose[] {
+  const v = animView(anim, view);
+  // own pose animations are stored as seen in their view (armR = the arm with the weapon)
+  const base = isCustom(anim) ? (anim.poses ?? []) : posesFor(anim, v);
+  const tune = tuneOf(doc, anim.id).poses ?? {};
+  return base.map((p, i) => addPose(p, tune[tuneKey(v, i)]));
+}
+
+/** every frame's pose (key poses + in-betweens) and which key frame it is (−1 = in-between) */
+export function animPoses(doc: SpriteDoc, anim: AnimDef | CustomAnim, view: View): { poses: Pose[]; keys: number[] } {
+  const keys = keyPoses(doc, anim, view);
+  const k = smoothOf(doc, anim);
+  if (k === 1 || keys.length < 2) return { poses: keys, keys: keys.map((_, i) => i) };
+  const poses: Pose[] = [];
+  const idx: number[] = [];
+  keys.forEach((p, i) => {
+    poses.push(p);
+    idx.push(i);
+    const next = keys[i + 1] ?? (anim.loop ? keys[0] : null);
+    if (!next) return;
+    for (let j = 1; j < k; j++) {
+      poses.push(lerpPose(p, next, j / k));
+      idx.push(-1);
+    }
+  });
+  return { poses, keys: idx };
+}
+
+/** playback speed: in-betweens play faster, so the animation keeps its length */
+export function animFps(doc: SpriteDoc, anim: AnimDef | CustomAnim): number {
+  return Math.min(30, Math.round((tuneOf(doc, anim.id).fps ?? anim.fps) * smoothOf(doc, anim)));
+}
+
+/** frames of an animation: rendered from the (tuned) poses, hand-edited frames win; pixel animations as drawn */
 export function framesOf(doc: SpriteDoc, anim: AnimDef | CustomAnim, view: View = 'front'): Uint8ClampedArray[] {
-  if ('frames' in anim) return anim.frames;
-  return posesFor(anim, view).map((p, i) => doc.frames?.[frameKey(view, anim.id, i)] ?? renderFrame(doc, p, view));
+  if (isPixelAnim(anim)) return (anim as CustomAnim).frames;
+  const v = animView(anim, view);
+  return animPoses(doc, anim, v).poses.map((p, i) => doc.frames?.[frameKey(v, anim.id, i)] ?? renderFrame(doc, p, v));
 }
 
 export function renderAnimation(doc: SpriteDoc, anim: AnimDef, view: View = 'front'): Uint8ClampedArray[] {
@@ -845,8 +947,8 @@ export function buildSheet(doc: SpriteDoc, anims: AnimDef[], views: View[] = ['f
   const items: { name: string; animId: string; view: View; frames: Uint8ClampedArray[]; loop: boolean; fps: number }[] = [];
   const multi = views.length > 1;
   for (const view of views)
-    for (const a of anims) items.push({ name: multi ? `${exportName(a.id)}_${DIR_NAME[view]}` : exportName(a.id), animId: a.id, view, frames: framesOf(doc, a, view), loop: a.loop, fps: fps[a.id] ?? a.fps });
-  for (const a of custom) items.push({ name: multi || a.view !== 'front' ? `${slug(a.name)}_${DIR_NAME[a.view]}` : slug(a.name), animId: a.id, view: a.view, frames: a.frames, loop: a.loop, fps: a.fps });
+    for (const a of anims) items.push({ name: multi ? `${exportName(a.id)}_${DIR_NAME[view]}` : exportName(a.id), animId: a.id, view, frames: framesOf(doc, a, view), loop: a.loop, fps: fps[a.id] ?? animFps(doc, a) });
+  for (const a of custom) items.push({ name: multi || a.view !== 'front' ? `${slug(a.name)}_${DIR_NAME[a.view]}` : slug(a.name), animId: a.id, view: a.view, frames: framesOf(doc, a, a.view), loop: a.loop, fps: animFps(doc, a) });
   const cols = Math.max(1, ...items.map((i) => i.frames.length));
   const c = document.createElement('canvas');
   c.width = cols * n;

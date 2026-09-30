@@ -4,15 +4,16 @@ import { Button, Segmented } from '../components/ui';
 import { Icon } from '../components/icons';
 import { useEditor } from '../store/editorStore';
 import { useProject } from '../store/projectStore';
+import { useSprites } from './store';
 import { formatCost, runAgent, useAgent } from '../api/agent';
 import { styleHint } from '../api/describe';
 import { gameView, setGameView, type GameView } from '../api/gameView';
 
 const EXAMPLES: Record<GameView, Record<SpriteKind, string[]>> = {
   side: {
-    character: ['Lauf-, Sprung- und Fall-Animation verbessern', 'Schwertangriff mit Schlagspur', 'Neue Animation: Wandsprung', 'Neue Animation: Dash', 'Details und Schattierung verbessern', 'An den Stil meiner Karte anpassen'],
-    creature: ['Bewegung und Angriff flüssiger machen', 'Treffer- und Tod-Animation verbessern', 'Neue Animation: Sprungangriff', 'Gefährlicher aussehen lassen', 'An den Stil meiner Karte anpassen'],
-    object: ['Fackel flackern lassen', 'Truhe öffnen animieren', 'Münze drehen lassen', 'Details und Schattierung verbessern', 'An den Stil meiner Karte anpassen'],
+    character: ['Alle Animationen flüssiger machen und prüfen', 'Lauf-, Sprung- und Fall-Animation verbessern', 'Schwertangriff mit Schlagspur', 'Neue Animation: Wandsprung', 'Neue Animation: Dash', 'Mein hochgeladenes Bild in Teile trennen und animieren', 'Details und Schattierung verbessern'],
+    creature: ['Bewegung und Angriff flüssiger machen', 'Treffer- und Tod-Animation verbessern', 'Neue Animation: Sprungangriff', 'Mein hochgeladenes Bild in Teile trennen und animieren', 'Gefährlicher aussehen lassen'],
+    object: ['Fackel flackern lassen', 'Truhe öffnen animieren', 'Münze drehen lassen', 'Mein hochgeladenes Objekt animieren', 'Details und Schattierung verbessern'],
   },
   top: {
     character: ['Lauf- und Angriffs-Animation verbessern', 'Neue Animation: Ausweichrolle', 'Roten Umhang und Krone dazu', 'Details und Schattierung verbessern', 'An den Stil meiner Karte anpassen'],
@@ -37,7 +38,10 @@ export function FigureAiPanel({ kind }: { kind: SpriteKind }) {
       view === 'side' && kind !== 'object'
         ? 'Das Spiel ist ein 2D-Side-Scroller: Seitenansicht (view side) ist die Hauptansicht, Animationen dort prüfen und verbessern (figure_render mit animation, figure_anim_frames, figure_anim_draw; neue Bewegungen mit figure_anim_new in view side).'
         : '',
-      /anim|beweg|lauf|sprung|spring|angriff|schlag|dash|flacker|öffn|dreh/i.test(wish) ? 'Es geht um Animation: sieh dir die betroffenen Animationen Bild für Bild an und zeichne sie sauber nach (siehe ANIMATION).' : '',
+      /anim|beweg|lauf|sprung|spring|angriff|schlag|dash|flacker|öffn|dreh|flüssig|teile/i.test(wish)
+        ? 'Es geht um Animation: arbeite wie unter ANIMATION beschrieben – Ebenen/Teile prüfen, Bewegung als Posen (figure_anim_pose, figure_anim_new mit poses), figure_anim_smooth, nach jeder Änderung figure_anim_check und figure_render (animation), bis alle Bilder zusammenpassen.'
+        : '',
+      useSprites.getState()[kind].doc.layers.some((l) => l.region === 'torso' && !l.partId) ? 'Die Figur ist ein hochgeladenes Bild: wenn sich Teile bewegen sollen, trenne sie zuerst mit figure_layer_split ab (figure_grid zeigt die Pixel).' : '',
       styleHint(),
       'Prüfe das Ergebnis mit figure_render. Zum Schluss figure_save.',
     ].filter(Boolean).join('\n');

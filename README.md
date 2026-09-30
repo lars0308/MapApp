@@ -335,6 +335,34 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.44 – Animieren: flüssiger, nachjustierbar, eigene Bilder, KI prüft jedes Bild**
+
+- **Reiter „Animieren“ im Figuren-Baukasten (wieder da, neu gebaut):**
+  - Animation und Ansicht wählen; im Side-Scroller startet er in der Seitenansicht.
+  - Große Vorschau mit Abspielen/Anhalten, Bild für Bild, „Vorheriges Bild durchscheinen“ und Tempo-Regler.
+  - Bildleiste mit allen Bildern. Berechnete Zwischenbilder sind gestrichelt, von Hand gemalte Bilder haben einen Punkt.
+- **Flüssiger:** „Flüssig ×2“ oder „Sehr flüssig ×3“ berechnet Zwischenbilder aus den Posen. Die Animation bleibt gleich lang und läuft weicher. Die Zwischenbilder folgen jeder Änderung automatisch.
+- **Selbst nachjustieren:** Bild anhalten, Körperteil wählen (Ganze Figur, Kopf, Rumpf, Arm 1 mit Waffe, Arm 2, Bein 1, Bein 2, Waffe; bei Kreaturen und Objekten passende Teile). Dann ← ↑ ↓ → um 1 px verschieben oder ↺ ↻ drehen. Weil die Figur aus ihren Ebenen neu berechnet wird, bleibt sie in allen Bildern dieselbe. „Pixel bearbeiten“ öffnet ein Bild zum Malen.
+- **Eigene Animationen:** „Neue Animation“ startet als Kopie einer bestehenden Animation oder der stehenden Figur. Bilder lassen sich doppeln, verschieben, löschen, und ein Zwischenbild lässt sich einfügen.
+- **„Prüfen: Passen alle Bilder zusammen?“** findet:
+  - fremde Farben und lose Einzelpixel,
+  - eine Figur, die plötzlich größer oder kleiner wird,
+  - Füße über oder im Boden,
+  - große Sprünge zwischen zwei Bildern,
+  - eine Schleife, die nicht sauber schließt, oder eine Figur, die zur Seite wandert.
+  Ein Tipp auf einen Hinweis springt zum Bild.
+- **Eigene Bilder hochladen und animieren:**
+  - „Eigenes Bild hochladen und animieren“ in der Figuren-Auswahl oder im Reiter Animieren.
+  - Ein einfarbiger Hintergrund wird automatisch entfernt.
+  - Das Bild bewegt sich zuerst als Ganzes (federt, lehnt sich, springt).
+  - Mit **„Teil abtrennen“** ziehst du ein Rechteck um Kopf, Arm, Bein, Waffe oder Deckel. Das Teil wird eine eigene Ebene und bewegt sich einzeln. Der Drehpunkt (Schulter, Hüfte, Hals) wird passend gesetzt und lässt sich per Tipp versetzen.
+  - Jede Ebene hat „Bewegt sich als …“.
+- **Die KI animiert besser:**
+  - Neue Befehle: `figure_anim_check` (Prüfung pro Bild), `figure_anim_pose` (Teile verschieben/drehen), `figure_anim_new` mit Posen und `figure_anim_set_poses` (ganze Bewegungen als Posen), `figure_anim_smooth` (Zwischenbilder), `figure_anim_frame_op`, `figure_layer_split` und `figure_layer_rig` (hochgeladene Bilder in Teile trennen).
+  - `figure_render` zeigt Animationen mit Bildnummern und Bodenlinie oder alle Bilder übereinander (Bewegungsbahn).
+  - Die KI arbeitet mit Ebenen und Posen statt Bilder neu zu malen und prüft nach jeder Änderung, bis alle Bilder zusammenpassen.
+- Zwischenbilder, Tempo und eigene Pose-Animationen gehen mit in den Godot-Export und in die Spielfigur.
+
 **Version 3.43 – Side-Scroller: Gelände-Baukasten, KI-Vorsortierung und Figuren-Animation**
 
 - **Gelände aus dem eigenen Tileset bauen (Seitenansicht):** Bei einer Side-Scroller-Karte wird aus „Raum bauen“ **„Gelände bauen“**. Du füllst einen Erdblock:

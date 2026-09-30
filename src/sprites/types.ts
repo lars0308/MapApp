@@ -116,7 +116,17 @@ export interface SpriteLayer {
   data: Uint8ClampedArray;
   /** own pixels for the other views (else painted from the part or taken from the front) */
   views?: Partial<Record<OtherView, Uint8ClampedArray>>;
+  /**
+   * "Bewegt sich als": the body region this layer moves with in animations (else from its slot and
+   * position). Own pictures: the whole picture moves as one (torso) until parts are cut off.
+   */
+  region?: RigRegion;
+  /** turning point of that region in canvas pixels (shoulder of an arm, neck of a head …) */
+  pivot?: [number, number];
 }
+
+/** body regions animations move (see animation.ts) */
+export type RigRegion = 'head' | 'torso' | 'armL' | 'armR' | 'legL' | 'legR' | 'ground' | 'effect' | 'weapon';
 
 /** An animation made of drawn / edited frames (own animation or imported spritesheet). */
 export interface CustomAnim {
@@ -125,8 +135,22 @@ export interface CustomAnim {
   fps: number;
   loop: boolean;
   view: View;
-  /** frameSize × frameSize RGBA each */
+  /** frameSize × frameSize RGBA each (pixel animation: imported sheet, drawn frames) */
   frames: Uint8ClampedArray[];
+  /**
+   * pose animation: frames are computed from the figure's layers (like the built-in ones), so
+   * every frame keeps the same pixels, colours and proportions. `frames` is then unused.
+   */
+  poses?: import('./animation').Pose[];
+}
+
+/** hand tuning of an animation (built-in or own) */
+export interface AnimTune {
+  fps?: number;
+  /** 1 = as drawn, 2 / 3 = computed in-between frames (smoother, same duration) */
+  smooth?: number;
+  /** added to the key pose `${view}:${index}` (nudged / turned body parts) */
+  poses?: Record<string, import('./animation').Pose>;
 }
 
 export interface SpriteDoc {
@@ -140,4 +164,6 @@ export interface SpriteDoc {
   /** frames edited by hand in "Animieren": key `${view}:${animId}:${index}` → full frame */
   frames?: Record<string, Uint8ClampedArray>;
   customAnims?: CustomAnim[];
+  /** per animation id: speed, in-betweens and nudged poses */
+  animTune?: Record<string, AnimTune>;
 }

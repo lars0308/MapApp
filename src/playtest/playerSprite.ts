@@ -59,11 +59,11 @@ export function playerSheet(doc: SpriteDoc): Stored {
   const map: NonNullable<Stored['rows']> = {};
   for (const r of rows) {
     const a = anims.find((x) => x.id === r.animId)!;
-    map[`${BASE_NAME[a.id] ?? a.id}_${r.view}`] = { row: r.row, frames: r.frames, fps: a.fps, loop: a.loop };
+    map[`${BASE_NAME[a.id] ?? a.id}_${r.view}`] = { row: r.row, frames: r.frames, fps: r.fps, loop: a.loop };
   }
   const idle = anims[0];
   const walk = anims[1] ?? anims[0];
-  return { name: doc.name, size: frameSize(doc.size), png: canvas.toDataURL('image/png'), idle: idle.poses.length, walk: walk.poses.length, feet: feetInFrame(doc), rows: map };
+  return { name: doc.name, size: frameSize(doc.size), png: canvas.toDataURL('image/png'), idle: map[`${BASE_NAME[idle.id] ?? idle.id}_front`]?.frames ?? idle.poses.length, walk: map[`${BASE_NAME[walk.id] ?? walk.id}_front`]?.frames ?? walk.poses.length, feet: feetInFrame(doc), rows: map };
 }
 
 export function setPlayerSprite(doc: SpriteDoc): boolean {

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Body, Bounds, Creature, CustomAnim, DemoPart, FitContext, SlotDef, SpriteDoc, SpriteKind, SpriteLayer, UserPart, View, OtherView } from './types';
+import type { AnimTune, Body, Bounds, Creature, CustomAnim, RigRegion, DemoPart, FitContext, SlotDef, SpriteDoc, SpriteKind, SpriteLayer, UserPart, View, OtherView } from './types';
 import { BODIES, CHARACTER_PARTS, CHARACTER_SLOTS, viewBody } from './parts/character';
 import { CREATURE_PARTS, CREATURE_SLOTS, DEFAULT_CREATURE, viewCreature } from './parts/creature';
 import { frameSize } from './frame';
@@ -7,12 +7,13 @@ import { OBJECT_PARTS, OBJECT_SLOTS } from './parts/object';
 import { render, S } from './painter';
 import { CHANNELS, PALETTE_PRESETS, RAMP_PRESETS, defaultRamps, hexToRgb, type Channel, type DrawPalette, type Ramp, type Ramps } from './palette';
 import { uid } from '../utils/id';
+import { addPose, lerpPose, type Pose } from './animation';
 
 export const SLOTS: Record<SpriteKind, SlotDef[]> = { character: CHARACTER_SLOTS, object: OBJECT_SLOTS, creature: CREATURE_SLOTS };
 export const DEMO_PARTS: Record<SpriteKind, DemoPart[]> = { character: CHARACTER_PARTS, object: OBJECT_PARTS, creature: CREATURE_PARTS };
 export const SIZES = [16, 32, 48, 64];
 
-export type SpriteTool = 'pen' | 'eraser' | 'fill' | 'pipette' | 'line' | 'rect' | 'move' | 'dither' | 'replace' | 'lighten' | 'darken' | 'hand';
+export type SpriteTool = 'pen' | 'eraser' | 'fill' | 'pipette' | 'line' | 'rect' | 'move' | 'dither' | 'replace' | 'lighten' | 'darken' | 'hand' | 'cut' | 'pivot';
 
 const DEFAULT_BOUNDS: Bounds = { x0: 8, y0: 9, x1: 23, y1: 26 };
 const HISTORY = 60;
@@ -109,9 +110,33 @@ export function partById(id: string | null): DemoPart | undefined {
   return (id.startsWith('c.') ? CHARACTER_PARTS : id.startsWith('k.') ? CREATURE_PARTS : OBJECT_PARTS).find((p) => p.id === id);
 }
 
+/** outline of everything drawn, in the 32-px design grid */
+function drawnBounds(layers: SpriteLayer[]): Bounds | null {
+  let x0 = Infinity,
+    y0 = Infinity,
+    x1 = -1,
+    y1 = -1;
+  let n = 0;
+  for (const l of layers) {
+    if (!l.visible || l.slot === 'shadow' || l.slot === 'effect') continue;
+    n = Math.round(Math.sqrt(l.data.length / 4));
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++)
+        if (l.data[(y * n + x) * 4 + 3]) {
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+  }
+  if (x1 < 0) return null;
+  const d = Math.floor((n - S) / 2);
+  return { x0: x0 - d, y0: y0 - d, x1: x1 - d, y1: y1 - d };
+}
+
 export function fitContext(doc: Pick<SpriteDoc, 'layers'>, view: View = 'front'): FitContext {
   let body: Body = BODIES.normal;
-  let bounds: Bounds = DEFAULT_BOUNDS;
+  let bounds: Bounds | null = null;
   let creature: Creature = DEFAULT_CREATURE;
   for (const l of doc.layers) {
     const p = partById(l.partId);
@@ -119,6 +144,8 @@ export function fitContext(doc: Pick<SpriteDoc, 'layers'>, view: View = 'front')
     if (p?.bounds) bounds = p.bounds;
     if (p?.creature) creature = p.creature;
   }
+  // own pictures / drawn objects: the bounds are what is drawn (lid = its upper part)
+  bounds ??= drawnBounds(doc.layers) ?? DEFAULT_BOUNDS;
   return { body: viewBody(body, view), bounds, creature: viewCreature(creature, view) };
 }
 
@@ -359,6 +386,26 @@ interface SpriteState {
   addCustomAnim: (kind: SpriteKind, anim: CustomAnim) => void;
   updateCustomAnim: (kind: SpriteKind, id: string, patch: Partial<CustomAnim>) => void;
   deleteCustomAnim: (kind: SpriteKind, id: string) => void;
+  /** speed / in-betweens of an animation; changing the in-betweens drops its hand-drawn frames */
+  setAnimTune: (kind: SpriteKind, animId: string, patch: Partial<Omit<AnimTune, 'poses'>>) => void;
+  /** nudge / turn body parts of one key frame (added up; null = back to the original pose) */
+  nudgePose: (kind: SpriteKind, animId: string, key: string, delta: Pose | null) => void;
+  /** own animation: duplicate / delete / move a frame, or put a computed in-between after it */
+  animFrameOp: (kind: SpriteKind, animId: string, op: 'duplicate' | 'delete' | 'left' | 'right' | 'inbetween', index: number) => void;
+  /** "Bewegt sich als" + turning point of a layer (undefined = automatic) */
+  setLayerRig: (kind: SpriteKind, layerId: string, rig: { region?: RigRegion | null; pivot?: [number, number] | null }) => void;
+  /**
+   * cut pixels (indices y·size+x) off a layer into a new one that moves as `region`; returns the
+   * new layer's id. Own pictures become animatable in parts this way (head, arms, weapon …).
+   */
+  splitLayer: (kind: SpriteKind, layerId: string, pixels: Iterable<number>, opts: { name?: string; region?: RigRegion; into?: string }) => string | null;
+  /** "Teil abtrennen": rectangles on the canvas move pixels of `from` into one new part */
+  cut: { kind: SpriteKind; from: string; into: string | null; region: RigRegion } | null;
+  startCut: (kind: SpriteKind, region: RigRegion) => boolean;
+  stopCut: () => void;
+  /** tab the figure builder should show next (set before opening it) */
+  studioTab: string | null;
+  setStudioTab: (tab: string | null) => void;
   /** own image as a new layer (centred) */
   importImageLayer: (kind: SpriteKind, img: ImageData, name: string) => void;
   /** own image as a new figure / object (size fitted: 16, 32, 48 or 64) */
@@ -398,6 +445,46 @@ interface SpriteState {
   saveToGallery: (kind: SpriteKind) => boolean;
   openFromGallery: (kind: SpriteKind, id: string) => Promise<void>;
   deleteFromGallery: (id: string) => void;
+}
+
+/** names of the regions ("Bewegt sich als") */
+export const REGION_NAME: Record<RigRegion, string> = {
+  head: 'Kopf',
+  torso: 'Körper',
+  armR: 'Arm 1 (Waffe)',
+  armL: 'Arm 2',
+  legR: 'Bein 1',
+  legL: 'Bein 2',
+  weapon: 'Waffe',
+  effect: 'Effekt',
+  ground: 'Schatten',
+};
+
+/** turning point that fits a region: shoulder / hip on top, neck and feet at the bottom */
+export function autoPivot(data: Uint8ClampedArray, n: number, region: RigRegion): [number, number] | undefined {
+  let x0 = n,
+    y0 = n,
+    x1 = -1,
+    y1 = -1;
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++)
+      if (data[(y * n + x) * 4 + 3]) {
+        x0 = Math.min(x0, x);
+        x1 = Math.max(x1, x);
+        y0 = Math.min(y0, y);
+        y1 = Math.max(y1, y);
+      }
+  if (x1 < 0) return undefined;
+  const cx = (x0 + x1 + 1) / 2;
+  if (region === 'armL' || region === 'armR' || region === 'legL' || region === 'legR') return [cx, y0 + 1];
+  if (region === 'head' || region === 'torso' || region === 'weapon') return [cx, y1 + 1];
+  return [cx, (y0 + y1 + 1) / 2];
+}
+
+/** hand-drawn frames of an animation removed (its frame numbers changed) */
+function dropFrames(frames: SpriteDoc['frames'], animId: string): SpriteDoc['frames'] {
+  if (!frames) return frames;
+  return Object.fromEntries(Object.entries(frames).filter(([k]) => k.split(':')[1] !== animId));
 }
 
 const kindState = (kind: SpriteKind): KindState => {
@@ -565,6 +652,117 @@ export const useSprites = create<SpriteState>((set, get) => {
     addCustomAnim: (kind, anim) => setDoc(kind, { customAnims: [...(get()[kind].doc.customAnims ?? []), anim] }),
     updateCustomAnim: (kind, id, p) => setDoc(kind, { customAnims: (get()[kind].doc.customAnims ?? []).map((a) => (a.id === id ? { ...a, ...p } : a)) }),
     deleteCustomAnim: (kind, id) => setDoc(kind, { customAnims: (get()[kind].doc.customAnims ?? []).filter((a) => a.id !== id) }),
+    setAnimTune: (kind, animId, p) => {
+      const doc = get()[kind].doc;
+      const cur = doc.animTune?.[animId] ?? {};
+      const next: AnimTune = { ...cur, ...p };
+      // in-betweens change the frame numbers: hand-drawn frames of this animation no longer fit
+      const frames = p.smooth !== undefined && p.smooth !== (cur.smooth ?? 1) ? dropFrames(doc.frames, animId) : doc.frames;
+      setDoc(kind, { animTune: { ...doc.animTune, [animId]: next }, frames });
+    },
+    nudgePose: (kind, animId, key, delta) => {
+      const doc = get()[kind].doc;
+      const cur = doc.animTune?.[animId] ?? {};
+      const poses = { ...cur.poses };
+      if (delta) poses[key] = addPose(poses[key] ?? {}, delta);
+      else delete poses[key];
+      // the pose moved: a hand-drawn copy of that frame would hide it
+      const [view, i] = key.split(':');
+      const smooth = cur.smooth ?? 1;
+      const frames = { ...(doc.frames ?? {}) };
+      delete frames[`${view}:${animId}:${Number(i) * smooth}`];
+      setDoc(kind, { animTune: { ...doc.animTune, [animId]: { ...cur, poses } }, frames });
+    },
+    animFrameOp: (kind, animId, op, index) => {
+      const doc = get()[kind].doc;
+      const anim = (doc.customAnims ?? []).find((a) => a.id === animId);
+      if (!anim) return;
+      const pose = !!anim.poses?.length;
+      const list: unknown[] = pose ? [...anim.poses!] : [...anim.frames];
+      if (index < 0 || index >= list.length) return;
+      if (op === 'duplicate') list.splice(index + 1, 0, pose ? structuredClone(list[index]) : new Uint8ClampedArray(list[index] as Uint8ClampedArray));
+      else if (op === 'delete') {
+        if (list.length <= 1) return;
+        list.splice(index, 1);
+      } else if (op === 'left' || op === 'right') {
+        const j = op === 'left' ? index - 1 : index + 1;
+        if (j < 0 || j >= list.length) return;
+        [list[index], list[j]] = [list[j], list[index]];
+      } else if (op === 'inbetween') {
+        const j = index + 1 < list.length ? index + 1 : anim.loop ? 0 : -1;
+        if (j < 0) return;
+        // drawn frames cannot be computed – only pose animations get in-betweens
+        if (!pose) return;
+        list.splice(index + 1, 0, lerpPose(list[index] as Pose, list[j] as Pose, 0.5));
+      }
+      // frame numbers moved: hand-drawn copies and nudges of this animation are dropped
+      const tune = doc.animTune?.[animId];
+      setDoc(kind, {
+        customAnims: (doc.customAnims ?? []).map((a) => (a.id !== animId ? a : pose ? { ...a, poses: list as Pose[] } : { ...a, frames: list as Uint8ClampedArray[] })),
+        frames: dropFrames(doc.frames, animId),
+        animTune: tune ? { ...doc.animTune, [animId]: { ...tune, poses: undefined } } : doc.animTune,
+      });
+    },
+    cut: null,
+    startCut: (kind, region) => {
+      const k = get()[kind];
+      const from = k.active && k.doc.layers.some((l) => l.id === k.active) ? k.active : k.doc.layers[k.doc.layers.length - 1]?.id;
+      if (!from) return false;
+      set({ cut: { kind, from, into: null, region }, tool: 'cut' });
+      return true;
+    },
+    stopCut: () => set({ cut: null, tool: get().tool === 'cut' || get().tool === 'pivot' ? 'pen' : get().tool }),
+    studioTab: null,
+    setStudioTab: (tab) => set({ studioTab: tab }),
+    setLayerRig: (kind, layerId, rig) => {
+      const doc = get()[kind].doc;
+      const layers = doc.layers.map((l) => {
+        if (l.id !== layerId) return l;
+        const out = { ...l };
+        if (rig.region !== undefined) {
+          out.region = rig.region ?? undefined;
+          // a new region gets a fitting turning point unless one is given
+          if (rig.pivot === undefined) out.pivot = rig.region ? autoPivot(l.data, doc.size, rig.region) : undefined;
+        }
+        if (rig.pivot !== undefined) out.pivot = rig.pivot ?? undefined;
+        return out;
+      });
+      setDoc(kind, { layers }, snapshot(kind));
+    },
+    splitLayer: (kind, layerId, pixels, opts) => {
+      const k = get()[kind];
+      const src = k.doc.layers.find((l) => l.id === layerId);
+      if (!src) return null;
+      const n = k.doc.size;
+      const hist = snapshot(kind);
+      const cut = (from: Uint8ClampedArray, to: Uint8ClampedArray) => {
+        let moved = 0;
+        for (const i of pixels) {
+          if (i < 0 || i >= n * n || !from[i * 4 + 3]) continue;
+          to.set(from.subarray(i * 4, i * 4 + 4), i * 4);
+          from.fill(0, i * 4, i * 4 + 4);
+          moved++;
+        }
+        return moved;
+      };
+      const data = new Uint8ClampedArray(src.data);
+      const target = opts.into ? k.doc.layers.find((l) => l.id === opts.into) : undefined;
+      const outData = target ? new Uint8ClampedArray(target.data) : blank(n);
+      const moved = cut(data, outData);
+      if (!moved) return null;
+      const views = src.views ? Object.fromEntries(Object.entries(src.views).map(([v, d]) => [v, new Uint8ClampedArray(d!)])) : undefined;
+      const outViews: SpriteLayer['views'] = {};
+      if (views) for (const [v, d] of Object.entries(views)) cut(d as Uint8ClampedArray, (outViews[v as OtherView] = blank(n)));
+      const region = opts.region ?? target?.region ?? 'torso';
+      const part: SpriteLayer = target
+        ? { ...target, data: outData, edited: true }
+        : { id: uid(), name: opts.name ?? REGION_NAME[region] ?? 'Teil', slot: src.slot === 'shadow' ? 'extra' : src.slot, partId: null, edited: true, visible: true, data: outData, views: views ? outViews : undefined, region };
+      part.pivot = autoPivot(outData, n, region);
+      const rest: SpriteLayer = { ...src, data, views, edited: true, region: src.region ?? 'torso' };
+      const layers = k.doc.layers.flatMap((l) => (l.id === src.id ? (target ? [rest] : [rest, part]) : l.id === target?.id ? [part] : [l]));
+      setDoc(kind, { layers }, { ...hist, active: part.id });
+      return part.id;
+    },
     importImageLayer: (kind, img, name) => {
       const k = get()[kind];
       const n = k.doc.size;
@@ -603,6 +801,12 @@ export const useSprites = create<SpriteState>((set, get) => {
       doc.name = name;
       patch(kind, { ...snapshot(kind), doc, active: null });
       get().importImageLayer(kind, src, name);
+      // a whole picture moves as one until parts are cut off (no torn-off limbs); objects keep lid / base
+      if (kind !== 'object') {
+        const k = get()[kind];
+        const l = k.doc.layers[k.doc.layers.length - 1];
+        if (l) setDoc(kind, { layers: k.doc.layers.map((x) => (x.id === l.id ? { ...x, region: 'torso' as RigRegion, pivot: autoPivot(x.data, k.doc.size, 'torso') } : x)) });
+      }
     },
     setDocument: (kind, doc) => patch(kind, { ...snapshot(kind), doc: { ...doc, kind }, active: doc.layers[doc.layers.length - 1]?.id ?? null }),
     applyPalette: (kind, colors) => {
@@ -870,7 +1074,8 @@ export const useSprites = create<SpriteState>((set, get) => {
             const t = (ty * size + tx) * 4;
             out.set(l.data.subarray(s, s + 4), t);
           }
-        return { ...l, data: out };
+        // turning points move with the pixels
+        return { ...l, data: out, pivot: l.pivot ? ([l.pivot[0] + d, l.pivot[1] + d] as [number, number]) : undefined };
       });
       const ctx = fitContext({ layers });
       const doc = { ...k.doc, size };
@@ -887,8 +1092,9 @@ export const useSprites = create<SpriteState>((set, get) => {
       );
       // own side / back pixels and hand-edited frames belong to the old size
       const d2 = get()[kind].doc;
-      if (d2.layers.some((l) => l.views) || d2.frames || d2.customAnims?.length)
-        setDoc(kind, { layers: d2.layers.map((l) => ({ ...l, views: undefined })), frames: undefined, customAnims: [] });
+      // (pose animations are computed from the layers: they stay)
+      if (d2.layers.some((l) => l.views) || d2.frames || d2.customAnims?.some((a) => !a.poses?.length))
+        setDoc(kind, { layers: d2.layers.map((l) => ({ ...l, views: undefined })), frames: undefined, customAnims: (d2.customAnims ?? []).filter((a) => a.poses?.length) });
     },
 
     saveAsPart: (kind, slot, label, layerId) => {
