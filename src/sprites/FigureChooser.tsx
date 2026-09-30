@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { imageDataFromFile } from './imageFile';
+import { ImageGenCard } from './ImageGenCard';
 import { useEditor } from '../store/editorStore';
 import { compose, toPng, useSprites } from './store';
 import type { SpriteKind } from './types';
@@ -55,6 +56,7 @@ function Which({ kind, purpose, onBack, onPick }: { kind: SpriteKind; purpose: '
   }, [kind]);
   const st = useSprites.getState();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [gen, setGen] = useState(false);
   return (
     <div className="page-inner chooser anim-picker">
       <button type="button" className="btn btn-ghost chooser-back" onClick={onBack}>
@@ -76,6 +78,14 @@ function Which({ kind, purpose, onBack, onPick }: { kind: SpriteKind; purpose: '
         )}
         {purpose === 'build' ? (
           <>
+            <button type="button" className={`start-continue${gen ? ' is-open' : ''}`} onClick={() => setGen(!gen)}>
+              <Icon.Spark size={18} />
+              <span>
+                Mit KI zeichnen <small>Beschreiben – ein Bildmodell zeichnet es in Pixel-Art, die KI animiert es</small>
+              </span>
+              <Icon.ChevronRight size={16} style={{ transform: gen ? 'rotate(90deg)' : undefined }} />
+            </button>
+            {gen && <ImageGenCard kind={kind} onDone={onPick} />}
             <button type="button" className="start-continue" onClick={() => (st.reset(kind, false), onPick())}>
               <Icon.Plus size={18} />
               <span>

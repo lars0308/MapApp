@@ -413,7 +413,7 @@ interface SpriteState {
   /** own image as a new layer (centred) */
   importImageLayer: (kind: SpriteKind, img: ImageData, name: string) => void;
   /** own image as a new figure / object (size fitted: 16, 32, 48 or 64) */
-  newFromImage: (kind: SpriteKind, img: ImageData, name: string) => void;
+  newFromImage: (kind: SpriteKind, img: ImageData, name: string, size?: number) => void;
   /** replace the current figure (sprite file import / gallery) */
   setDocument: (kind: SpriteKind, doc: SpriteDoc) => void;
   /** snap every pixel of every layer to the nearest palette colour */
@@ -832,9 +832,9 @@ export const useSprites = create<SpriteState>((set, get) => {
       const layer: SpriteLayer = { id: uid(), name, slot: 'extra', partId: null, edited: true, visible: true, data };
       setDoc(kind, { layers: [...k.doc.layers, layer] }, { ...snapshot(kind), active: layer.id });
     },
-    newFromImage: (kind, img, name) => {
+    newFromImage: (kind, img, name, want) => {
       const need = Math.max(img.width, img.height);
-      const size = SIZES.find((s) => s >= need) ?? 64;
+      const size = want && SIZES.includes(want) && want >= Math.min(need, 64) ? want : (SIZES.find((s) => s >= need) ?? 64);
       let src = img;
       if (need > 64) {
         // larger images are scaled down (nearest neighbour) to 64 px

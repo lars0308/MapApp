@@ -1890,6 +1890,51 @@
       }
     },
     {
+      "name": "figure_generate_image",
+      "description": "Let an image model paint a new figure as detailed pixel art from a description (much more detail than drawing pixel by pixel) and load it into the builder as one layer – then cut it into parts (figure_layer_split) and animate it. Use it when the user wants a new, detailed figure; the current one is saved to the gallery first.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "what to paint, in English or German: look, colours, clothes, weapon, mood"
+          },
+          "name": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "enum": [
+              32,
+              48,
+              64
+            ]
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "front",
+              "side",
+              "back"
+            ],
+            "description": "default: side in a side-scroller project, else front"
+          }
+        },
+        "required": [
+          "kind",
+          "description"
+        ]
+      }
+    },
+    {
       "name": "figure_new",
       "description": "Start a new figure: random parts, or empty (a blank canvas for drawing it yourself with figure_draw). size in pixels (default 32; parts are made for 32, larger sizes centre them).",
       "input": {

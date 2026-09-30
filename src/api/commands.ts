@@ -1,6 +1,7 @@
 import spec from './spec.json';
 import { useProject, createProject } from '../store/projectStore';
 import { sideGame } from './gameView';
+import { generateFigure } from './imageGen';
 import { useEditor } from '../store/editorStore';
 import { useApp, type Page } from '../store/appStore';
 import { applyProfile, deriveConfig, genreInfo, type GameProfile, type ViewKind, type Genre, type Effort } from '../profiles';
@@ -1332,6 +1333,25 @@ const H: Record<string, Handler> = {
     else ramp = RAMP_PRESETS[ch][int(a.preset, 'preset', 0)] ?? fail(`preset 0–${RAMP_PRESETS[ch].length - 1}`);
     useSprites.getState().setRamp(kind, ch, ramp);
     return { data: { channel: ch, ramp } };
+  },
+
+  figure_generate_image: async (a) => {
+    const kind = kindOf(a.kind);
+    const description = str(a.description, 'description');
+    await useSprites.getState().load(kind);
+    const st = useSprites.getState();
+    // keep what was open in the gallery
+    if (st[kind].doc.layers.some((l) => l.edited || l.partId)) st.saveToGallery(kind);
+    const fig = await generateFigure({ description, kind, view: a.view ? viewOf(a.view, kind) : undefined, size: int(a.size, 'size', 48) });
+    st.newFromImage(kind, fig.image, String(a.name ?? description).slice(0, 40), fig.size);
+    return {
+      data: {
+        size: fig.size,
+        cost: fig.cost,
+        hint: 'Das Bildmodell hat die Figur gezeichnet und sie ist geladen (eine Ebene, bewegt sich als Ganzes). Zum Animieren Teile mit figure_layer_split abtrennen (figure_grid zeigt die Pixel), dann Animationen prüfen.',
+      },
+      text: 'Figur vom Bildmodell gezeichnet und geladen',
+    };
   },
 
   figure_new: async (a) => {

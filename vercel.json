@@ -38,6 +38,9 @@
     "api/agent.js": {
       "maxDuration": 300,
       "includeFiles": "src/api/spec.json"
+    },
+    "api/image.js": {
+      "maxDuration": 120
     }
   }
 }

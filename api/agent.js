@@ -50,6 +50,7 @@ const FIGURES = `
 
 FIGUREN (Charakter, Kreatur, Objekt) – Ziel ist Pixel-Art in sehr hoher Qualität, wie von einem guten Pixel-Artist:
 Ablauf:
+0. Neue, detaillierte Figur gewünscht (nicht nur Baukasten)? Dann zuerst figure_generate_image (ein Bildmodell zeichnet sie in Pixel-Art, deutlich detaillierter als Pixel für Pixel) und danach wie unter ANIMATION zerlegen und animieren. Schritte 1–5 nur, wenn das Bildmodell nicht verfügbar ist oder der Nutzer Baukasten-Teile will.
 1. figure_new (kind, name, meist size 32 – die Teile sind für 32 px gemacht; bei 48/64 zeichne Körper und Details selbst in voller Größe, sonst wirkt die Figur klein im Bild) → figure_parts und figure_status lesen (anatomy zeigt, wo Kopf, Rumpf, Arme, Beine bzw. Körper, Augen, Boden liegen).
 2. Basis wählen. Charaktere: fast immer Teile (Körper, Beine, Füße, Oberteil, Gesicht, Haare, Kopfbedeckung, Waffe, Schild, Rücken) – sie passen in allen Ansichten und animieren sauber. Kreaturen/Objekte: passende Teile, sonst figure_new mit empty und alles selbst zeichnen (Körper in slot body bzw. base, Augen/Mund in eigenen Slots).
 3. Farben mit figure_color: für jeden Kanal eigene 3 Töne [hell, mittel, dunkel] passend zur Beschreibung oder zum Referenzbild.

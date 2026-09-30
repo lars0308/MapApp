@@ -1,4 +1,6 @@
 import { SIDE_WORDS, setGameView, sideGame } from './gameView';
+import { generateFigure, rigTask } from './imageGen';
+import { withBusy } from '../store/busy';
 import { runCommand } from './commands';
 import { aiMode, runAgent } from './agent';
 import { defaultGenerator, defaultHex, defaultSide } from '../generator/presets';
@@ -161,6 +163,24 @@ export async function buildFigure(fig: FigurePlan & { kind: SpriteKind }, wish: 
   // side-scroller: the map is one, the user said so (then remembered for later figures) or chose it in the builder
   if (SIDE_WORDS.test(`${wish} ${fig.brief ?? ''}`)) setGameView('side');
   const side = sideGame() && kind !== 'object';
+  const place = [
+    onMap && fig.use === 'player' && kind !== 'object' ? 'Mach sie danach mit figure_use_as_player zur Spielfigur.' : '',
+    onMap && fig.use !== 'player' ? 'Stelle sie danach mit figure_to_map und place_object passend auf die Karte (1–3 Mal, an sinnvolle Stellen).' : '',
+  ];
+  // 1. the image model paints it (detailed pixel art), the building AI cuts it into parts and animates it
+  try {
+    const painted = await withBusy(
+      'Das Bildmodell zeichnet deine Figur …',
+      () => generateFigure({ description: [fig.name, fig.brief, wish.trim()].filter(Boolean).join('. '), kind, size: Math.max(48, size), reference: image ?? undefined, refMode: 'design' }),
+      { ai: true, detail: 'Danach wird sie in echte Pixel umgewandelt, zerlegt und animiert' },
+    );
+    useSprites.getState().newFromImage(kind, painted.image, (fig.name ?? KIND_LABEL[kind]).slice(0, 40), painted.size);
+    const r = await runAgent([rigTask(kind, wish), ...place].filter(Boolean).join('\n'), [], { focus: 'figures' });
+    return { ...r, cost: r.cost + (painted.cost ?? 0) };
+  } catch (e) {
+    // no image model (local build, error): the building AI draws it itself
+    console.warn('[mapforge] Bildmodell nicht verfügbar – die KI zeichnet selbst', e);
+  }
   const task = [
     `Baue diese Figur (${KIND_LABEL[kind]}, kind "${kind}") in bestmöglicher Pixel-Art-Qualität: „${fig.name ?? KIND_LABEL[kind]}“.`,
     fig.brief ? `Beschreibung: ${fig.brief}` : '',
@@ -179,8 +199,7 @@ export async function buildFigure(fig: FigurePlan & { kind: SpriteKind }, wish: 
           : '',
     `Beginne mit figure_new (kind "${kind}", name, size ${size}). Nutze Teile, eigene Farben und figure_draw für alle Details; prüfe mit figure_render und verbessere, bis sie wirklich gut aussieht.`,
     'Zum Schluss figure_save.',
-    onMap && fig.use === 'player' && kind !== 'object' ? 'Mach sie danach mit figure_use_as_player zur Spielfigur.' : '',
-    onMap && fig.use !== 'player' ? 'Stelle sie danach mit figure_to_map und place_object passend auf die Karte (1–3 Mal, an sinnvolle Stellen).' : '',
+    ...place,
   ].filter(Boolean).join('\n');
   return runAgent(task, image ? [{ label: 'Referenzbild des Nutzers', dataUrl: image }] : [], { focus: 'figures' });
 }
