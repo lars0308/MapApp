@@ -2,6 +2,7 @@ import spec from './spec.json';
 import { useProject, createProject } from '../store/projectStore';
 import { sideGame } from './gameView';
 import { generateFigure } from './imageGen';
+import { imageDataFromUrl, pixelate } from '../sprites/pixelate';
 import { useEditor } from '../store/editorStore';
 import { useApp, type Page } from '../store/appStore';
 import { applyProfile, deriveConfig, genreInfo, type GameProfile, type ViewKind, type Genre, type Effort } from '../profiles';
@@ -368,6 +369,23 @@ function animOf(doc: SpriteDoc, kind: SpriteKind, want: unknown): { anim: AnimDe
   return { anim: built!, custom: false };
 }
 
+
+/** transparent margins of a small sprite cut off */
+function cropImage(img: ImageData): ImageData {
+  let x0 = img.width,
+    y0 = img.height,
+    x1 = -1,
+    y1 = -1;
+  for (let y = 0; y < img.height; y++)
+    for (let x = 0; x < img.width; x++)
+      if (img.data[(y * img.width + x) * 4 + 3] > 0) (x0 = Math.min(x0, x)), (x1 = Math.max(x1, x)), (y0 = Math.min(y0, y)), (y1 = Math.max(y1, y));
+  if (x1 < 0) fail('Das Bild ist leer');
+  const w = x1 - x0 + 1;
+  const h = y1 - y0 + 1;
+  const out = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) out.set(img.data.subarray(((y + y0) * img.width + x0) * 4, ((y + y0) * img.width + x0 + w) * 4), y * w * 4);
+  return new ImageData(out, w, h);
+}
 
 const REGIONS = Object.keys(REGION_NAME) as Region[];
 function regionOf(v: unknown): Region {
@@ -1333,6 +1351,29 @@ const H: Record<string, Handler> = {
     else ramp = RAMP_PRESETS[ch][int(a.preset, 'preset', 0)] ?? fail(`preset 0–${RAMP_PRESETS[ch].length - 1}`);
     useSprites.getState().setRamp(kind, ch, ramp);
     return { data: { channel: ch, ramp } };
+  },
+
+  figure_import_image: async (a) => {
+    const kind = kindOf(a.kind);
+    const b64 = str(a.image_base64, 'image_base64').replace(/^data:image\/\w+;base64,/, '');
+    await useSprites.getState().load(kind);
+    const st = useSprites.getState();
+    if (st[kind].doc.layers.some((l) => l.edited || l.partId)) st.saveToGallery(kind);
+    const img = await imageDataFromUrl(`data:image/png;base64,${b64}`);
+    // a big painted picture is turned into pixels, a small sprite is taken as it is
+    const pic = Math.max(img.width, img.height) > 128 ? pixelate(img, { size: int(a.size, 'size', 48) }) : cropImage(img);
+    st.newFromImage(kind, pic, String(a.name ?? 'Eigenes Bild').slice(0, 40), a.size ? int(a.size, 'size') : undefined);
+    const d = useSprites.getState()[kind].doc;
+    return { data: { size: d.size, layers: d.layers.map((l) => ({ name: l.name, moves_as: l.region ?? 'auto', swing: l.swing ?? 1 })), hint: 'Beine und Arme wurden automatisch erkannt und abgetrennt (figure_status). Fehlt etwas, mit figure_layer_split nachhelfen.' } };
+  },
+
+  figure_auto_rig: async (a) => {
+    const kind = kindOf(a.kind);
+    const doc = await figureReady(kind);
+    const layer = a.layer ? (doc.layers.find((l) => l.id === a.layer || l.name === a.layer) ?? fail(`Layer "${a.layer}" gibt es nicht`)) : undefined;
+    const made = useSprites.getState().autoRig(kind, layer?.id);
+    const d = useSprites.getState()[kind].doc;
+    return { data: { parts: made, layers: d.layers.map((l) => ({ id: l.id, name: l.name, moves_as: l.region ?? 'auto', swing: l.swing ?? 1, pivot: l.pivot })), hint: made ? 'Beine/Arme abgetrennt – jetzt eine Animation rendern und prüfen.' : 'Keine dünnen Glieder gefunden – Teile mit figure_layer_split selbst abtrennen.' } };
   },
 
   figure_generate_image: async (a) => {

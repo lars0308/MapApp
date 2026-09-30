@@ -1890,6 +1890,66 @@
       }
     },
     {
+      "name": "figure_import_image",
+      "description": "Load an own picture (PNG as base64) as a new figure: a big painted picture is turned into clean pixels, a small sprite is taken as it is. Legs and arms of characters and creatures are found and cut off automatically so they move (an animal walks instead of sliding).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "image_base64": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "enum": [
+              16,
+              32,
+              48,
+              64
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "image_base64"
+        ]
+      }
+    },
+    {
+      "name": "figure_auto_rig",
+      "description": "Find the thin parts sticking out of the body of an own picture (legs, arms, antennae, tentacles) and cut each into its own layer: legs reaching the ground become legs (characters legL/legR, creatures side limbs), the others arms; each turns at the joint where it touches the body, neighbouring legs swing against each other. Run it before animating an uploaded or generated figure; fix the rest with figure_layer_split / figure_layer_rig.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "layer": {
+            "type": "string",
+            "description": "layer to cut (default: the picture)"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      }
+    },
+    {
       "name": "figure_generate_image",
       "description": "Let an image model paint a new figure as detailed pixel art from a description (much more detail than drawing pixel by pixel) and load it into the builder as one layer – then cut it into parts (figure_layer_split) and animate it. Use it when the user wants a new, detailed figure; the current one is saved to the gallery first.",
       "input": {

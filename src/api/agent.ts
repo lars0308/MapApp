@@ -49,6 +49,8 @@ const STEP: Record<string, string> = {
   level_switch: 'Wechselt die Ebene',
   figure_new: 'Legt eine neue Figur an',
   figure_generate_image: 'Lässt das Bildmodell die Figur zeichnen',
+  figure_import_image: 'Lädt ein Bild als Figur',
+  figure_auto_rig: 'Erkennt Beine und Arme',
   figure_parts: 'Schaut sich die Bauteile an',
   figure_status: 'Schaut sich die Figur an',
   figure_set_part: 'Setzt ein Bauteil ein',

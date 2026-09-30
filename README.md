@@ -335,6 +335,17 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.49 – Tiere laufen: Beine und Arme werden automatisch erkannt**
+
+- **Automatisch zerlegen:** Beim Laden eines eigenen oder vom Bildmodell gezeichneten Bildes sucht MapForge die dünnen Teile, die vom Körper abstehen: Beine, Arme, Fühler, Tentakel. Jedes wird eine eigene Ebene.
+  - Beine, die bis zum Boden reichen, laufen: bei Charakteren als Bein 1/2, bei Kreaturen als Seitenglieder.
+  - Benachbarte Beine schwingen abwechselnd, jedes dreht sich dort, wo es am Körper sitzt.
+  - Eine Spinne krabbelt also, statt als Block zu gleiten.
+- **Knopf „Beine & Arme automatisch erkennen“** im Reiter Animieren, für Figuren, die du schon vorher geladen hast.
+- **Krabbeln** hat deutlichere Schritte: Die Seiten schwingen gegeneinander, der Fuß hebt sich an.
+- **Eigene Bilder als Charakter** stehen auf ihrer eigenen Unterkante statt auf der Fußhöhe der Baukasten-Figur.
+- **KI-Befehle:** `figure_import_image` (eigenes Bild laden, auch über MCP) und `figure_auto_rig`. Nach dem Zeichnen mit dem Bildmodell prüft die KI die erkannten Beine und trennt nur noch ab, was fehlt (Kopf, Waffe).
+
 **Version 3.48 – „Mit KI zeichnen“: Figuren vom Bildmodell, wie bei PixelLab**
 
 - **Neu in der Figuren-Auswahl: „Mit KI zeichnen“.**

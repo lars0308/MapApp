@@ -493,6 +493,18 @@ function RigSection({ kind }: { kind: SpriteKind }) {
         Eigenes Bild hochladen
       </Button>
 
+      {kind !== 'object' && (
+        <Button
+          variant="secondary"
+          icon={<Icon.Spark size={16} />}
+          onClick={() => {
+            const n = st.autoRig(kind);
+            toast(n ? `${n} Beine/Arme erkannt – sie bewegen sich jetzt einzeln` : 'Keine dünnen Beine oder Arme gefunden – trenne Teile unten selbst ab', n ? 'success' : 'error');
+          }}
+        >
+          Beine &amp; Arme automatisch erkennen
+        </Button>
+      )}
       <h4>Teil abtrennen</h4>
       <div className="anim2-cut">
         <label className="field">

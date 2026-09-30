@@ -57,7 +57,7 @@ export function rigTask(kind: SpriteKind, wish: string): string {
     wish.trim() ? `Wunsch des Nutzers: ${wish.trim()}` : '',
     kind === 'object'
       ? 'Mach sie animierbar: bewegliche Teile (Deckel, Flamme, Glitzern) mit figure_layer_split abtrennen (region head bzw. effect), dann passende Animationen prüfen (figure_anim_check, figure_render).'
-      : 'Mach sie animierbar: sieh dir figure_grid an und trenne Kopf, Arme, Beine und die Waffe mit figure_layer_split als eigene Teile ab (Waffe immer einzeln, region weapon). Mehr Köpfe/Arme als üblich: jedes Glied einzeln, mit swing abwechselnd. Dann die wichtigsten Animationen mit figure_anim_check und figure_render (animation) prüfen und mit figure_anim_pose / figure_anim_smooth verbessern, bis alle Bilder zusammenpassen.',
+      : 'Mach sie animierbar: Beine und Arme wurden beim Laden schon automatisch abgetrennt (figure_status zeigt die Ebenen; falls nicht: figure_auto_rig). Prüfe das, sieh dir figure_grid an und trenne mit figure_layer_split ab, was noch fehlt: Kopf, Waffe (Waffe immer einzeln, region weapon). Mehr Köpfe/Arme als üblich: jedes Glied einzeln, mit swing abwechselnd. Dann die wichtigsten Animationen mit figure_anim_check und figure_render (animation) prüfen und mit figure_anim_pose / figure_anim_smooth verbessern, bis alle Bilder zusammenpassen.',
     'Zum Schluss figure_save.',
   ]
     .filter(Boolean)

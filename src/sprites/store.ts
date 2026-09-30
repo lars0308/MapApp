@@ -8,6 +8,7 @@ import { render, S } from './painter';
 import { CHANNELS, PALETTE_PRESETS, RAMP_PRESETS, defaultRamps, hexToRgb, type Channel, type DrawPalette, type Ramp, type Ramps } from './palette';
 import { uid } from '../utils/id';
 import { addPose, lerpPose, type Pose } from './animation';
+import { findLimbs } from './autoRig';
 
 export const SLOTS: Record<SpriteKind, SlotDef[]> = { character: CHARACTER_SLOTS, object: OBJECT_SLOTS, creature: CREATURE_SLOTS };
 export const DEMO_PARTS: Record<SpriteKind, DemoPart[]> = { character: CHARACTER_PARTS, object: OBJECT_PARTS, creature: CREATURE_PARTS };
@@ -403,6 +404,8 @@ interface SpriteState {
    * new layer's id. Own pictures become animatable in parts this way (head, arms, weapon …).
    */
   splitLayer: (kind: SpriteKind, layerId: string, pixels: Iterable<number>, opts: { name?: string; region?: RigRegion; into?: string }) => string | null;
+  /** "Automatisch zerlegen": legs, arms, antennae of an own picture become parts that move; returns how many */
+  autoRig: (kind: SpriteKind, layerId?: string) => number;
   /** "Teil abtrennen": rectangles on the canvas move pixels of `from` into one new part */
   cut: { kind: SpriteKind; from: string; into: string | null; region: RigRegion } | null;
   startCut: (kind: SpriteKind, region: RigRegion) => boolean;
@@ -751,6 +754,23 @@ export const useSprites = create<SpriteState>((set, get) => {
         animTune: tune ? { ...doc.animTune, [animId]: { ...tune, poses: undefined } } : doc.animTune,
       });
     },
+    autoRig: (kind, layerId) => {
+      const k = get()[kind];
+      const src = k.doc.layers.find((l) => l.id === layerId) ?? [...k.doc.layers].reverse().find((l) => l.visible && l.slot !== 'shadow' && (l.region === 'torso' || !l.partId));
+      if (!src) return 0;
+      const parts = findLimbs(src.data, k.doc.size, kind);
+      let made = 0;
+      for (const part of parts) {
+        const id = get().splitLayer(kind, src.id, part.pixels, { region: part.region, name: part.name });
+        if (!id) continue;
+        made++;
+        if (part.swing !== 1) {
+          const d = get()[kind].doc;
+          setDoc(kind, { layers: d.layers.map((l) => (l.id === id ? { ...l, swing: part.swing } : l)) });
+        }
+      }
+      return made;
+    },
     cut: null,
     startCut: (kind, region) => {
       const k = get()[kind];
@@ -858,6 +878,8 @@ export const useSprites = create<SpriteState>((set, get) => {
         const k = get()[kind];
         const l = k.doc.layers[k.doc.layers.length - 1];
         if (l) setDoc(kind, { layers: k.doc.layers.map((x) => (x.id === l.id ? { ...x, region: 'torso' as RigRegion, pivot: autoPivot(x.data, k.doc.size, 'torso') } : x)) });
+        // legs and arms move right away (an animal walks instead of sliding as one block)
+        if (l) get().autoRig(kind, l.id);
       }
     },
     setDocument: (kind, doc) => patch(kind, { ...snapshot(kind), doc: { ...doc, kind }, active: doc.layers[doc.layers.length - 1]?.id ?? null }),

@@ -359,7 +359,14 @@ export const ANIMATIONS: AnimDef[] = [
     fps: 10,
     loop: true,
     hint: 'Beine / Klauen im Wechsel (Spinne, Käfer, Wolf)',
-    poses: [{ rot: { armL: 14, armR: 8 }, off: { armL: o(0, -1) } }, { all: o(0, 1) }, { rot: { armL: -8, armR: -14 }, off: { armR: o(0, -1) } }, { all: o(0, 1) }],
+    // clear steps: the limbs of each side swing against the other side, the lifted foot comes up 1 px;
+    // own pictures cut into single legs swing neighbour against neighbour (see autoRig)
+    poses: [
+      { rot: { armL: 22, armR: -18 }, off: { armL: o(0, -1) } },
+      { all: o(0, 1), rot: { armL: 6, armR: -4 } },
+      { rot: { armL: -18, armR: 22 }, off: { armR: o(0, -1) } },
+      { all: o(0, 1), rot: { armL: -4, armR: 6 } },
+    ],
   },
   {
     id: 'k_fly',
@@ -583,7 +590,9 @@ export function feetInFrame(doc: SpriteDoc, view: View = 'front'): number {
   const n = doc.size;
   const d = Math.floor((n - S) / 2);
   const { body, bounds, creature } = fitContext(doc, view);
-  return (doc.kind === 'character' ? body.ly[1] : doc.kind === 'creature' ? creature.ground : bounds.y1) + d + framePad(n);
+  // a character without a Baukasten body (own picture) stands on what is drawn
+  const ownPicture = doc.kind === 'character' && !doc.layers.some((l) => l.partId && l.slot === 'body');
+  return (doc.kind === 'character' ? (ownPicture ? bounds.y1 : body.ly[1]) : doc.kind === 'creature' ? creature.ground : bounds.y1) + d + framePad(n);
 }
 
 // sub-pixel samples for rotated pixels (no holes in turned arms / weapons)
