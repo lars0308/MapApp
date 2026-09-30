@@ -999,6 +999,29 @@
           },
           "hide_in_other_views": {
             "type": "boolean"
+          },
+          "region": {
+            "type": "string",
+            "enum": [
+              "head",
+              "torso",
+              "armL",
+              "armR",
+              "legL",
+              "legR",
+              "weapon",
+              "effect",
+              "ground"
+            ],
+            "description": "how this layer moves in animations – for extra limbs / heads drawn as own layers (each turns at its own joint: where it touches the other layers, or pivot)"
+          },
+          "pivot": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
           }
         },
         "required": [
@@ -1709,7 +1732,7 @@
     },
     {
       "name": "figure_layer_rig",
-      "description": "How a layer moves in animations: region ('auto' = from its slot and position) and turning point pivot [x, y] in figure pixels (shoulder of an arm, hip of a leg, neck of a head, grip of a weapon, hinge of a lid).",
+      "description": "How a layer moves in animations: region ('auto' = from its slot and position), turning point pivot [x, y] in figure pixels (shoulder of an arm, hip of a leg, neck of a head, grip of a weapon, hinge of a lid) – every layer turns at its own pivot, so several arms / heads of one region each turn at their own joint – and swing: how strongly it follows the region's motion (1 normal, 0.5 less, -1 against it, e.g. every second arm of a six-armed monster, or the second head).",
       "input": {
         "type": "object",
         "properties": {
@@ -1746,6 +1769,11 @@
             },
             "minItems": 2,
             "maxItems": 2
+          },
+          "swing": {
+            "type": "number",
+            "minimum": -1.5,
+            "maximum": 1.5
           }
         },
         "required": [

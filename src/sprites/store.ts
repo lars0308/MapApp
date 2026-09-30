@@ -137,15 +137,19 @@ function drawnBounds(layers: SpriteLayer[]): Bounds | null {
 export function fitContext(doc: Pick<SpriteDoc, 'layers'>, view: View = 'front'): FitContext {
   let body: Body = BODIES.normal;
   let bounds: Bounds | null = null;
-  let creature: Creature = DEFAULT_CREATURE;
+  let creature: Creature | null = null;
   for (const l of doc.layers) {
     const p = partById(l.partId);
     if (p?.body) body = p.body;
     if (p?.bounds) bounds = p.bounds;
     if (p?.creature) creature = p.creature;
   }
-  // own pictures / drawn objects: the bounds are what is drawn (lid = its upper part)
-  bounds ??= drawnBounds(doc.layers) ?? DEFAULT_BOUNDS;
+  // own pictures / drawn figures: bounds and ground line come from what is drawn
+  const drawn = !bounds || !creature ? drawnBounds(doc.layers) : null;
+  bounds ??= drawn ?? DEFAULT_BOUNDS;
+  creature ??= drawn
+    ? { ...DEFAULT_CREATURE, cx: (drawn.x0 + drawn.x1 + 1) / 2, cy: (drawn.y0 + drawn.y1 + 1) / 2, rx: (drawn.x1 - drawn.x0 + 1) / 2, ry: (drawn.y1 - drawn.y0 + 1) / 2, ground: drawn.y1, top: drawn.y0 }
+    : DEFAULT_CREATURE;
   return { body: viewBody(body, view), bounds, creature: viewCreature(creature, view) };
 }
 
@@ -393,7 +397,7 @@ interface SpriteState {
   /** own animation: duplicate / delete / move a frame, or put a computed in-between after it */
   animFrameOp: (kind: SpriteKind, animId: string, op: 'duplicate' | 'delete' | 'left' | 'right' | 'inbetween', index: number) => void;
   /** "Bewegt sich als" + turning point of a layer (undefined = automatic) */
-  setLayerRig: (kind: SpriteKind, layerId: string, rig: { region?: RigRegion | null; pivot?: [number, number] | null }) => void;
+  setLayerRig: (kind: SpriteKind, layerId: string, rig: { region?: RigRegion | null; pivot?: [number, number] | null; swing?: number | null }) => void;
   /**
    * cut pixels (indices y·size+x) off a layer into a new one that moves as `region`; returns the
    * new layer's id. Own pictures become animatable in parts this way (head, arms, weapon …).
@@ -769,6 +773,7 @@ export const useSprites = create<SpriteState>((set, get) => {
           if (rig.pivot === undefined) out.pivot = rig.region ? autoPivot(l.data, doc.size, rig.region) : undefined;
         }
         if (rig.pivot !== undefined) out.pivot = rig.pivot ?? undefined;
+        if (rig.swing !== undefined) out.swing = rig.swing === null || rig.swing === 1 ? undefined : rig.swing;
         return out;
       });
       setDoc(kind, { layers }, snapshot(kind));

@@ -602,7 +602,9 @@ export function renderFrame(doc: SpriteDoc, pose: Pose, view: View = 'front'): U
   // own turning points of rigged layers (canvas pixels) win over the body measurements
   const own: Partial<Record<Region, Pt>> = {};
   for (const l of doc.layers) if (l.region && l.pivot && !own[l.region]) own[l.region] = [l.pivot[0] + p, l.pivot[1] + p];
-  const pv = (r: Region): Pt => {
+  // a layer's own turning point for its own region (6 arms: every arm turns at its own shoulder)
+  const pv = (r: Region, l?: SpriteLayer): Pt => {
+    if (l?.pivot && l.region === r) return [l.pivot[0] + p, l.pivot[1] + p];
     if (own[r]) return own[r]!;
     const q = piv[r] ?? [S / 2, S / 2];
     return [q[0] + k, q[1] + k];
@@ -613,22 +615,24 @@ export function renderFrame(doc: SpriteDoc, pose: Pose, view: View = 'front'): U
   const spinC: Pt = [F / 2, feet + 1];
 
   /** frame position of a point of a region (continuous coordinates) */
-  const place = (r: Region, x: number, y: number): Pt => {
+  const place = (r: Region, x: number, y: number, l?: SpriteLayer): Pt => {
     let q: Pt = [x, y];
     let ox = 0;
     let oy = 0;
     let base = r;
+    // "Schwung" of a layer: 1 = as the pose says, 0.5 = less, −1 = the other way (extra arms swinging against each other)
+    const sw = l?.swing ?? 1;
     if (r === 'weapon') {
       // pose angles count from an upright weapon; drawn weapons already lean by `rest`
-      if (rot.weapon !== undefined && rot.weapon !== rest) q = rotAbout(q[0], q[1], pv('weapon'), rot.weapon - rest);
-      else if (rot.weapon === undefined && pose.hold && rot.armR) q = rotAbout(q[0], q[1], pv('weapon'), -pose.hold * rot.armR);
-      ox += pose.off?.weapon?.x ?? 0;
-      oy += pose.off?.weapon?.y ?? 0;
+      if (rot.weapon !== undefined && rot.weapon !== rest) q = rotAbout(q[0], q[1], pv('weapon', l), (rot.weapon - rest) * sw);
+      else if (rot.weapon === undefined && pose.hold && rot.armR) q = rotAbout(q[0], q[1], pv('weapon', l), -pose.hold * rot.armR * sw);
+      ox += (pose.off?.weapon?.x ?? 0) * sw;
+      oy += (pose.off?.weapon?.y ?? 0) * sw;
       base = 'armR';
     }
-    if (rot[base]) q = rotAbout(q[0], q[1], pv(base), rot[base]!);
-    ox += pose.off?.[base]?.x ?? 0;
-    oy += pose.off?.[base]?.y ?? 0;
+    if (rot[base]) q = rotAbout(q[0], q[1], pv(base, l), rot[base]! * sw);
+    ox += (pose.off?.[base]?.x ?? 0) * sw;
+    oy += (pose.off?.[base]?.y ?? 0) * sw;
     q = [q[0] + ox, q[1] + oy];
     if (r !== 'ground') {
       q = [q[0] + (pose.all?.x ?? 0), q[1] + (pose.all?.y ?? 0)];
@@ -654,7 +658,7 @@ export function renderFrame(doc: SpriteDoc, pose: Pose, view: View = 'front'): U
           const r = regionAt(l, x, y);
           if (r === 'ground' || r === 'weapon' || r === 'effect') continue;
           still = Math.max(still, y + p);
-          maxY = Math.max(maxY, place(r, x + p + 0.5, y + p + 0.5)[1]);
+          maxY = Math.max(maxY, place(r, x + p + 0.5, y + p + 0.5, l)[1]);
         }
     // the lowest point may go as deep as it is standing still (shoes below the feet line), not deeper
     const floor = Math.max(feet + 1, still + 1);
@@ -696,17 +700,17 @@ export function renderFrame(doc: SpriteDoc, pose: Pose, view: View = 'front'): U
         if (!l.data[s + 3]) continue;
         const r = regionAt(l, x, y);
         if (!turned) {
-          const q = place(r, x + p, y + p);
+          const q = place(r, x + p, y + p, l);
           put(Math.round(q[0]), Math.round(q[1]), s, r);
           continue;
         }
         for (const u of SUB)
           for (const v of SUB) {
-            const q = place(r, x + p + u, y + p + v);
+            const q = place(r, x + p + u, y + p + v, l);
             put(q[0], q[1], s, r);
           }
         if (armC && (r === 'weapon' || r === 'armR')) {
-          const q = place(r, x + p + 0.5, y + p + 0.5);
+          const q = place(r, x + p + 0.5, y + p + 0.5, l);
           const dd = Math.hypot(q[0] - armC[0], q[1] - armC[1]) + (r === 'weapon' ? 100 : 0);
           if (dd > tipD) (tipD = dd), (tip = q);
         }
@@ -773,20 +777,81 @@ function drawTrail(img: Uint8ClampedArray, F: number, c: Pt, tip: Pt, deg: numbe
   }
 }
 
-/** squash (< 1) / stretch (> 1) towards the feet line, width changes the other way */
+/**
+ * squash (< 1) / stretch (> 1) towards the feet line, the width changes the other way. Like a pixel
+ * artist does it: whole rows / columns in the middle of the body are taken out or doubled – the
+ * ones that look most like their neighbour – so eyes, outlines and feet never get lost.
+ */
 function squash(img: Uint8ClampedArray, n: number, feet: number, s: number): Uint8ClampedArray {
-  const out = new Uint8ClampedArray(img.length);
-  const cx = n / 2;
-  const wx = 1 / Math.sqrt(s);
+  let x0 = n,
+    x1 = -1,
+    y0 = n;
   for (let y = 0; y < n; y++)
-    for (let x = 0; x < n; x++) {
-      // below the feet line (soles, shadow) nothing is stretched – the figure keeps standing on it
-      const sy = y > feet ? y : Math.round(feet - (feet - y) / s);
-      const sx = Math.floor(cx + (x + 0.5 - cx) / wx);
-      if (sx < 0 || sy < 0 || sx >= n || sy >= n || sy > feet + 3) continue;
+    for (let x = 0; x < n; x++)
+      if (img[(y * n + x) * 4 + 3] > 0) {
+        if (y < y0) y0 = y;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+      }
+  if (x1 < 0 || y0 >= feet) return img;
+  const H = feet - y0 + 1;
+  const W = x1 - x0 + 1;
+  const dRows = Math.round(H * (1 - s)); // > 0: rows out, < 0: rows doubled
+  const dCols = Math.round(W * (1 / Math.sqrt(s) - 1)); // > 0: columns doubled, < 0: out
+  const same = (a: number, b: number) => img[a + 3] === img[b + 3] && img[a] === img[b] && img[a + 1] === img[b + 1] && img[a + 2] === img[b + 2];
+  /** how different a row / column is from the one before (0 = identical, cheap to remove or double) */
+  const rowCost = (y: number) => {
+    let c = 0;
+    for (let x = 0; x < n; x++) if (!same((y * n + x) * 4, ((y - 1) * n + x) * 4)) c++;
+    return c;
+  };
+  const colCost = (x: number) => {
+    let c = 0;
+    for (let y = 0; y < n; y++) if (!same((y * n + x) * 4, (y * n + x - 1) * 4)) c++;
+    return c;
+  };
+  const pick = (from: number, to: number, count: number, cost: (i: number) => number) => {
+    const c: [number, number][] = [];
+    for (let i = Math.max(1, from); i <= to; i++) c.push([cost(i), i]);
+    return new Set(c.sort((a, b) => a[0] - b[0] || Math.abs(a[1] - (from + to) / 2) - Math.abs(b[1] - (from + to) / 2)).slice(0, count).map((e) => e[1]));
+  };
+  // rows: the order from the feet upwards, with the middle band thinned out or doubled
+  const band = pick(Math.round(y0 + H * 0.3), Math.round(y0 + H * 0.75), Math.abs(dRows), rowCost);
+  const rows: number[] = [];
+  for (let y = feet; y >= y0; y--) {
+    if (dRows > 0 && band.has(y)) continue;
+    rows.push(y);
+    if (dRows < 0 && band.has(y)) rows.push(y);
+  }
+  // columns: from the centre outwards on both sides
+  const cx = Math.round((x0 + x1) / 2);
+  const cband = pick(Math.round(x0 + W * 0.25), Math.round(x0 + W * 0.75), Math.abs(dCols), colCost);
+  const colsR: number[] = [];
+  for (let x = cx; x <= x1; x++) {
+    if (dCols < 0 && cband.has(x)) continue;
+    colsR.push(x);
+    if (dCols > 0 && cband.has(x)) colsR.push(x);
+  }
+  const colsL: number[] = [];
+  for (let x = cx - 1; x >= x0; x--) {
+    if (dCols < 0 && cband.has(x)) continue;
+    colsL.push(x);
+    if (dCols > 0 && cband.has(x)) colsL.push(x);
+  }
+  const out = new Uint8ClampedArray(img.length);
+  // below the feet line (soles, shadow) everything stays
+  out.set(img.subarray((feet + 1) * n * 4), (feet + 1) * n * 4);
+  rows.forEach((sy, k) => {
+    const ty = feet - k;
+    if (ty < 0) return;
+    const put = (sx: number, tx: number) => {
+      if (tx < 0 || tx >= n) return;
       const i = (sy * n + sx) * 4;
-      if (img[i + 3]) out.set(img.subarray(i, i + 4), (y * n + x) * 4);
-    }
+      if (img[i + 3]) out.set(img.subarray(i, i + 4), (ty * n + tx) * 4);
+    };
+    colsR.forEach((sx, j) => put(sx, cx + j));
+    colsL.forEach((sx, j) => put(sx, cx - 1 - j));
+  });
   return out;
 }
 

@@ -1,4 +1,4 @@
-import { animPoses, feetInFrame, framesOf, type Pose, isPixelAnim, renderFrame, animView, frameSize, type AnimDef } from './animation';
+import { animPoses, feetInFrame, frameKey, framesOf, isPixelAnim, renderFrame, animView, frameSize, type AnimDef } from './animation';
 import type { CustomAnim, SpriteDoc, View } from './types';
 import { viewLayers } from './store';
 
@@ -63,7 +63,8 @@ function diff(a: Uint8ClampedArray, b: Uint8ClampedArray, size: number): number 
 /** pixels without any neighbour */
 function strays(f: Uint8ClampedArray, n: number): number {
   let c = 0;
-  const on = (x: number, y: number) => x >= 0 && y >= 0 && x < n && y < n && f[(y * n + x) * 4 + 3] > 40;
+  // solid pixels only: the soft edge of a shadow is not a crumb
+  const on = (x: number, y: number) => x >= 0 && y >= 0 && x < n && y < n && f[(y * n + x) * 4 + 3] > 200;
   for (let y = 0; y < n; y++)
     for (let x = 0; x < n; x++)
       if (on(x, y) && !on(x - 1, y - 1) && !on(x, y - 1) && !on(x + 1, y - 1) && !on(x - 1, y) && !on(x + 1, y) && !on(x - 1, y + 1) && !on(x, y + 1) && !on(x + 1, y + 1)) c++;
@@ -150,23 +151,29 @@ export function checkAnimation(doc: SpriteDoc, anim: AnimDef | CustomAnim, view:
     else if (!air && !ownAnim && !lying && feet0 - bb.y1 > 1) issues.push({ frame: i, level: 'error', text: `Füße schweben ${feet0 - bb.y1} px über dem Boden` });
   });
 
-  // parts that vanish: a layer (sword, arm, head) turned behind another one in some frame
+  // parts that vanish: a sword turned behind the head, an arm of an own picture hidden by the body.
+  // Measured with a marker colour on that one layer (hats briefly covered by a raised arm are normal,
+  // so only weapons, the other hand and the parts of own pictures are checked)
   if (!pixel && !anim.id.includes('death')) {
-    const parts = doc.layers.filter((l) => l.visible && l.slot !== 'shadow' && l.region !== 'ground').slice(0, 12);
-    const shown = (l: typeof parts[number], full: Uint8ClampedArray, pose: Pose) => {
-      const without = renderFrame({ ...doc, layers: doc.layers.filter((x) => x.id !== l.id) }, pose, v);
+    const parts = doc.layers.filter((l) => l.visible && (l.slot === 'weapon' || l.slot === 'offhand' || (l.region && !l.partId && l.region !== 'ground' && l.region !== 'torso'))).slice(0, 12);
+    const MARK = [255, 0, 254];
+    // a part lying under its own weapon is fine: weapons are left out when other parts are measured
+    const isWeapon = (l: (typeof doc.layers)[number]) => l.slot === 'weapon' || l.region === 'weapon';
+    const marked = (id: string) => ({ ...doc, layers: doc.layers.filter((l) => l.id === id || !isWeapon(l) || isWeapon(doc.layers.find((x) => x.id === id)!)).map((l) => (l.id !== id ? l : { ...l, data: l.data.map((v, i) => (i % 4 === 3 ? v : l.data[i - (i % 4) + 3] ? MARK[i % 4] : v)), views: undefined })) });
+    const count = (f: Uint8ClampedArray) => {
       let c = 0;
-      for (let k = 0; k < full.length; k += 4) if (full[k + 3] > 40 && (full[k] !== without[k] || full[k + 1] !== without[k + 1] || full[k + 2] !== without[k + 2] || without[k + 3] <= 40)) c++;
+      for (let k = 0; k < f.length; k += 4) if (f[k] === MARK[0] && f[k + 1] === MARK[1] && f[k + 2] === MARK[2] && f[k + 3] > 40) c++;
       return c;
     };
     for (const l of parts) {
-      const base = shown(l, still, {});
+      const d = marked(l.id);
+      const base = count(renderFrame(d, {}, v));
       if (base < 6) continue;
       let worst = 1;
       let at = -1;
       poses.forEach((p, i) => {
-        if (p.lie || p.alpha !== undefined || p.flash) return;
-        const r = shown(l, renderFrame(doc, p, v), p) / base;
+        if (p.lie || p.alpha !== undefined || p.flash || p.bright) return;
+        const r = count(renderFrame(d, p, v)) / base;
         if (r < worst) (worst = r), (at = i);
       });
       if (at >= 0 && worst < 0.35)
@@ -192,9 +199,11 @@ export function checkAnimation(doc: SpriteDoc, anim: AnimDef | CustomAnim, view:
       // a strike frame with a motion trail is fast on purpose (smear frame)
       const smear = !!poses[b]?.trail || !!poses[a]?.trail;
       const jump = !anim.id.includes('death') && !poses[b]?.lie && step[k] > far && step[k] > Math.max(1, ms) * 2.5;
-      if (!smear && ((d[k] > 0.32 && d[k] > m * 2.2) || jump))
+      // falling over / collapsing is quick on purpose
+      if (!smear && !anim.id.includes('death') && ((d[k] > 0.32 && d[k] > m * 2.2) || jump))
         issues.push({ frame: a, level: 'error', text: seam ? `Der Übergang vom letzten zum ersten Bild ruckelt (Schleife schließt nicht sauber)` : `Großer Sprung von Bild ${a + 1} zu ${b + 1} – Bewegung kleiner machen oder Zwischenbild einfügen` });
-      else if (anim.loop && frames.length > 2 && !seam && same(frames[a], frames[b])) issues.push({ frame: a, level: 'hint', text: `Bild ${a + 1} und ${b + 1} sind gleich (Standbild)` });
+      // identical frames: only drawn / hand-edited ones (computed poses of a tiny figure may round to the same picture)
+      else if (anim.loop && frames.length > 2 && !seam && (pixel || !!doc.frames?.[frameKey(v, anim.id, a)] || !!doc.frames?.[frameKey(v, anim.id, b)]) && same(frames[a], frames[b])) issues.push({ frame: a, level: 'hint', text: `Bild ${a + 1} und ${b + 1} sind gleich (Standbild)` });
     });
     // a loop on the spot must end where it started
     if (anim.loop && IN_PLACE.has(anim.id)) {

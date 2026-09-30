@@ -335,6 +335,15 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.47 – Monster mit mehreren Köpfen und Armen, sauberes Stauchen**
+
+- **Jedes Teil dreht sich an seinem eigenen Gelenk:** Ein Monster mit 6 Armen oder 2 Köpfen bekommt jedes Glied als eigene Ebene. Jede Ebene hat ihren eigenen Drehpunkt; früher teilten sich alle Arme einer Seite einen.
+- **„Schwung“ pro Ebene** (Reiter Animieren → Ebenen): normal, schwach, gegenläufig oder bewegt sich nicht. Beispiel: Jeder zweite Arm schwingt gegenläufig, damit nicht alle im Gleichschritt gehen, und der zweite Kopf nickt gegenläufig.
+- **KI:** kann beim Zeichnen gleich sagen, wie sich eine Ebene bewegt (`figure_draw` mit `region`). Der Drehpunkt wird dort gesetzt, wo das Glied den Körper berührt. Mit `figure_layer_rig swing` stellt sie den Schwung ein.
+- **Stauchen und Strecken wie von Hand gepixelt:** Beim Atmen, Hüpfen und Landen werden die unauffälligsten Reihen in der Körpermitte entfernt oder verdoppelt, statt das Bild ungleichmäßig umzurechnen. Einzelne Pixelreihen wie Augen, Umriss oder Füße gehen dadurch nicht mehr verloren. Vorher verschwanden z. B. die Augen beim Atmen.
+- **Selbst gezeichnete Kreaturen:** Boden und Körpermaße kommen aus der Zeichnung, damit nichts unter den Boden rutscht oder abgeschnitten wird.
+- **Prüfung:** meldet verdeckte Waffen und verdeckte Teile eigener Bilder, aber nicht mehr eine Krone, die beim Armheben kurz verdeckt ist. Weiche Schattenränder zählen nicht als lose Pixel.
+
 **Version 3.46 – Eigene Bilder: bessere Reihenfolge der Teile, verdeckte Teile werden erkannt**
 
 - **Reihenfolge der abgetrennten Teile** wie in der Seitenansicht üblich: hinterer Arm und hinteres Bein hinter dem Körper, Kopf davor, Waffenarm und Waffe ganz vorn.

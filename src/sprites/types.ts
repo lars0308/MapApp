@@ -123,6 +123,8 @@ export interface SpriteLayer {
   region?: RigRegion;
   /** turning point of that region in canvas pixels (shoulder of an arm, neck of a head …) */
   pivot?: [number, number];
+  /** "Schwung": how strongly it follows its region's motion (1 = normal, 0.5 = less, −1 = against it) */
+  swing?: number;
 }
 
 /** body regions animations move (see animation.ts) */

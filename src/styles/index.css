@@ -6808,3 +6808,6 @@ details.more[open] {
   cursor: pointer;
   padding: 6px 4px;
 }
+.anim2-layers li:has(.anim2-swing) {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr);
+}

@@ -25,7 +25,7 @@ import { S as DESIGN } from '../sprites/painter';
 import { RAMP_PRESETS, CHANNELS, type Channel, type Ramp } from '../sprites/palette';
 import { animFps, animPoses, animsFor, feetInFrame, frameKey, framesOf, frameSize, isPixelAnim, keyPoses, smoothOf, tuneKey, tuneOf, type AnimDef, type Pose, type Region } from '../sprites/animation';
 import { checkAnimation } from '../sprites/animCheck';
-import { REGION_NAME } from '../sprites/store';
+import { REGION_NAME, autoPivot, jointPivot } from '../sprites/store';
 import { buildSpriteGodot } from '../sprites/exportSprite';
 import { setPlayerSprite } from '../playtest/playerSprite';
 import { figureToObject } from '../objects/fromFigure';
@@ -1004,7 +1004,7 @@ const H: Record<string, Handler> = {
         name: doc.name,
         size: doc.size,
         ...(sideGame() && kind !== 'object' ? { game: 'side_scroller', main_view: 'side', hint: 'Side-Scroller: die Seitenansicht (side, Blick nach rechts) ist die wichtigste – im Spiel sieht man fast nur sie; Animationen in view side prüfen und verbessern.' } : {}),
-        layers: doc.layers.map((l) => ({ id: l.id, slot: l.slot, part: l.partId, name: l.name, drawn: l.edited, own_views: Object.keys(l.views ?? {}), visible: l.visible, moves_as: l.region ?? 'auto', ...(l.pivot ? { pivot: l.pivot } : {}) })),
+        layers: doc.layers.map((l) => ({ id: l.id, slot: l.slot, part: l.partId, name: l.name, drawn: l.edited, own_views: Object.keys(l.views ?? {}), visible: l.visible, moves_as: l.region ?? 'auto', ...(l.pivot ? { pivot: l.pivot } : {}), ...(l.swing !== undefined ? { swing: l.swing } : {}) })),
         ...(!doc.layers.some((l) => l.partId) && doc.layers.some((l) => l.region)
           ? doc.layers.filter((l) => l.region && l.region !== 'ground').length === 1
             ? { own_picture: 'Hochgeladenes Bild: es bewegt sich als Ganzes. Für Gliedmaßen-Bewegung Teile mit figure_layer_split abtrennen (Kopf, Arme, Beine, Waffe).' }
@@ -1053,8 +1053,18 @@ const H: Record<string, Handler> = {
     const target = new Uint8ClampedArray(a.clear ? blank(n) : view === 'front' ? layer.data : layerPixels(doc, layer, view));
     const { painted, outside } = paintPicture(target, n, pic);
     layers[at] = view === 'front' ? { ...layer, data: target } : { ...layer, views: { ...layer.views, [view]: target } };
+    // "moves as": an extra arm / head / leg gets its region and turns where it touches the rest
+    if (a.region !== undefined && a.region !== null) {
+      const region = regionOf(a.region);
+      const l = layers[at];
+      const others = blank(n);
+      for (const o of layers) if (o.id !== l.id && o.visible) for (let i = 3; i < o.data.length; i += 4) if (o.data[i]) others[i] = 255;
+      const [px, py] = Array.isArray(a.pivot) ? (a.pivot as number[]).map(Number) : [NaN, NaN];
+      layers[at] = { ...l, region, pivot: Number.isFinite(px) && Number.isFinite(py) ? [px, py] : (jointPivot(l.data, others, n, region) ?? autoPivot(l.data, n, region)) };
+    }
     useSprites.getState().setDocument(kind, { ...doc, layers, updatedAt: Date.now() });
-    return { data: { layer: layers[at].id, name: layers[at].name, slot: layers[at].slot, view, painted, ...(outside ? { outside } : {}) } };
+    const done = layers[at];
+    return { data: { layer: done.id, name: done.name, slot: done.slot, view, painted, ...(done.region ? { moves_as: done.region, pivot: done.pivot } : {}), ...(outside ? { outside } : {}) } };
   },
 
   figure_grid: async (a) => {
@@ -1265,7 +1275,8 @@ const H: Record<string, Handler> = {
     const kind = kindOf(a.kind);
     const doc = await figureReady(kind);
     const layer = doc.layers.find((l) => l.id === a.layer || l.name === a.layer) ?? fail(`Layer "${a.layer}" gibt es nicht`);
-    const rig: { region?: Region | null; pivot?: [number, number] | null } = {};
+    const rig: { region?: Region | null; pivot?: [number, number] | null; swing?: number | null } = {};
+    if (a.swing !== undefined) rig.swing = a.swing === null ? null : Math.max(-1.5, Math.min(1.5, Number(a.swing) || 0));
     if (a.region !== undefined) rig.region = a.region === null || a.region === 'auto' ? null : regionOf(a.region);
     if (a.pivot !== undefined) {
       if (a.pivot === null) rig.pivot = null;
@@ -1277,7 +1288,7 @@ const H: Record<string, Handler> = {
     }
     useSprites.getState().setLayerRig(kind, layer!.id, rig);
     const l = useSprites.getState()[kind].doc.layers.find((x) => x.id === layer!.id)!;
-    return { data: { layer: l.id, region: l.region ?? 'auto', pivot: l.pivot ?? null } };
+    return { data: { layer: l.id, region: l.region ?? 'auto', pivot: l.pivot ?? null, swing: l.swing ?? 1 } };
   },
 
   figure_parts: (a) => {

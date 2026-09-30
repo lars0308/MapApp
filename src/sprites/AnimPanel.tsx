@@ -537,6 +537,14 @@ function RigSection({ kind }: { kind: SpriteKind }) {
                 </option>
               ))}
             </select>
+            {l.region && l.region !== 'ground' && (
+              <select className="input anim2-swing" aria-label={`${l.name}: Schwung`} title="Schwung: wie stark das Teil mitschwingt" value={String(l.swing ?? 1)} onChange={(e) => st.setLayerRig(kind, l.id, { swing: Number(e.target.value) })}>
+                <option value="1">Schwung normal</option>
+                <option value="0.5">Schwung schwach</option>
+                <option value="-1">Gegenläufig</option>
+                <option value="0">Bewegt sich nicht</option>
+              </select>
+            )}
           </li>
         ))}
       </ul>
@@ -552,7 +560,7 @@ function RigSection({ kind }: { kind: SpriteKind }) {
           {tool === 'pivot' ? 'Drehpunkt fertig' : 'Drehpunkt der aktiven Ebene setzen'}
         </Button>
       </div>
-      <p className="hint">„Automatisch“ = nach Baukasten-Teil und Lage. Der Drehpunkt wird beim Abtrennen passend gesetzt (Arm: Schulter, Bein: Hüfte, Kopf: Hals) – du kannst ihn selbst versetzen.</p>
+      <p className="hint">„Automatisch“ = nach Baukasten-Teil und Lage. Mehrere Arme oder Köpfe: jedes als eigene Ebene – jede dreht sich an ihrem eigenen Drehpunkt; „Gegenläufig“ bei jedem zweiten Arm, damit nicht alle im Gleichschritt gehen. Der Drehpunkt wird beim Abtrennen passend gesetzt (Arm: Schulter, Bein: Hüfte, Kopf: Hals) – du kannst ihn selbst versetzen.</p>
     </details>
   );
 }
