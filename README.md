@@ -335,6 +335,26 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.48 – „Mit KI zeichnen“: Figuren vom Bildmodell, wie bei PixelLab**
+
+- **Neu in der Figuren-Auswahl: „Mit KI zeichnen“.**
+  - Du beschreibst die Figur, wählst Größe (32/48/64 px) und Ansicht (Seite/Vorne).
+  - Ein Bildmodell über dein Vercel AI Gateway zeichnet **zwei Entwürfe** in Pixel-Art (Standard: Nano Banana 2, per `MAPFORGE_IMAGE_MODEL` änderbar).
+  - „Diese nehmen“ lädt die Figur und öffnet den Reiter Animieren.
+  - Auf Wunsch zerlegt die KI sie gleich in Kopf, Arme, Beine und Waffe und animiert sie.
+- **Vorher** formuliert ein kleines Sprachmodell deine Beschreibung in eine klare englische Bildbeschreibung um: Anzahlen ausgeschrieben („six arms, three on each side“), Blickrichtung genannt. Das Bildmodell hält sich daran deutlich besser.
+- **Echte Pixel:** Die App wandelt das Bild des Modells um:
+  - Hintergrund entfernen (inklusive Magenta-Rand),
+  - nur die größte Figur behalten,
+  - das Pixelraster des Modells erkennen (Blockgröße und Versatz, auf 1/20 Pixel genau),
+  - pro Block die häufigste Farbe übernehmen, damit der Umriss scharf bleibt,
+  - die Palette auf höchstens 24 Farben reduzieren und lose Pixel entfernen.
+  Ist die Figur zu groß, wird automatisch die nächstgrößere Leinwand genommen, statt zu verkleinern.
+- **„Beschreibe dein Spiel“** auf der Startseite lässt Figuren jetzt zuerst vom Bildmodell zeichnen, danach zerlegt und animiert sie die KI. Ohne Bildmodell zeichnet die KI wie bisher selbst. Ein Referenzbild dient als Vorlage für das Aussehen.
+- **KI-Befehl `figure_generate_image`**: Auch der KI-Reiter und der MCP-Zugang können das Bildmodell nutzen.
+- **Kosten:** laut Gateway-Preisliste etwa 6,7 Cent pro Bild, also rund 13,5 Cent für zwei Entwürfe. Die App zeigt die Kosten nach jedem Durchgang an.
+- **Grenzen:** Exakte Anzahlen (z. B. 6 Arme) hält das Bildmodell nicht immer ein; im Test wurden es 4 Arme. „Neue Entwürfe“ gibt eine neue Chance. Das Modell zeichnet meist feiner als bestellt, dann wird beim Umwandeln vereinfacht.
+
 **Version 3.47 – Monster mit mehreren Köpfen und Armen, sauberes Stauchen**
 
 - **Jedes Teil dreht sich an seinem eigenen Gelenk:** Ein Monster mit 6 Armen oder 2 Köpfen bekommt jedes Glied als eigene Ebene. Jede Ebene hat ihren eigenen Drehpunkt; früher teilten sich alle Arme einer Seite einen.
