@@ -6812,8 +6812,106 @@ details.more[open] {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr);
 }
 
-/* "Mit KI zeichnen" */
-.imagegen {
+
+
+/* character page (describe → painted → animations) */
+.charsheet {
+  display: grid;
+  gap: 16px;
+  max-width: 880px;
+}
+.sheet-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sheet-bar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sheet-create {
+  display: grid;
+  gap: 12px;
+}
+.sheet-create textarea,
+.sheet-add textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+.sheet-create .chip.is-active,
+.sheet-add .chip.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.start-continue.is-primary {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.sheet-hero {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.sheet-preview {
+  flex: none;
+  width: 192px;
+  height: 192px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-2);
+  background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface) 0 50%) 0 0 / 16px 16px;
+  display: grid;
+  place-items: center;
+}
+.sheet-preview-canvas {
+  width: 176px;
+  height: 176px;
+  image-rendering: pixelated;
+}
+.sheet-info {
+  flex: 1 1 240px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.sheet-info h1 {
+  margin: 0;
+  font-size: 22px;
+}
+.sheet-prompt {
+  margin: 0;
+  color: var(--text-2);
+  font-style: italic;
+}
+.sheet-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+.sheet-anims {
+  display: grid;
+  gap: 10px;
+}
+.sheet-anims-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sheet-anims-head h2 {
+  margin: 0;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sheet-add {
   display: grid;
   gap: 10px;
   padding: 12px;
@@ -6821,32 +6919,59 @@ details.more[open] {
   border: 1px solid var(--accent-line);
   background: var(--bg-2);
 }
-.imagegen .hint {
+.sheet-add .hint {
   margin: 0;
 }
-.imagegen-drafts {
+.sheet-anim {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 10px;
-}
-.imagegen-draft {
-  display: grid;
-  gap: 6px;
-  justify-items: center;
-  padding: 8px;
+  gap: 8px;
+  padding: 10px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line-2);
-  background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface) 0 50%) 0 0 / 16px 16px;
+  background: var(--surface);
 }
-.imagegen-sprite {
-  width: 128px;
-  height: 128px;
+.sheet-anim header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sheet-anim header .icon-btn {
+  margin-left: auto;
+}
+.sheet-anim-body {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+.sheet-anim-play {
+  flex: none;
+  width: 96px;
+  height: 96px;
   image-rendering: pixelated;
+  border-radius: var(--radius-sm);
+  background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface) 0 50%) 0 0 / 12px 12px;
 }
-.imagegen-raw {
-  width: 48px;
-  height: 48px;
-  object-fit: contain;
-  border-radius: 4px;
-  opacity: 0.8;
+.sheet-strip {
+  height: 72px;
+  max-width: 100%;
+  image-rendering: pixelated;
+  overflow: hidden;
+  min-width: 0;
+}
+.sheet-templates-toggle {
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+  height: auto;
+  padding: 8px;
+}
+.sheet-strip-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+.sheet-strip {
+  max-width: none;
 }

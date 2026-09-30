@@ -335,6 +335,31 @@ Wichtige Entscheidungen:
 
 ## Änderungen
 
+**Version 3.50 – Charakter-Seite wie bei PixelLab, bessere Bilder vom Bildmodell**
+
+- **Neuer Ablauf:** „Mit KI erstellen“ auf der Figuren-Auswahl öffnet die Charakter-Seite.
+  - Du beschreibst die Figur und wählst Stil, Größe (32/48/64 px) und Ansicht. Dann tippst du auf „Erstellen“.
+  - Danach siehst du die Figur, die Beschreibung und die Liste der Animationen.
+  - Mit „Neue Animation“ beschreibst du eine Bewegung, zum Beispiel „hebt das Pendel über den Kopf und schmettert es auf den Boden“, und wählst 4, 6 oder 8 Bilder.
+  - Die kostenlosen Skelett-Vorlagen (Laufen, Springen, Angriff …) stehen darunter.
+  - „Im Baukasten bearbeiten“ führt weiter zum bisherigen Profi-Editor.
+- **Bessere Prompts:**
+  - Ein Art Director (Claude) schreibt aus deiner Beschreibung eine genaue Bildanweisung: Proportionen passend zur Größe, Pose, Ansicht, eine benannte Farbpalette und ausgeschriebene Anzahlen.
+  - Für Animationen schreibt er zusätzlich Schlüsselposen pro Bild: Ausholen, Schlag, Aufprall, Nachschwingen.
+  - Die technischen Stilregeln (harte Pixel, klare Umrisse, keine Schrift, kein Raster, magenta Hintergrund) hängt MapForge selbst an.
+- **Stile:** Retro 16-Bit, Modern & detailreich, Niedlich, Dark Fantasy.
+- **Qualitätsprüfung:** Claude sieht sich jedes Bild an. Bei Fehlern (falsche Ansicht, mehrere Figuren, Raster, falsche Anzahl) wird einmal mit einem Korrekturhinweis neu gezeichnet. Übrig gebliebene Probleme meldet die App.
+- **Animationen vom Bildmodell:**
+  - Das Bildmodell bekommt die fertige Figur als Vorlage und zeichnet die Bewegung als Bildreihe.
+  - MapForge schneidet die einzelnen Bilder aus, gibt allen dieselbe Palette und stellt sie auf dieselbe Bodenlinie. Sprünge bleiben dabei erhalten.
+  - Angriffe, Sprünge und Tod laufen einmal, alles andere in Schleife.
+- **KI-Befehl** `figure_generate_animation`. Die bauende KI legt eine Figur jetzt über die Charakter-Seite an.
+- **Kosten:** etwa 7–15 Cent pro Figur oder Animation (Bild, Anweisung, Prüfung, gegebenenfalls ein zweiter Versuch).
+- **Grenzen:**
+  - Das Bildmodell hält Anzahlen (Arme, Köpfe) nicht immer ein.
+  - Eine Animation hat nur eine Richtung (Seite, links gespiegelt, oder vorne). Mehrere Richtungen wie bei PixelLab gibt es noch nicht.
+  - Die Bilder einer Bildreihe sind nicht immer ganz gleich.
+
 **Version 3.49 – Tiere laufen: Beine und Arme werden automatisch erkannt**
 
 - **Automatisch zerlegen:** Beim Laden eines eigenen oder vom Bildmodell gezeichneten Bildes sucht MapForge die dünnen Teile, die vom Körper abstehen: Beine, Arme, Fühler, Tentakel. Jedes wird eine eigene Ebene.

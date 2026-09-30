@@ -410,6 +410,13 @@ interface SpriteState {
   cut: { kind: SpriteKind; from: string; into: string | null; region: RigRegion } | null;
   startCut: (kind: SpriteKind, region: RigRegion) => boolean;
   stopCut: () => void;
+  /** character page (describe → painted → add animations) instead of the builder */
+  simple: boolean;
+  setSimple: (v: boolean) => void;
+  /** the character page starts with the description form */
+  sheetCreate: boolean;
+  setSheetCreate: (v: boolean) => void;
+  setDocPrompt: (kind: SpriteKind, prompt: string) => void;
   /** tab the figure builder should show next (set before opening it) */
   studioTab: string | null;
   setStudioTab: (tab: string | null) => void;
@@ -780,6 +787,11 @@ export const useSprites = create<SpriteState>((set, get) => {
       return true;
     },
     stopCut: () => set({ cut: null, tool: get().tool === 'cut' || get().tool === 'pivot' ? 'pen' : get().tool }),
+    simple: false,
+    setSimple: (v) => set({ simple: v }),
+    sheetCreate: false,
+    setSheetCreate: (v) => set({ sheetCreate: v }),
+    setDocPrompt: (kind, prompt) => setDoc(kind, { prompt }),
     studioTab: null,
     setStudioTab: (tab) => set({ studioTab: tab }),
     setLayerRig: (kind, layerId, rig) => {

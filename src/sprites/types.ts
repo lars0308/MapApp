@@ -166,6 +166,8 @@ export interface SpriteDoc {
   /** frames edited by hand in "Animieren": key `${view}:${animId}:${index}` → full frame */
   frames?: Record<string, Uint8ClampedArray>;
   customAnims?: CustomAnim[];
+  /** what the user described (character page) */
+  prompt?: string;
   /** per animation id: speed, in-betweens and nudged poses */
   animTune?: Record<string, AnimTune>;
 }

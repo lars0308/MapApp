@@ -40,7 +40,7 @@
       "includeFiles": "src/api/spec.json"
     },
     "api/image.js": {
-      "maxDuration": 120
+      "maxDuration": 300
     }
   }
 }

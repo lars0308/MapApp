@@ -1995,6 +1995,39 @@
       }
     },
     {
+      "name": "figure_generate_animation",
+      "description": "Let the image model paint a whole move of the open figure as a row of frames (it gets the figure as reference): e.g. 'lifts a huge pendulum over its head and slams it on the ground with a small shockwave'. The frames are cut out, scaled to the figure, given one palette and put on the same ground line, and stored as an own (drawn) animation. Best for special moves that the skeleton templates cannot do.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "creature",
+              "object"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "description": "what happens, in words"
+          },
+          "frames": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 8
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "action"
+        ]
+      }
+    },
+    {
       "name": "figure_new",
       "description": "Start a new figure: random parts, or empty (a blank canvas for drawing it yourself with figure_draw). size in pixels (default 32; parts are made for 32, larger sizes centre them).",
       "input": {

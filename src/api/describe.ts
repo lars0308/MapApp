@@ -1,5 +1,5 @@
 import { SIDE_WORDS, setGameView, sideGame } from './gameView';
-import { generateFigure, rigTask } from './imageGen';
+import { generateFigure } from './imageGen';
 import { withBusy } from '../store/busy';
 import { runCommand } from './commands';
 import { aiMode, runAgent } from './agent';
@@ -174,8 +174,14 @@ export async function buildFigure(fig: FigurePlan & { kind: SpriteKind }, wish: 
       () => generateFigure({ description: [fig.name, fig.brief, wish.trim()].filter(Boolean).join('. '), kind, size: Math.max(48, size), reference: image ?? undefined, refMode: 'design' }),
       { ai: true, detail: 'Danach wird sie in echte Pixel umgewandelt, zerlegt und animiert' },
     );
-    useSprites.getState().newFromImage(kind, painted.image, (fig.name ?? KIND_LABEL[kind]).slice(0, 40), painted.size);
-    const r = await runAgent([rigTask(kind, wish), ...place].filter(Boolean).join('\n'), [], { focus: 'figures' });
+    const st = useSprites.getState();
+    st.newFromImage(kind, painted.image, (fig.name ?? KIND_LABEL[kind]).slice(0, 40), painted.size);
+    st.setDocPrompt(kind, [fig.brief, wish.trim()].filter(Boolean).join(' – ').slice(0, 400));
+    // the character page: legs are rigged already, animations are added there by describing them
+    st.setSheetCreate(false);
+    st.setSimple(true);
+    if (!place.some(Boolean)) return { text: `${fig.name ?? KIND_LABEL[kind]} ist fertig – füge auf der Charakter-Seite Animationen hinzu`, cost: painted.cost ?? 0, stopped: false };
+    const r = await runAgent([...place, 'Die Figur ist fertig gezeichnet und geladen – nicht neu zeichnen. Zum Schluss figure_save.'].filter(Boolean).join('\n'), [], { focus: 'figures' });
     return { ...r, cost: r.cost + (painted.cost ?? 0) };
   } catch (e) {
     // no image model (local build, error): the building AI draws it itself

@@ -1,7 +1,7 @@
 import spec from './spec.json';
 import { useProject, createProject } from '../store/projectStore';
 import { sideGame } from './gameView';
-import { generateFigure } from './imageGen';
+import { generateAnimation, generateFigure } from './imageGen';
 import { imageDataFromUrl, pixelate } from '../sprites/pixelate';
 import { useEditor } from '../store/editorStore';
 import { useApp, type Page } from '../store/appStore';
@@ -1351,6 +1351,13 @@ const H: Record<string, Handler> = {
     else ramp = RAMP_PRESETS[ch][int(a.preset, 'preset', 0)] ?? fail(`preset 0–${RAMP_PRESETS[ch].length - 1}`);
     useSprites.getState().setRamp(kind, ch, ramp);
     return { data: { channel: ch, ramp } };
+  },
+
+  figure_generate_animation: async (a) => {
+    const kind = kindOf(a.kind);
+    await figureReady(kind);
+    const r = await generateAnimation(kind, str(a.action, 'action'), Math.max(2, Math.min(8, int(a.frames, 'frames', 6))), undefined, a.name ? String(a.name) : undefined);
+    return { data: { animation: r.id, frames: r.frames, cost: r.cost, ...(r.problems ? { check: r.problems } : {}), hint: 'Gemalte Animation (Bildmodell) – mit figure_render (animation) und figure_anim_check prüfen, einzelne Bilder mit figure_anim_draw ausbessern.' } };
   },
 
   figure_import_image: async (a) => {

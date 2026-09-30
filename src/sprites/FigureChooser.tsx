@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { imageDataFromFile } from './imageFile';
-import { ImageGenCard } from './ImageGenCard';
 import { useEditor } from '../store/editorStore';
 import { compose, toPng, useSprites } from './store';
 import type { SpriteKind } from './types';
@@ -56,7 +55,6 @@ function Which({ kind, purpose, onBack, onPick }: { kind: SpriteKind; purpose: '
   }, [kind]);
   const st = useSprites.getState();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [gen, setGen] = useState(false);
   return (
     <div className="page-inner chooser anim-picker">
       <button type="button" className="btn btn-ghost chooser-back" onClick={onBack}>
@@ -68,7 +66,7 @@ function Which({ kind, purpose, onBack, onPick }: { kind: SpriteKind; purpose: '
       </h1>
       <div className="anim-picker-more">
         {loaded && (
-          <button type="button" className="start-continue" onClick={onPick}>
+          <button type="button" className="start-continue" onClick={() => (st.setSheetCreate(false), st.setSimple(!!current.prompt), onPick())}>
             {thumb && <img src={thumb} alt="" className="anim-picker-thumb" />}
             <span>
               Zuletzt bearbeitet: <strong>{current.name}</strong>
@@ -78,22 +76,21 @@ function Which({ kind, purpose, onBack, onPick }: { kind: SpriteKind; purpose: '
         )}
         {purpose === 'build' ? (
           <>
-            <button type="button" className={`start-continue${gen ? ' is-open' : ''}`} onClick={() => setGen(!gen)}>
+            <button type="button" className="start-continue is-primary" onClick={() => (st.setSheetCreate(true), st.setSimple(true), onPick())}>
               <Icon.Spark size={18} />
               <span>
-                Mit KI zeichnen <small>Beschreiben – ein Bildmodell zeichnet es in Pixel-Art, die KI animiert es</small>
+                Mit KI erstellen <small>Beschreiben – die KI zeichnet in Pixel-Art, danach Animationen hinzufügen</small>
               </span>
-              <Icon.ChevronRight size={16} style={{ transform: gen ? 'rotate(90deg)' : undefined }} />
+              <Icon.ChevronRight size={16} />
             </button>
-            {gen && <ImageGenCard kind={kind} onDone={onPick} />}
-            <button type="button" className="start-continue" onClick={() => (st.reset(kind, false), onPick())}>
+            <button type="button" className="start-continue" onClick={() => (st.setSimple(false), st.reset(kind, false), onPick())}>
               <Icon.Plus size={18} />
               <span>
                 Neu mit Baukasten-Teilen <small>Teile antippen, Farben wählen – am schnellsten</small>
               </span>
               <Icon.ChevronRight size={16} />
             </button>
-            <button type="button" className="start-continue" onClick={() => (st.reset(kind, true), onPick())}>
+            <button type="button" className="start-continue" onClick={() => (st.setSimple(false), st.reset(kind, true), onPick())}>
               <Icon.Pencil size={18} />
               <span>
                 Neu auf leerer Zeichenfläche <small>Alles selbst zeichnen</small>
@@ -119,6 +116,7 @@ function Which({ kind, purpose, onBack, onPick }: { kind: SpriteKind; purpose: '
                 try {
                   st.newFromImage(kind, await imageDataFromFile(f), f.name.replace(/\.[^.]+$/, ''));
                   st.setStudioTab('anim');
+                  st.setSimple(false);
                   onPick();
                 } catch (err) {
                   useEditor.getState().toast(err instanceof Error ? err.message : 'Bild konnte nicht geladen werden', 'error');
@@ -144,6 +142,8 @@ function Which({ kind, purpose, onBack, onPick }: { kind: SpriteKind; purpose: '
                 className="gallery-open"
                 onClick={async () => {
                   await useSprites.getState().openFromGallery(kind, g.doc.id);
+                  st.setSheetCreate(false);
+                  st.setSimple(!!useSprites.getState()[kind].doc.prompt);
                   onPick();
                 }}
               >

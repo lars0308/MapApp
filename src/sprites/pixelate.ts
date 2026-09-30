@@ -15,7 +15,7 @@ export interface PixelateOptions {
   grow?: boolean;
 }
 
-type RGB = [number, number, number];
+export type RGB = [number, number, number];
 const dist2 = (a: RGB, b: RGB) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
 
 /** transparent where the background is: own alpha, else the border colour (flood from the edges + the magenta key everywhere) */
@@ -132,7 +132,7 @@ export function detectGrid(d: ImageData, mask: Uint8Array, x0: number, y0: numbe
 }
 
 /** median cut: at most n colours */
-function palette(colors: RGB[], n: number): RGB[] {
+export function palette(colors: RGB[], n: number): RGB[] {
   if (!colors.length) return [];
   let boxes: RGB[][] = [colors];
   while (boxes.length < n) {

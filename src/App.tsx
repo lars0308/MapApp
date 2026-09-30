@@ -15,6 +15,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { useApp } from './store/appStore';
 import { MapChooser } from './components/MapChooser';
 import { FigureChooser } from './sprites/FigureChooser';
+import { CharacterSheet } from './sprites/CharacterSheet';
+import { useSprites } from './sprites/store';
 import { StartPage } from './components/StartPage';
 import { SettingsPage } from './components/SettingsPage';
 import { PageShell } from './components/PageShell';
@@ -45,6 +47,7 @@ export function App() {
   const wizardOpen = useEditor((s) => s.wizardOpen);
   const page = useApp((s) => s.page);
   const chosen = useApp((s) => s.chosen);
+  const simple = useSprites((s) => s.simple);
   useShortcuts();
 
   useEffect(() => {
@@ -87,7 +90,7 @@ export function App() {
             {page === 'project' && <StartPage />}
             {page === 'settings' && <SettingsPage desktop={desktop} />}
             {(page === 'character' || page === 'object' || page === 'creature') &&
-              (chosen.figures ? <SpriteStudio kind={page} desktop={desktop} /> : <FigureChooser purpose="build" onPick={(k) => useApp.getState().goTo(k)} />)}
+              (chosen.figures ? (simple ? <CharacterSheet kind={page} /> : <SpriteStudio kind={page} desktop={desktop} />) : <FigureChooser purpose="build" onPick={(k) => useApp.getState().goTo(k)} />)}
           </ErrorBoundary>
         </PageShell>
       )}
