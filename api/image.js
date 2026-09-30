@@ -6,6 +6,37 @@ const CHAT = 'https://ai-gateway.vercel.sh/v1/chat/completions';
 const MODELS_URL = 'https://ai-gateway.vercel.sh/v1/models';
 const MODEL = process.env.MAPFORGE_IMAGE_MODEL || 'google/gemini-3.1-flash-image-preview';
 const MAX_REF = 3_000_000;
+const MESSAGES = 'https://ai-gateway.vercel.sh/v1/messages';
+const WRITER = 'anthropic/claude-haiku-4.5';
+
+/**
+ * The user's words (often German, counts like "6 Arme") → one clear English picture description
+ * with every count and the viewing angle spelled out – image models follow that much better.
+ */
+async function sharpen(description, kind, view, token) {
+  try {
+    const r = await fetch(MESSAGES, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: WRITER,
+        max_tokens: 300,
+        messages: [
+          {
+            role: 'user',
+            content: `Rewrite this game ${kind} idea as ONE short English description for an image model that paints a pixel art sprite (max. 60 words, no style words, no background). Spell out every count as a number word and where it is, e.g. "six arms, three on each side of the body", "two heads side by side". Mention the viewing angle: ${view === 'front' ? 'front view, facing the viewer' : view === 'back' ? 'back view' : 'side view in profile, facing right'}. Keep colours, clothes, weapons, mood. Answer with the description only.\n\nIdea: ${description}`,
+          },
+        ],
+      }),
+    });
+    const out = await r.json().catch(() => null);
+    const text = (out?.content ?? []).filter((c) => c.type === 'text').map((c) => c.text).join(' ').trim();
+    const u = out?.usage ?? {};
+    return r.ok && text ? { text: text.slice(0, 600), cost: ((u.input_tokens ?? 0) * 1 + (u.output_tokens ?? 0) * 5) / 1e6 } : null;
+  } catch {
+    return null;
+  }
+}
 
 const KIND_WORD = { character: 'character', creature: 'creature / monster', object: 'object / item' };
 const VIEW_TEXT = {
@@ -42,7 +73,8 @@ function prompt({ description, kind, view, size, palette, reference, refMode }) 
       ? `This is the same ${what} as in the reference picture – keep its design, colours, proportions, clothes and details exactly, only the viewing angle changes.`
       : '',
     angle ? `Draw it ${VIEW_TEXT[view] ?? VIEW_TEXT.side}.` : `One single ${what}, full body, centered, ${kind === 'object' ? 'straight view' : VIEW_TEXT[view] ?? VIEW_TEXT.side}.`,
-    `Style: clean retro 16-bit pixel art. The whole sprite is a real ${size}x${size} pixel game sprite shown enlarged: from head to feet it is only about ${Math.round(size * 0.9)} pixels tall, so every pixel is a big square block of about ${Math.round(1024 / size)} image pixels on one regular grid – low detail, chunky pixels, limited palette (about 16 colours), dark coloured 1-pixel outline, readable silhouette, light from the top left, no blur, no anti-aliasing, no gradients, no dithering noise.`,
+    `Style: clean retro 16-bit pixel art of a small ${size}x${size} game sprite, enlarged: from head to feet it is only about ${Math.round(size * 0.9)} pixels tall, so every pixel is a big square block (about ${Math.round(1024 / size)} image pixels wide) – low detail, chunky pixels, limited palette (about 16 colours), dark coloured 1-pixel outline, readable silhouette, light from the top left, no blur, no anti-aliasing, no gradients, no dithering noise.`,
+    'Exactly ONE picture of ONE figure: no grid lines, no second copy, no comparison, no split screen, no sprite sheet.',
     palette?.length ? `Use mainly these colours: ${palette.slice(0, 16).join(', ')}.` : '',
     'No text, no border, no frame, no ground, no cast shadow, no other objects.',
     `Background: flat solid pure magenta (#FF00FF) everywhere around the ${what}; never use magenta in the ${what} itself.`,
@@ -68,7 +100,9 @@ export default async function handler(req, res) {
   const token = process.env.AI_GATEWAY_API_KEY || req.headers['x-vercel-oidc-token'] || process.env.VERCEL_OIDC_TOKEN;
   if (!token) return res.status(500).json({ ok: false, error: 'KI ist auf dem Server nicht eingerichtet (AI Gateway)' });
   const size = [16, 32, 48, 64].includes(Number(body.size)) ? Number(body.size) : 48;
-  const text = prompt({ description, kind: body.kind, view: body.view, size, palette: Array.isArray(body.palette) ? body.palette.map(String) : null, reference, refMode: body.refMode });
+  // clear English with the counts spelled out (a reference picture keeps the user's words)
+  const sharp = description && !reference ? await sharpen(description, body.kind ?? 'character', body.view, token) : null;
+  const text = prompt({ description: sharp?.text ?? description, kind: body.kind, view: body.view, size, palette: Array.isArray(body.palette) ? body.palette.map(String) : null, reference, refMode: body.refMode });
   const content = [{ type: 'text', text }];
   if (reference) content.push({ type: 'image_url', image_url: { url: reference } });
   try {
@@ -93,7 +127,7 @@ export default async function handler(req, res) {
     // per picture (image models list a price per image or per image size), plus the prompt tokens
     const perImage = p.image ? Number(p.image) : (p.image_dimension_quality_pricing ?? []).find((x) => x.size === 'default' || x.size === '1K')?.cost;
     const cost = perImage !== undefined ? Number(perImage) + (u.prompt_tokens ?? 0) * Number(p.input ?? 0) : p.input && p.output ? (u.prompt_tokens ?? 0) * Number(p.input) + (u.completion_tokens ?? 0) * Number(p.output) : null;
-    return res.status(200).json({ ok: true, image, model: MODEL, cost });
+    return res.status(200).json({ ok: true, image, model: MODEL, prompt: sharp?.text ?? description, cost: cost === null ? null : cost + (sharp?.cost ?? 0) });
   } catch (e) {
     console.error('[mapforge-image]', e);
     return res.status(200).json({ ok: false, error: `Bild konnte nicht erzeugt werden: ${e?.message ?? e}` });

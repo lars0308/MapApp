@@ -183,6 +183,52 @@ export function pixelate(src: ImageData, opts: PixelateOptions): ImageData {
         if (y > y1) y1 = y;
       }
   if (x1 < 0) throw new Error('Auf dem Bild ist keine Figur zu finden');
+  // only the biggest figure (a model sometimes paints a second copy next to it): coarse blobs,
+  // the largest one plus what is close to it
+  {
+    const step = 4;
+    const cw = Math.ceil(w / step);
+    const ch = Math.ceil(h / step);
+    const cell = new Uint8Array(cw * ch);
+    for (let y = 0; y < h; y += step) for (let x = 0; x < w; x += step) if (!mask[y * w + x]) cell[(y / step) * cw + x / step] = 1;
+    const label = new Int32Array(cw * ch).fill(-1);
+    const blobs: { n: number; x0: number; y0: number; x1: number; y1: number }[] = [];
+    for (let i = 0; i < cell.length; i++) {
+      if (!cell[i] || label[i] >= 0) continue;
+      const b = { n: 0, x0: cw, y0: ch, x1: -1, y1: -1 };
+      const stack = [i];
+      label[i] = blobs.length;
+      while (stack.length) {
+        const j = stack.pop()!;
+        const x = j % cw;
+        const y = (j - x) / cw;
+        b.n++;
+        b.x0 = Math.min(b.x0, x);
+        b.x1 = Math.max(b.x1, x);
+        b.y0 = Math.min(b.y0, y);
+        b.y1 = Math.max(b.y1, y);
+        for (let dy = -2; dy <= 2; dy++)
+          for (let dx = -2; dx <= 2; dx++) {
+            const xx = x + dx;
+            const yy = y + dy;
+            if (xx < 0 || yy < 0 || xx >= cw || yy >= ch) continue;
+            const k = yy * cw + xx;
+            if (cell[k] && label[k] < 0) (label[k] = blobs.length), stack.push(k);
+          }
+      }
+      blobs.push(b);
+    }
+    const big = blobs.reduce((a, b) => (b.n > a.n ? b : a), blobs[0]);
+    if (big && blobs.length > 1) {
+      // parts that overlap the big blob's box (a sword held a bit away) stay, others go
+      const keep = blobs.filter((b) => b === big || (b.x1 >= big.x0 - 4 && b.x0 <= big.x1 + 4 && b.y1 >= big.y0 - 4 && b.y0 <= big.y1 + 4));
+      x0 = Math.max(0, Math.min(...keep.map((b) => b.x0)) * step - step);
+      y0 = Math.max(0, Math.min(...keep.map((b) => b.y0)) * step - step);
+      x1 = Math.min(w - 1, (Math.max(...keep.map((b) => b.x1)) + 1) * step + step);
+      y1 = Math.min(h - 1, (Math.max(...keep.map((b) => b.y1)) + 1) * step + step);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (x < x0 || x > x1 || y < y0 || y > y1) mask[y * w + x] = 1;
+    }
+  }
   const bw = x1 - x0 + 1;
   const bh = y1 - y0 + 1;
   // block size: the model's own pixel grid if it can be found, but never bigger than the canvas allows
